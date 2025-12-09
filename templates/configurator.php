@@ -217,5 +217,9 @@ $button_text = isset( $button_text ) ? $button_text : __( 'Ajouter au panier', '
 	<input type="hidden" name="wc_pc13_preview_url" id="wc-pc13-preview-url">
 	<input type="hidden" name="wc_pc13_pdf_id" id="wc-pc13-pdf-id">
 	<input type="hidden" name="wc_pc13_pdf_url" id="wc-pc13-pdf-url">
+	
+	<div class="wc-pc13-copyright">
+		<p>&copy; <?php echo esc_html( date( 'Y' ) ); ?> Configurateur MonHorloge - Développé par la société MonHorloge</p>
+	</div>
 </div>
 
