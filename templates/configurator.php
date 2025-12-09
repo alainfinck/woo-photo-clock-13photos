@@ -60,6 +60,7 @@ $button_text = isset( $button_text ) ? $button_text : __( 'Ajouter au panier', '
 				</div>
 				<!-- Panneau flottant pour les contrôles de photo périphérique -->
 				<div class="wc-pc13-floating-controls" style="display: none;">
+					<button type="button" class="wc-pc13-floating-controls-close" aria-label="<?php esc_attr_e( 'Fermer', 'wc-photo-clock-13' ); ?>">&times;</button>
 					<div class="wc-pc13-floating-controls-content">
 						<h5 class="wc-pc13-floating-controls-title"><?php esc_html_e( 'Ajuster la photo', 'wc-photo-clock-13' ); ?></h5>
 						<label>

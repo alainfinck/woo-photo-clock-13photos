@@ -98,6 +98,32 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	pointer-events: auto;
 }
 
+.wc-pc13-floating-controls-close {
+	position: absolute;
+	top: 4px;
+	right: 4px;
+	background: none;
+	border: none;
+	font-size: 20px;
+	line-height: 1;
+	color: #666;
+	cursor: pointer;
+	padding: 0;
+	width: 24px;
+	height: 24px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 3px;
+	transition: all 0.2s ease;
+	z-index: 1001;
+}
+
+.wc-pc13-floating-controls-close:hover {
+	background: #e0e0e0;
+	color: #333;
+}
+
 .wc-pc13-floating-controls-content {
 	display: flex;
 	flex-direction: column;

@@ -1332,6 +1332,23 @@ let jsPDFLoader = null;
 		updateSelectionUI();
 	}
 
+	function closeFloatingControls() {
+		const configurator = document.querySelector(selectors.configurator);
+		if (!configurator) {
+			return;
+		}
+
+		const floatingControls = configurator.querySelector('.wc-pc13-floating-controls');
+		if (floatingControls) {
+			floatingControls.style.display = 'none';
+		}
+
+		// Désélectionner le slot périphérique
+		if (state.currentSlot && state.currentSlot !== 'center' && parseInt(state.currentSlot, 10) >= 1 && parseInt(state.currentSlot, 10) <= 12) {
+			selectSlot('center');
+		}
+	}
+
 	function positionFloatingControls(slotKey) {
 		const configurator = document.querySelector(selectors.configurator);
 		if (!configurator) {
@@ -1829,6 +1846,7 @@ function handleNumbersDistanceChange(event) {
 			const floatingAxisX = floatingControls.querySelector('input[data-axis="x"]');
 			const floatingAxisY = floatingControls.querySelector('input[data-axis="y"]');
 			const floatingRemove = floatingControls.querySelector('.wc-pc13-floating-remove');
+			const floatingClose = floatingControls.querySelector('.wc-pc13-floating-controls-close');
 
 			if (floatingZoom) {
 				floatingZoom.addEventListener('input', handleZoomChange);
@@ -1845,6 +1863,35 @@ function handleNumbersDistanceChange(event) {
 			if (floatingRemove) {
 				floatingRemove.addEventListener('click', handleRemove);
 			}
+
+			// Bouton de fermeture
+			if (floatingClose) {
+				floatingClose.addEventListener('click', (e) => {
+					e.stopPropagation();
+					closeFloatingControls();
+				});
+			}
+		}
+
+		// Détecter les clics en dehors de l'horloge pour désélectionner
+		const preview = configurator.querySelector('.wc-pc13-preview');
+		const ring = configurator.querySelector('.wc-pc13-ring');
+		if (preview && ring) {
+			document.addEventListener('click', (e) => {
+				// Ne pas fermer si on clique sur le panneau flottant ou ses éléments
+				const floatingControlsEl = configurator.querySelector('.wc-pc13-floating-controls');
+				if (floatingControlsEl && floatingControlsEl.contains(e.target)) {
+					return;
+				}
+
+				// Vérifier si le clic est en dehors de l'horloge (ring)
+				if (!ring.contains(e.target)) {
+					// Si une photo périphérique est sélectionnée, désélectionner
+					if (state.currentSlot && state.currentSlot !== 'center' && parseInt(state.currentSlot, 10) >= 1 && parseInt(state.currentSlot, 10) <= 12) {
+						closeFloatingControls();
+					}
+				}
+			});
 		}
 
 		if (slotSizeRange) {
