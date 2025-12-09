@@ -46,6 +46,8 @@ class WC_PC13_Frontend {
 		add_filter( 'woocommerce_cart_item_thumbnail', array( $this, 'filter_cart_item_thumbnail' ), 10, 3 );
 		add_filter( 'woocommerce_checkout_cart_item_thumbnail', array( $this, 'filter_cart_item_thumbnail' ), 10, 3 );
 		add_filter( 'woocommerce_order_item_thumbnail', array( $this, 'filter_order_item_thumbnail' ), 10, 3 );
+		add_action( 'woocommerce_before_add_to_cart_quantity', array( $this, 'hide_quantity_selector' ), 5 );
+		add_action( 'woocommerce_after_add_to_cart_quantity', array( $this, 'hide_quantity_selector_end' ), 5 );
 	}
 
 	/**
@@ -573,8 +575,44 @@ class WC_PC13_Frontend {
 			return $thumbnail;
 		}
 
+		// Ne pas appliquer la vignette personnalisée dans le mini panier (widget)
+		// Vérifier si on est dans un contexte de widget shopping cart
+		$backtrace = debug_backtrace( DEBUG_BACKTRACE_IGNORE_ARGS, 15 );
+		$is_widget_context = false;
+		
+		foreach ( $backtrace as $trace ) {
+			if ( isset( $trace['function'] ) && (
+				strpos( $trace['function'], 'widget_shopping_cart' ) !== false ||
+				strpos( $trace['function'], 'woocommerce_mini_cart' ) !== false ||
+				strpos( $trace['function'], 'WC_Widget' ) !== false ||
+				( isset( $trace['class'] ) && (
+					strpos( $trace['class'], 'Widget' ) !== false ||
+					strpos( $trace['class'], 'WC_Widget_Shopping_Cart' ) !== false
+				) )
+			) ) {
+				$is_widget_context = true;
+				break;
+			}
+		}
+
+		// Vérifier aussi via les actions en cours
+		if ( ! $is_widget_context ) {
+			$is_widget_context = (
+				doing_action( 'woocommerce_widget_shopping_cart_before_buttons' ) ||
+				doing_action( 'woocommerce_widget_shopping_cart_item_start' ) ||
+				doing_action( 'woocommerce_mini_cart_contents' )
+			);
+		}
+
+		// Si on est dans un widget (mini panier), retourner la vignette par défaut
+		if ( $is_widget_context ) {
+			return $thumbnail;
+		}
+
+		// Retourner notre vignette personnalisée (avec aiguilles, même logique que downloadAsJpeg)
 		$html = $this->get_preview_thumbnail_html( $cart_item['wc_pc13_preview'] );
 
+		// Retourner notre vignette uniquement, remplacer complètement la vignette par défaut
 		return $html ? $html : $thumbnail;
 	}
 
@@ -648,6 +686,29 @@ class WC_PC13_Frontend {
 		}
 
 		return '';
+	}
+
+	/**
+	 * Masque le sélecteur de quantité pour les produits avec configurateur.
+	 */
+	public function hide_quantity_selector() {
+		global $product;
+
+		if ( ! $product instanceof WC_Product ) {
+			return;
+		}
+
+		$enabled = $product->get_meta( '_wc_pc13_enabled' );
+		if ( 'yes' === $enabled ) {
+			echo '<style>.wc-pc13-configurator ~ .quantity, .wc-pc13-configurator ~ form .quantity, .product form.cart .quantity:has(+ .wc-pc13-configurator), form.cart:has(.wc-pc13-configurator) .quantity { display: none !important; }</style>';
+		}
+	}
+
+	/**
+	 * Fermeture du masquage du sélecteur de quantité.
+	 */
+	public function hide_quantity_selector_end() {
+		// Le style est déjà ajouté dans hide_quantity_selector
 	}
 }
 

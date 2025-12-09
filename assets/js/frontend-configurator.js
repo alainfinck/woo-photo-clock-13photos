@@ -465,6 +465,7 @@ let jsPDFLoader = null;
 		}
 
 		// Capturer l'image avec une résolution réduite pour le panier (plus rapide)
+		// Utiliser printMode: false pour inclure les aiguilles (même logique que downloadAsJpeg)
 		try {
 			// Utiliser scale 1 et qualité réduite pour un upload plus rapide
 			const canvas = await capturePreview(1, { printMode: false, skipLivePreviewUpdate: true });
@@ -1260,11 +1261,43 @@ let jsPDFLoader = null;
 		// Afficher/masquer le bloc éditeur uniquement pour les slots périphériques (pas le centre)
 		const slotEditor = configurator.querySelector('.wc-pc13-slot-editor');
 		if (slotEditor) {
-			// Afficher uniquement si une zone périphérique est sélectionnée (1-12), pas le centre
+			// Masquer le panneau latéral pour les photos périphériques
 			if (state.currentSlot && state.currentSlot !== 'center' && parseInt(state.currentSlot, 10) >= 1 && parseInt(state.currentSlot, 10) <= 12) {
-				slotEditor.classList.add('has-selection');
+				slotEditor.classList.remove('has-selection');
 			} else {
 				slotEditor.classList.remove('has-selection');
+			}
+		}
+
+		// Afficher/masquer le panneau flottant pour les photos périphériques
+		const floatingControls = configurator.querySelector('.wc-pc13-floating-controls');
+		if (floatingControls) {
+			if (state.currentSlot && state.currentSlot !== 'center' && parseInt(state.currentSlot, 10) >= 1 && parseInt(state.currentSlot, 10) <= 12) {
+				// Afficher le panneau flottant et le positionner
+				floatingControls.style.display = 'block';
+				positionFloatingControls(state.currentSlot);
+				
+				// Mettre à jour les contrôles du panneau flottant
+				const floatingZoom = floatingControls.querySelector('input[data-zoom]');
+				const floatingAxisX = floatingControls.querySelector('input[data-axis="x"]');
+				const floatingAxisY = floatingControls.querySelector('input[data-axis="y"]');
+				const floatingRemove = floatingControls.querySelector('.wc-pc13-floating-remove');
+				
+				if (floatingZoom) {
+					floatingZoom.value = current.scale;
+				}
+				if (floatingAxisX) {
+					floatingAxisX.value = current.x;
+				}
+				if (floatingAxisY) {
+					floatingAxisY.value = current.y;
+				}
+				if (floatingRemove) {
+					floatingRemove.disabled = !current.image_url;
+				}
+			} else {
+				// Masquer le panneau flottant
+				floatingControls.style.display = 'none';
 			}
 		}
 
@@ -1297,6 +1330,30 @@ let jsPDFLoader = null;
 	function selectSlot(slot) {
 		state.currentSlot = slot;
 		updateSelectionUI();
+	}
+
+	function positionFloatingControls(slotKey) {
+		const configurator = document.querySelector(selectors.configurator);
+		if (!configurator) {
+			return;
+		}
+
+		const floatingControls = configurator.querySelector('.wc-pc13-floating-controls');
+		const preview = configurator.querySelector('.wc-pc13-preview');
+		
+		if (!floatingControls || !preview) {
+			return;
+		}
+
+		// Obtenir la position du preview
+		const previewRect = preview.getBoundingClientRect();
+		
+		// Centrer le panneau au centre de l'horloge (au niveau des aiguilles)
+		const centerX = previewRect.width / 2;
+		const centerY = previewRect.height / 2;
+		
+		floatingControls.style.left = `${centerX}px`;
+		floatingControls.style.top = `${centerY}px`;
 	}
 
 	function bindSlotClicks() {
@@ -1427,28 +1484,59 @@ function processFile(file, inputEl) {
 		return;
 	}
 
-		const maxBytes = WCPC13.settings && WCPC13.settings.max_upload_bytes ? parseInt(WCPC13.settings.max_upload_bytes, 10) : 0;
-		if (maxBytes && file.size > maxBytes) {
-			window.alert(WCPC13.labels.file_too_large);
-		if (inputEl) {
-			inputEl.value = '';
-		}
-			return;
-		}
+	const maxBytes = WCPC13.settings && WCPC13.settings.max_upload_bytes ? parseInt(WCPC13.settings.max_upload_bytes, 10) : 0;
+	if (maxBytes && file.size > maxBytes) {
+		window.alert(WCPC13.labels.file_too_large);
+	if (inputEl) {
+		inputEl.value = '';
+	}
+		return;
+	}
 
-		const slotKey = state.currentSlot;
-
-		uploadFile(slotKey, file)
-			.then((response) => {
-				applyUploadedImage(response);
-			})
-			.catch((error) => {
-				window.alert(error);
-			});
-		if (inputEl) {
-			inputEl.value = '';
+	const slotKey = state.currentSlot;
+	const configurator = document.querySelector(selectors.configurator);
+	
+	// Afficher le loader
+	let loadingButton = null;
+	let originalText = '';
+	if (slotKey === 'center') {
+		loadingButton = configurator ? configurator.querySelector(selectors.centerSelectButton) : null;
+		if (loadingButton) {
+			originalText = loadingButton.textContent.trim();
+		}
+	} else {
+		// Pour les slots périphériques, trouver le bouton d'upload
+		loadingButton = configurator ? configurator.querySelector('.wc-pc13-upload-button') : null;
+		if (loadingButton) {
+			originalText = loadingButton.textContent.trim();
 		}
 	}
+	
+	if (loadingButton && originalText) {
+		loadingButton.disabled = true;
+		loadingButton.classList.add('wc-pc13-loading');
+		loadingButton.innerHTML = '<span class="wc-pc13-spinner"></span> ' + originalText;
+	}
+
+	uploadFile(slotKey, file)
+		.then((response) => {
+			applyUploadedImage(response);
+		})
+		.catch((error) => {
+			window.alert(error);
+		})
+		.finally(() => {
+			// Masquer le loader
+			if (loadingButton && originalText) {
+				loadingButton.disabled = false;
+				loadingButton.classList.remove('wc-pc13-loading');
+				loadingButton.textContent = originalText;
+			}
+		});
+	if (inputEl) {
+		inputEl.value = '';
+	}
+}
 
 function handleFileChange(event) {
 	const file = event.target.files[0];
@@ -1733,6 +1821,31 @@ function handleNumbersDistanceChange(event) {
 		axisRanges.forEach((range) => {
 			range.addEventListener('input', handleAxisChange);
 		});
+
+		// Event listeners pour le panneau flottant
+		const floatingControls = configurator.querySelector('.wc-pc13-floating-controls');
+		if (floatingControls) {
+			const floatingZoom = floatingControls.querySelector('input[data-zoom]');
+			const floatingAxisX = floatingControls.querySelector('input[data-axis="x"]');
+			const floatingAxisY = floatingControls.querySelector('input[data-axis="y"]');
+			const floatingRemove = floatingControls.querySelector('.wc-pc13-floating-remove');
+
+			if (floatingZoom) {
+				floatingZoom.addEventListener('input', handleZoomChange);
+			}
+
+			if (floatingAxisX) {
+				floatingAxisX.addEventListener('input', handleAxisChange);
+			}
+
+			if (floatingAxisY) {
+				floatingAxisY.addEventListener('input', handleAxisChange);
+			}
+
+			if (floatingRemove) {
+				floatingRemove.addEventListener('click', handleRemove);
+			}
+		}
 
 		if (slotSizeRange) {
 			slotSizeRange.addEventListener('input', handleRingSizeChange);
@@ -2547,6 +2660,10 @@ function handleNumbersDistanceChange(event) {
 		scheduleLivePreviewUpdate();
 
 		window.addEventListener('resize', () => {
+			// Repositionner le panneau flottant si une photo périphérique est sélectionnée
+			if (state.currentSlot && state.currentSlot !== 'center' && parseInt(state.currentSlot, 10) >= 1 && parseInt(state.currentSlot, 10) <= 12) {
+				positionFloatingControls(state.currentSlot);
+			}
 			applyTransforms();
 			savePayload();
 		});

@@ -58,6 +58,25 @@ $button_text = isset( $button_text ) ? $button_text : __( 'Ajouter au panier', '
 						<div class="wc-pc13-hand second"></div>
 					</div>
 				</div>
+				<!-- Panneau flottant pour les contrôles de photo périphérique -->
+				<div class="wc-pc13-floating-controls" style="display: none;">
+					<div class="wc-pc13-floating-controls-content">
+						<h5 class="wc-pc13-floating-controls-title"><?php esc_html_e( 'Ajuster la photo', 'wc-photo-clock-13' ); ?></h5>
+						<label>
+							<span><?php esc_html_e( 'Zoom', 'wc-photo-clock-13' ); ?></span>
+							<input type="range" min="0.5" max="2.5" step="0.01" value="1" data-zoom>
+						</label>
+						<label>
+							<span><?php esc_html_e( 'Position horizontale', 'wc-photo-clock-13' ); ?></span>
+							<input type="range" min="-100" max="100" step="1" value="0" data-axis="x">
+						</label>
+						<label>
+							<span><?php esc_html_e( 'Position verticale', 'wc-photo-clock-13' ); ?></span>
+							<input type="range" min="-100" max="100" step="1" value="0" data-axis="y">
+						</label>
+						<button type="button" class="button wc-pc13-floating-remove" disabled><?php esc_html_e( 'Supprimer la photo', 'wc-photo-clock-13' ); ?></button>
+					</div>
+				</div>
 			</div>
 			<p class="wc-pc13-preview-hint"><?php esc_html_e( 'Cliquez sur une zone pour l’éditer.', 'wc-photo-clock-13' ); ?></p>
 			<div class="wc-pc13-download-actions">
