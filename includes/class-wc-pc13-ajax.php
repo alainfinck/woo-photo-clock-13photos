@@ -43,6 +43,10 @@ class WC_PC13_Ajax {
 		add_action( 'wp_ajax_nopriv_wc_pc13_fetch_unsplash', array( $this, 'handle_fetch_unsplash' ) );
 		add_action( 'wp_ajax_wc_pc13_add_to_cart', array( $this, 'handle_add_to_cart' ) );
 		add_action( 'wp_ajax_nopriv_wc_pc13_add_to_cart', array( $this, 'handle_add_to_cart' ) );
+		add_action( 'wp_ajax_wc_pc13_save_share', array( $this, 'handle_save_share' ) );
+		add_action( 'wp_ajax_nopriv_wc_pc13_save_share', array( $this, 'handle_save_share' ) );
+		add_action( 'wp_ajax_wc_pc13_load_share', array( $this, 'handle_load_share' ) );
+		add_action( 'wp_ajax_nopriv_wc_pc13_load_share', array( $this, 'handle_load_share' ) );
 	}
 
 	/**
@@ -203,7 +207,14 @@ class WC_PC13_Ajax {
 
 		$images = array();
 		foreach ( $data as $photo ) {
-			if ( isset( $photo['urls']['regular'] ) ) {
+			// Utiliser 'small' au lieu de 'regular' pour des images moins lourdes (environ 400px au lieu de 1080px)
+			if ( isset( $photo['urls']['small'] ) ) {
+				$images[] = array(
+					'url' => $photo['urls']['small'],
+					'thumb' => isset( $photo['urls']['thumb'] ) ? $photo['urls']['thumb'] : $photo['urls']['small'],
+				);
+			} elseif ( isset( $photo['urls']['regular'] ) ) {
+				// Fallback sur regular si small n'est pas disponible
 				$images[] = array(
 					'url' => $photo['urls']['regular'],
 					'thumb' => isset( $photo['urls']['thumb'] ) ? $photo['urls']['thumb'] : $photo['urls']['regular'],
@@ -302,6 +313,97 @@ class WC_PC13_Ajax {
 				'cart_count'   => $cart_count,
 				'preview_url'  => $preview_image_url,
 				'product_name' => $product->get_name(),
+			)
+		);
+	}
+
+	/**
+	 * Sauvegarde une configuration pour le partage.
+	 */
+	public function handle_save_share() {
+		check_ajax_referer( 'wc_pc13_nonce', 'nonce' );
+
+		$product_id = isset( $_POST['product_id'] ) ? absint( $_POST['product_id'] ) : 0;
+		$payload    = isset( $_POST['payload'] ) ? wp_unslash( $_POST['payload'] ) : '';
+
+		if ( ! $product_id ) {
+			wp_send_json_error( array( 'message' => __( 'ID produit manquant.', 'wc-photo-clock-13' ) ) );
+		}
+
+		if ( ! $payload || empty( trim( $payload ) ) ) {
+			wp_send_json_error( array( 'message' => __( 'Configuration manquante.', 'wc-photo-clock-13' ) ) );
+		}
+
+		// Décoder le JSON (pas besoin de wp_unslash car déjà fait)
+		$payload_decoded = json_decode( $payload, true );
+		if ( ! is_array( $payload_decoded ) || json_last_error() !== JSON_ERROR_NONE ) {
+			wp_send_json_error( 
+				array( 
+					'message' => __( 'Configuration invalide.', 'wc-photo-clock-13' ),
+					'debug' => json_last_error_msg()
+				) 
+			);
+		}
+
+		// Générer un identifiant unique
+		$share_id = wp_generate_password( 32, false );
+		
+		// Nettoyer la configuration
+		$config = WC_PC13_Frontend::sanitize_payload( $payload_decoded );
+		
+		// Sauvegarder dans un transient (valide 30 jours)
+		$data = array(
+			'product_id' => $product_id,
+			'config'     => $config,
+			'created_at' => current_time( 'mysql' ),
+		);
+		
+		$transient_key = 'wc_pc13_share_' . $share_id;
+		set_transient( $transient_key, $data, 30 * DAY_IN_SECONDS );
+
+		// Générer l'URL de partage
+		$share_url = add_query_arg(
+			array(
+				'share' => $share_id,
+			),
+			get_permalink( $product_id )
+		);
+
+		wp_send_json_success(
+			array(
+				'share_id'  => $share_id,
+				'share_url' => $share_url,
+			)
+		);
+	}
+
+	/**
+	 * Charge une configuration partagée.
+	 */
+	public function handle_load_share() {
+		check_ajax_referer( 'wc_pc13_nonce', 'nonce' );
+
+		$share_id = isset( $_POST['share_id'] ) ? sanitize_text_field( wp_unslash( $_POST['share_id'] ) ) : '';
+
+		if ( ! $share_id ) {
+			wp_send_json_error( array( 'message' => __( 'ID de partage manquant.', 'wc-photo-clock-13' ) ) );
+		}
+
+		$transient_key = 'wc_pc13_share_' . $share_id;
+		$data = get_transient( $transient_key );
+
+		if ( false === $data ) {
+			wp_send_json_error( array( 'message' => __( 'Configuration partagée introuvable ou expirée.', 'wc-photo-clock-13' ) ) );
+		}
+
+		if ( ! is_array( $data ) || ! isset( $data['config'] ) ) {
+			wp_send_json_error( array( 'message' => __( 'Configuration invalide.', 'wc-photo-clock-13' ) ) );
+		}
+
+		wp_send_json_success(
+			array(
+				'config'     => $data['config'],
+				'product_id' => isset( $data['product_id'] ) ? absint( $data['product_id'] ) : 0,
 			)
 		);
 	}

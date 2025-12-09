@@ -320,6 +320,8 @@ let jsPDFLoader = null;
 										offsetLeft = centerRect.left - centerWrapperRect.left;
 										offsetTop = centerRect.top - centerWrapperRect.top;
 									}
+									
+									// S'assurer que l'image centrale est visible et correctement positionnée
 									clonedCenterEl.style.transform = 'none';
 									clonedCenterEl.style.left = `${offsetLeft * scale}px`;
 									clonedCenterEl.style.top = `${offsetTop * scale}px`;
@@ -328,15 +330,38 @@ let jsPDFLoader = null;
 									clonedCenterEl.style.margin = '0';
 									clonedCenterEl.style.inset = 'auto';
 									clonedCenterEl.style.position = 'absolute';
+									clonedCenterEl.style.zIndex = '2';
+									clonedCenterEl.style.display = 'block';
+									clonedCenterEl.style.visibility = 'visible';
+									clonedCenterEl.style.opacity = '1';
+									
+									// S'assurer que le background-image est bien copié
+									if (centerEl && state.center.image_url) {
+										const originalBg = centerComputedStyles.backgroundImage;
+										if (originalBg && originalBg !== 'none') {
+											clonedCenterEl.style.backgroundImage = originalBg;
+										} else {
+											// Fallback : utiliser l'URL directement
+											clonedCenterEl.style.backgroundImage = `url("${state.center.image_url}")`;
+										}
+									}
+									
 									if (centerBackgroundSize) {
 										clonedCenterEl.style.backgroundSize = centerBackgroundSize;
+									} else {
+										clonedCenterEl.style.backgroundSize = 'cover';
 									}
+									
 									if (centerBackgroundPosition) {
 										clonedCenterEl.style.backgroundPosition = centerBackgroundPosition;
+									} else {
+										clonedCenterEl.style.backgroundPosition = 'center';
 									}
+									
 									if (centerTransformOrigin) {
 										clonedCenterEl.style.transformOrigin = centerTransformOrigin;
 									}
+									
 									if (clonedCenterWrapper && centerWrapperRect) {
 										const wrapperLeft = centerWrapperRect.left - previewRect.left;
 										const wrapperTop = centerWrapperRect.top - previewRect.top;
@@ -347,7 +372,17 @@ let jsPDFLoader = null;
 										clonedCenterWrapper.style.height = `${centerWrapperRect.height * scale}px`;
 										clonedCenterWrapper.style.margin = '0';
 										clonedCenterWrapper.style.position = 'absolute';
+										clonedCenterWrapper.style.zIndex = '1';
+										clonedCenterWrapper.style.display = 'block';
+										clonedCenterWrapper.style.visibility = 'visible';
 									}
+									
+									// S'assurer que les aiguilles sont au-dessus mais n'obscurcissent pas l'image
+									const clonedHands = clonedDoc.querySelector('.wc-pc13-hands');
+									if (clonedHands) {
+										clonedHands.style.zIndex = '5';
+									}
+									
 									if (window.WCPC13_DEBUG) {
 										const cloneRect = clonedCenterEl.getBoundingClientRect();
 										console.groupCollapsed('🪞 DEBUG capturePreview - Clone html2canvas');
@@ -355,6 +390,8 @@ let jsPDFLoader = null;
 										console.log('transformOrigin', clonedCenterEl.style.transformOrigin);
 										console.log('backgroundSize', clonedCenterEl.style.backgroundSize);
 										console.log('backgroundPosition', clonedCenterEl.style.backgroundPosition);
+										console.log('backgroundImage', clonedCenterEl.style.backgroundImage);
+										console.log('zIndex', clonedCenterEl.style.zIndex);
 										if (cloneRect) {
 											console.log('cloneRect', {
 												left: cloneRect.left.toFixed(2),
@@ -427,11 +464,11 @@ let jsPDFLoader = null;
 			return null;
 		}
 
-		// Capturer l'image telle qu'elle est affichée (comme downloadAsJpeg)
+		// Capturer l'image avec une résolution réduite pour le panier (plus rapide)
 		try {
-			// Utiliser la même méthode que downloadAsJpeg pour capturer l'image correctement
-			const canvas = await capturePreview(2, { printMode: false, skipLivePreviewUpdate: true });
-			const blob = await canvasToJpegBlob(canvas, 0.92);
+			// Utiliser scale 1 et qualité réduite pour un upload plus rapide
+			const canvas = await capturePreview(1, { printMode: false, skipLivePreviewUpdate: true });
+			const blob = await canvasToJpegBlob(canvas, 0.75);
 
 			const formData = new FormData();
 			formData.append('action', 'wc_pc13_upload_preview');
@@ -609,7 +646,7 @@ let jsPDFLoader = null;
 		const slotDomMap = new Map();
 		configurator.querySelectorAll(`${selectors.slot}[data-slot]`).forEach((slotEl) => {
 			const index = parseInt(slotEl.dataset.slot, 10);
-			if (!index) {
+			if (!index || index < 1 || index > 12) {
 				return;
 			}
 			const imageEl = slotEl.querySelector(selectors.slotImage);
@@ -619,9 +656,20 @@ let jsPDFLoader = null;
 			const styles = window.getComputedStyle(imageEl);
 			const backgroundImage = styles.backgroundImage || '';
 			let imageUrl = '';
-			const match = backgroundImage.match(/url\(["']?(.*?)["']?\)/);
-			if (match && match[1]) {
-				imageUrl = match[1];
+			// Améliorer l'extraction de l'URL depuis backgroundImage
+			if (backgroundImage && backgroundImage !== 'none') {
+				// Essayer plusieurs patterns pour extraire l'URL
+				const patterns = [
+					/url\(["']?([^"']+)["']?\)/,  // url("...") ou url('...') ou url(...)
+					/url\(([^)]+)\)/,            // url(...) sans guillemets
+				];
+				for (const pattern of patterns) {
+					const match = backgroundImage.match(pattern);
+					if (match && match[1]) {
+						imageUrl = match[1].trim();
+						break;
+					}
+				}
 			}
 			const zoom = parseFloat(imageEl.dataset.zoom || slotEl.dataset.zoom || '1');
 			const axisX = parseFloat(imageEl.dataset.axisX || slotEl.dataset.axisX || '0');
@@ -645,11 +693,12 @@ let jsPDFLoader = null;
 				};
 			}
 			const domInfo = slotDomMap.get(i) || {};
-			const resolvedUrl = state.slots[i].image_url || domInfo.imageUrl || '';
+			// Prioriser l'URL du DOM si elle existe, sinon utiliser celle du state
+			const resolvedUrl = (domInfo.imageUrl && domInfo.imageUrl.trim()) || (state.slots[i].image_url && state.slots[i].image_url.trim()) || '';
 			const resolvedTransform = {
-				x: typeof domInfo.x === 'number' ? domInfo.x : state.slots[i].x,
-				y: typeof domInfo.y === 'number' ? domInfo.y : state.slots[i].y,
-				scale: typeof domInfo.scale === 'number' && domInfo.scale > 0 ? domInfo.scale : state.slots[i].scale,
+				x: typeof domInfo.x === 'number' ? domInfo.x : (typeof state.slots[i].x === 'number' ? state.slots[i].x : 0),
+				y: typeof domInfo.y === 'number' ? domInfo.y : (typeof state.slots[i].y === 'number' ? state.slots[i].y : 0),
+				scale: typeof domInfo.scale === 'number' && domInfo.scale > 0 ? domInfo.scale : (typeof state.slots[i].scale === 'number' && state.slots[i].scale > 0 ? state.slots[i].scale : 1),
 			};
 			slotEntries.push({
 				index: i,
@@ -661,8 +710,32 @@ let jsPDFLoader = null;
 			});
 		}
 
+		// Charger toutes les images avec gestion d'erreur pour chaque image
 		const slotImages = await Promise.all(
-			slotEntries.map((entry) => (entry.imageUrl ? loadImageAsset(entry.imageUrl) : Promise.resolve(null)))
+			slotEntries.map(async (entry) => {
+				if (!entry.imageUrl || !entry.imageUrl.trim()) {
+					if (window.WCPC13_DEBUG) {
+						console.warn(`[PDF] Slot ${entry.index}: pas d'URL d'image`);
+					}
+					return null;
+				}
+				try {
+					const img = await loadImageAsset(entry.imageUrl);
+					if (!img) {
+						if (window.WCPC13_DEBUG) {
+							console.warn(`[PDF] Slot ${entry.index}: échec du chargement de l'image`, entry.imageUrl);
+						}
+					} else if (window.WCPC13_DEBUG) {
+						console.log(`[PDF] Slot ${entry.index}: image chargée`, entry.imageUrl);
+					}
+					return img;
+				} catch (error) {
+					if (window.WCPC13_DEBUG) {
+						console.error(`[PDF] Slot ${entry.index}: erreur lors du chargement`, error, entry.imageUrl);
+					}
+					return null;
+				}
+			})
 		);
 
 		let centerImageUrl = state.center?.image_url || '';
@@ -671,9 +744,37 @@ let jsPDFLoader = null;
 		if (!centerImageUrl && centerImageEl) {
 			const styles = window.getComputedStyle(centerImageEl);
 			const bg = styles.backgroundImage || '';
-			const match = bg.match(/url\(["']?(.*?)["']?\)/);
-			if (match && match[1]) {
-				centerImageUrl = match[1];
+			// Améliorer l'extraction de l'URL depuis backgroundImage
+			if (bg && bg !== 'none') {
+				const patterns = [
+					/url\(["']?([^"']+)["']?\)/,  // url("...") ou url('...') ou url(...)
+					/url\(([^)]+)\)/,            // url(...) sans guillemets
+				];
+				for (const pattern of patterns) {
+					const match = bg.match(pattern);
+					if (match && match[1]) {
+						centerImageUrl = match[1].trim();
+						break;
+					}
+				}
+			}
+		}
+		// Prioriser l'URL du DOM si elle existe
+		if (centerImageEl && !centerImageUrl) {
+			const styles = window.getComputedStyle(centerImageEl);
+			const bg = styles.backgroundImage || '';
+			if (bg && bg !== 'none') {
+				const patterns = [
+					/url\(["']?([^"']+)["']?\)/,
+					/url\(([^)]+)\)/,
+				];
+				for (const pattern of patterns) {
+					const match = bg.match(pattern);
+					if (match && match[1]) {
+						centerImageUrl = match[1].trim();
+						break;
+					}
+				}
 			}
 		}
 		if (centerImageEl) {
@@ -689,9 +790,13 @@ let jsPDFLoader = null;
 		}
 		const centerImage = centerImageUrl ? await loadImageAsset(centerImageUrl) : null;
 
+		let drawnSlotsCount = 0;
 		slotEntries.forEach((entry, idx) => {
 			const image = slotImages[idx];
 			if (!image) {
+				if (window.WCPC13_DEBUG) {
+					console.warn(`[PDF] Slot ${entry.index}: image non disponible, ignorée`);
+				}
 				return;
 			}
 			const angleDeg = (entry.index % 12) * 30;
@@ -700,7 +805,15 @@ let jsPDFLoader = null;
 			const slotCenterY = centerY - Math.cos(angleRad) * ringRadius;
 
 			drawCircularImage(ctx, slotCenterX, slotCenterY, slotSize, image, entry.state);
+			drawnSlotsCount++;
+			if (window.WCPC13_DEBUG) {
+				console.log(`[PDF] Slot ${entry.index}: image dessinée à (${slotCenterX.toFixed(1)}, ${slotCenterY.toFixed(1)})`);
+			}
 		});
+		
+		if (window.WCPC13_DEBUG) {
+			console.log(`[PDF] ${drawnSlotsCount} photos périphériques dessinées sur ${slotEntries.length}`);
+		}
 
 		if (centerImage) {
 			drawCircularImage(ctx, centerX, centerY, centerSize, centerImage, centerTransformFallback);
@@ -848,9 +961,17 @@ let jsPDFLoader = null;
 		preview: '.wc-pc13-preview',
 		downloadJpeg: '.wc-pc13-download-jpeg',
 		downloadPdf: '.wc-pc13-download-pdf',
+		shareBtn: '.wc-pc13-share-btn',
+		shareModal: '.wc-pc13-share-modal',
+		shareModalClose: '.wc-pc13-share-modal-close',
+		shareUrlInput: '#wc-pc13-share-url',
+		copyLinkBtn: '.wc-pc13-copy-link-btn',
+		shareEmail: '.wc-pc13-share-email',
+		shareWhatsapp: '.wc-pc13-share-whatsapp',
+		shareFacebook: '.wc-pc13-share-facebook',
+		shareX: '.wc-pc13-share-x',
 		livePreviewImage: '.wc-pc13-live-preview-image',
 		livePreviewPlaceholder: '.wc-pc13-live-preview-placeholder',
-		fillDemo: '.wc-pc13-fill-demo',
 		fillUnsplash: '.wc-pc13-fill-unsplash',
 	};
 
@@ -1154,10 +1275,7 @@ let jsPDFLoader = null;
 
 	function savePayload() {
 		const payloadInput = document.querySelector(selectors.payload);
-		if (!payloadInput) {
-			return;
-		}
-
+		
 		const payload = {
 			color: state.color,
 			second_hand: state.secondHand,
@@ -1169,7 +1287,11 @@ let jsPDFLoader = null;
 			numbers: state.numbers,
 		};
 
-		payloadInput.value = JSON.stringify(payload);
+		if (payloadInput) {
+			payloadInput.value = JSON.stringify(payload);
+		}
+		
+		return payload;
 	}
 
 	function selectSlot(slot) {
@@ -1488,11 +1610,17 @@ function handleNumbersDistanceChange(event) {
 
 			try {
 				savePayload();
-				await uploadPreviewForCart();
-				await uploadPdfForCart();
+				
+				// Générer la vignette et uploader l'aperçu en parallèle
+				const [previewData, thumbnailDataUrl] = await Promise.all([
+					uploadPreviewForCart(),
+					generateThumbnail(1, 0.75)
+				]);
 
-				// Générer une vignette pour la notification
-				const thumbnailDataUrl = await generateThumbnail(1, 0.85);
+				// Uploader le PDF en arrière-plan (non bloquant)
+				uploadPdfForCart().catch((error) => {
+					console.warn('Erreur lors de l\'upload du PDF (non bloquant):', error);
+				});
 
 				// Récupérer les données du formulaire
 				const productId = configurator ? parseInt(configurator.dataset.product, 10) : 0;
@@ -1587,7 +1715,7 @@ function handleNumbersDistanceChange(event) {
 	const uploadButton = configurator.querySelector('.wc-pc13-upload-button');
 		const downloadJpegBtn = configurator.querySelector(selectors.downloadJpeg);
 		const downloadPdfBtn = configurator.querySelector(selectors.downloadPdf);
-		const fillDemoBtn = configurator.querySelector(selectors.fillDemo);
+		const shareBtn = configurator.querySelector(selectors.shareBtn);
 		const fillUnsplashBtn = configurator.querySelector(selectors.fillUnsplash);
 
 		if (fileInput) {
@@ -1674,10 +1802,65 @@ function handleNumbersDistanceChange(event) {
 			});
 		}
 
-		if (fillDemoBtn) {
-			fillDemoBtn.addEventListener('click', (event) => {
+		if (shareBtn) {
+			shareBtn.addEventListener('click', (event) => {
 				event.preventDefault();
-				fillDemoImages();
+				openShareModal();
+			});
+		}
+
+		// Gestion du modal de partage
+		const shareModal = configurator.querySelector(selectors.shareModal);
+		const shareModalClose = configurator.querySelector(selectors.shareModalClose);
+		if (shareModalClose) {
+			shareModalClose.addEventListener('click', () => {
+				closeShareModal();
+			});
+		}
+		if (shareModal) {
+			shareModal.addEventListener('click', (event) => {
+				if (event.target === shareModal) {
+					closeShareModal();
+				}
+			});
+		}
+
+		// Bouton copier le lien
+		const copyLinkBtn = configurator.querySelector(selectors.copyLinkBtn);
+		if (copyLinkBtn) {
+			copyLinkBtn.addEventListener('click', () => {
+				copyShareLink();
+			});
+		}
+
+		// Boutons de partage social
+		const shareEmailBtn = configurator.querySelector(selectors.shareEmail);
+		const shareWhatsappBtn = configurator.querySelector(selectors.shareWhatsapp);
+		const shareFacebookBtn = configurator.querySelector(selectors.shareFacebook);
+		const shareXBtn = configurator.querySelector(selectors.shareX);
+
+		if (shareEmailBtn) {
+			shareEmailBtn.addEventListener('click', (event) => {
+				event.preventDefault();
+				shareViaEmail();
+			});
+		}
+		if (shareWhatsappBtn) {
+			shareWhatsappBtn.addEventListener('click', (event) => {
+				event.preventDefault();
+				shareViaWhatsapp();
+			});
+		}
+		if (shareFacebookBtn) {
+			shareFacebookBtn.addEventListener('click', (event) => {
+				event.preventDefault();
+				shareViaFacebook();
+			});
+		}
+		if (shareXBtn) {
+			shareXBtn.addEventListener('click', (event) => {
+				event.preventDefault();
+				shareViaX();
 			});
 		}
 
@@ -2293,11 +2476,14 @@ function handleNumbersDistanceChange(event) {
 		}
 	}
 
-	function init() {
+	async function init() {
 		const configurator = document.querySelector(selectors.configurator);
 		if (!configurator) {
 			return;
 		}
+
+		// Charger la configuration partagée si un paramètre share est présent
+		await loadSharedConfig();
 
 		const preview = configurator.querySelector(selectors.preview);
 		const ringSizeInput = configurator.querySelector(selectors.slotSizeRange);
@@ -2413,6 +2599,268 @@ function handleNumbersDistanceChange(event) {
 				}, 300);
 			}
 		}, 5000);
+	}
+
+	// Fonctions de partage
+	let currentShareUrl = '';
+
+	async function openShareModal() {
+		const configurator = document.querySelector(selectors.configurator);
+		if (!configurator) {
+			return;
+		}
+
+		const productId = configurator.dataset.product;
+		if (!productId) {
+			window.alert('ID produit manquant');
+			return;
+		}
+
+		// Sauvegarder la configuration et obtenir le lien de partage
+		try {
+			const payload = savePayload();
+			
+			// Vérifier que le payload est valide
+			if (!payload || typeof payload !== 'object') {
+				throw new Error('Configuration invalide : payload manquant');
+			}
+			
+			const payloadJson = JSON.stringify(payload);
+			if (!payloadJson || payloadJson === '{}') {
+				throw new Error('Configuration invalide : payload vide');
+			}
+			
+			const formData = new FormData();
+			formData.append('action', 'wc_pc13_save_share');
+			formData.append('nonce', WCPC13.nonce);
+			formData.append('product_id', productId);
+			formData.append('payload', payloadJson);
+
+			const response = await fetch(WCPC13.ajax_url, {
+				method: 'POST',
+				credentials: 'same-origin',
+				body: formData,
+			});
+
+			if (!response.ok) {
+				throw new Error('Erreur lors de la sauvegarde');
+			}
+
+			const data = await response.json();
+			if (!data || !data.success || !data.data) {
+				throw new Error(data?.data?.message || 'Erreur lors de la sauvegarde');
+			}
+
+			currentShareUrl = data.data.share_url || '';
+			const shareUrlInput = configurator.querySelector(selectors.shareUrlInput);
+			if (shareUrlInput) {
+				shareUrlInput.value = currentShareUrl;
+			}
+
+			// Mettre à jour les liens de partage social
+			updateSocialShareLinks();
+
+			// Afficher le modal
+			const shareModal = configurator.querySelector(selectors.shareModal);
+			if (shareModal) {
+				shareModal.style.display = 'flex';
+			}
+		} catch (error) {
+			console.error('Erreur lors de l\'ouverture du modal de partage:', error);
+			window.alert(error?.message || 'Erreur lors de la génération du lien de partage');
+		}
+	}
+
+	function closeShareModal() {
+		const configurator = document.querySelector(selectors.configurator);
+		if (!configurator) {
+			return;
+		}
+		const shareModal = configurator.querySelector(selectors.shareModal);
+		if (shareModal) {
+			shareModal.style.display = 'none';
+		}
+	}
+
+	function copyShareLink() {
+		const configurator = document.querySelector(selectors.configurator);
+		if (!configurator) {
+			return;
+		}
+		const shareUrlInput = configurator.querySelector(selectors.shareUrlInput);
+		if (!shareUrlInput || !shareUrlInput.value) {
+			return;
+		}
+
+		shareUrlInput.select();
+		shareUrlInput.setSelectionRange(0, 99999); // Pour mobile
+
+		try {
+			document.execCommand('copy');
+			const copyBtn = configurator.querySelector(selectors.copyLinkBtn);
+			if (copyBtn) {
+				const originalText = copyBtn.textContent;
+				copyBtn.textContent = '✓ Copié';
+				setTimeout(() => {
+					copyBtn.textContent = originalText;
+				}, 2000);
+			}
+		} catch (error) {
+			console.error('Erreur lors de la copie:', error);
+		}
+	}
+
+	function updateSocialShareLinks() {
+		const configurator = document.querySelector(selectors.configurator);
+		if (!configurator || !currentShareUrl) {
+			return;
+		}
+
+		const productTitle = document.querySelector('.product_title')?.textContent || 'Mon horloge personnalisée';
+		const shareText = encodeURIComponent(`Découvrez mon horloge personnalisée : ${productTitle}`);
+
+		// Email
+		const shareEmailBtn = configurator.querySelector(selectors.shareEmail);
+		if (shareEmailBtn) {
+			shareEmailBtn.href = `mailto:?subject=${encodeURIComponent(productTitle)}&body=${encodeURIComponent(`Découvrez mon horloge personnalisée :\n${currentShareUrl}`)}`;
+		}
+
+		// WhatsApp
+		const shareWhatsappBtn = configurator.querySelector(selectors.shareWhatsapp);
+		if (shareWhatsappBtn) {
+			shareWhatsappBtn.href = `https://wa.me/?text=${shareText}%20${encodeURIComponent(currentShareUrl)}`;
+		}
+
+		// Facebook
+		const shareFacebookBtn = configurator.querySelector(selectors.shareFacebook);
+		if (shareFacebookBtn) {
+			shareFacebookBtn.href = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(currentShareUrl)}`;
+		}
+
+		// X (anciennement Twitter)
+		const shareXBtn = configurator.querySelector(selectors.shareX);
+		if (shareXBtn) {
+			shareXBtn.href = `https://x.com/intent/tweet?text=${shareText}&url=${encodeURIComponent(currentShareUrl)}`;
+		}
+	}
+
+	function shareViaEmail() {
+		// Le lien est déjà mis à jour dans updateSocialShareLinks
+	}
+
+	function shareViaWhatsapp() {
+		// Le lien est déjà mis à jour dans updateSocialShareLinks
+	}
+
+	function shareViaFacebook() {
+		// Le lien est déjà mis à jour dans updateSocialShareLinks
+	}
+
+	function shareViaX() {
+		// Le lien est déjà mis à jour dans updateSocialShareLinks
+	}
+
+	// Charger la configuration depuis l'URL si un paramètre share est présent
+	async function loadSharedConfig() {
+		const urlParams = new URLSearchParams(window.location.search);
+		const shareId = urlParams.get('share');
+		if (!shareId) {
+			return;
+		}
+
+		try {
+			const formData = new FormData();
+			formData.append('action', 'wc_pc13_load_share');
+			formData.append('nonce', WCPC13.nonce);
+			formData.append('share_id', shareId);
+
+			const response = await fetch(WCPC13.ajax_url, {
+				method: 'POST',
+				credentials: 'same-origin',
+				body: formData,
+			});
+
+			if (!response.ok) {
+				throw new Error('Erreur lors du chargement');
+			}
+
+			const data = await response.json();
+			if (!data || !data.success || !data.data) {
+				throw new Error(data?.data?.message || 'Configuration introuvable');
+			}
+
+			const sharedConfig = data.data.config;
+			if (!sharedConfig || !isObject(sharedConfig)) {
+				return;
+			}
+
+			// Charger la configuration partagée
+			if (sharedConfig.center) {
+				state.center = { ...state.center, ...sharedConfig.center };
+			}
+			if (sharedConfig.slots) {
+				state.slots = { ...state.slots, ...sharedConfig.slots };
+			}
+			if (sharedConfig.color) {
+				state.color = sharedConfig.color;
+			}
+			if (sharedConfig.diameter) {
+				state.diameter = sharedConfig.diameter;
+			}
+			if (sharedConfig.secondHand) {
+				state.secondHand = sharedConfig.secondHand;
+			}
+			if (sharedConfig.ringSize) {
+				state.ringSize = sharedConfig.ringSize;
+			}
+			if (sharedConfig.showNumbers !== undefined) {
+				state.showNumbers = sharedConfig.showNumbers;
+			}
+			if (sharedConfig.numbers) {
+				state.numbers = { ...state.numbers, ...sharedConfig.numbers };
+			}
+
+			// Appliquer la configuration
+			applyStateToUI();
+			updatePreview();
+		} catch (error) {
+			console.error('Erreur lors du chargement de la configuration partagée:', error);
+			// Ne pas afficher d'alerte pour ne pas perturber l'utilisateur
+		}
+	}
+
+	function isObject(value) {
+		return value !== null && typeof value === 'object' && !Array.isArray(value);
+	}
+
+	function applyStateToUI() {
+		const configurator = document.querySelector(selectors.configurator);
+		if (!configurator) {
+			return;
+		}
+
+		// Appliquer la couleur
+		const colorInput = configurator.querySelector(selectors.colorInput);
+		if (colorInput && state.color) {
+			colorInput.value = state.color;
+			updateHandsColor();
+		}
+
+		// Appliquer le diamètre
+		const diameterSelect = configurator.querySelector('#wc-pc13-diameter');
+		if (diameterSelect && state.diameter) {
+			diameterSelect.value = state.diameter;
+		}
+
+		// Appliquer la trotteuse
+		const secondHandSelect = configurator.querySelector('#wc-pc13-second-hand');
+		if (secondHandSelect && state.secondHand) {
+			secondHandSelect.value = state.secondHand;
+			updateSecondHand();
+		}
+
+		// Appliquer les images
+		updatePreview();
 	}
 
 	$(init);

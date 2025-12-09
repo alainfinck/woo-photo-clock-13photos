@@ -633,18 +633,15 @@ class WC_PC13_Frontend {
 		$attachment_id = ! empty( $preview['id'] ) ? absint( $preview['id'] ) : 0;
 		$url           = ! empty( $preview['url'] ) ? esc_url( $preview['url'] ) : '';
 
+		// Utiliser l'URL originale pour éviter les redimensionnements non carrés
 		if ( $attachment_id ) {
-			$image = wp_get_attachment_image( $attachment_id, $size, false, array( 'class' => 'wc-pc13-preview-thumb' ) );
-			if ( $image ) {
-				return $image;
-			}
-
 			$url = wp_get_attachment_url( $attachment_id );
 		}
 
 		if ( $url ) {
+			// Générer une image carrée avec object-fit pour éviter la déformation
 			return sprintf(
-				'<img src="%s" alt="%s" class="wc-pc13-preview-thumb" style="width: 100%%; height: auto; border-radius: 8px;" />',
+				'<img src="%s" alt="%s" class="wc-pc13-preview-thumb" style="width: 100%%; aspect-ratio: 1 / 1; object-fit: cover; border-radius: 8px;" />',
 				esc_url( $url ),
 				esc_attr__( 'Aperçu personnalisé', 'wc-photo-clock-13' )
 			);
