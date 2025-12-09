@@ -95,19 +95,12 @@ $button_text = isset( $button_text ) ? $button_text : __( 'Ajouter au panier', '
 					<div class="wc-pc13-tutorial-step">
 						<span class="wc-pc13-tutorial-icon">2️⃣</span>
 						<div class="wc-pc13-tutorial-content">
-							<strong><?php esc_html_e( 'Ajustez vos photos', 'wc-photo-clock-13' ); ?></strong>
-							<p><?php esc_html_e( 'Utilisez les contrôles à droite pour ajuster le zoom, la position et la taille de chaque photo selon vos préférences.', 'wc-photo-clock-13' ); ?></p>
+							<strong><?php esc_html_e( 'Ajustez et personnalisez', 'wc-photo-clock-13' ); ?></strong>
+							<p><?php esc_html_e( 'Utilisez les contrôles à droite pour ajuster le zoom, la position de chaque photo, choisir le diamètre, la couleur des aiguilles et les options d\'affichage.', 'wc-photo-clock-13' ); ?></p>
 						</div>
 					</div>
 					<div class="wc-pc13-tutorial-step">
 						<span class="wc-pc13-tutorial-icon">3️⃣</span>
-						<div class="wc-pc13-tutorial-content">
-							<strong><?php esc_html_e( 'Personnalisez l\'horloge', 'wc-photo-clock-13' ); ?></strong>
-							<p><?php esc_html_e( 'Choisissez le diamètre, la couleur des aiguilles, la trotteuse et les options d\'affichage des chiffres.', 'wc-photo-clock-13' ); ?></p>
-						</div>
-					</div>
-					<div class="wc-pc13-tutorial-step">
-						<span class="wc-pc13-tutorial-icon">4️⃣</span>
 						<div class="wc-pc13-tutorial-content">
 							<strong><?php esc_html_e( 'Prévisualisez et ajoutez au panier', 'wc-photo-clock-13' ); ?></strong>
 							<p><?php esc_html_e( 'Votre horloge se met à jour en temps réel. Téléchargez un aperçu si besoin, puis ajoutez votre création au panier.', 'wc-photo-clock-13' ); ?></p>

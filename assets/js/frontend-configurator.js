@@ -1136,10 +1136,11 @@ let jsPDFLoader = null;
 			centerRemoveBtn.disabled = !state.center.image_url;
 		}
 
-		// Afficher/masquer le bloc éditeur selon la sélection
+		// Afficher/masquer le bloc éditeur uniquement pour les slots périphériques (pas le centre)
 		const slotEditor = configurator.querySelector('.wc-pc13-slot-editor');
 		if (slotEditor) {
-			if (state.currentSlot) {
+			// Afficher uniquement si une zone périphérique est sélectionnée (1-12), pas le centre
+			if (state.currentSlot && state.currentSlot !== 'center' && parseInt(state.currentSlot, 10) >= 1 && parseInt(state.currentSlot, 10) <= 12) {
 				slotEditor.classList.add('has-selection');
 			} else {
 				slotEditor.classList.remove('has-selection');
