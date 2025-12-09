@@ -158,6 +158,16 @@ class WC_PC13_Frontend {
 
 		// Construire les badges de réglages
 		$badges = array();
+		
+		// Badge diamètre avec prix
+		if ( ! empty( $config['diameter'] ) ) {
+			$diameter = absint( $config['diameter'] );
+			$price = isset( $config['diameter_price'] ) ? floatval( $config['diameter_price'] ) : 59;
+			$badges[] = '<span class="wc-pc13-cart-badge wc-pc13-cart-badge-diameter">' . 
+				sprintf( esc_html__( '%d cm - %s€', 'wc-photo-clock-13' ), $diameter, number_format_i18n( $price, 0 ) ) . 
+				'</span>';
+		}
+		
 		if ( ! empty( $config['hands'] ) && ! empty( $config['color'] ) ) {
 			$color_display = sanitize_hex_color( $config['color'] );
 			$hands_label = ucfirst( sanitize_text_field( $config['hands'] ) );
@@ -345,9 +355,29 @@ class WC_PC13_Frontend {
 	 * @return array
 	 */
 	public static function sanitize_payload( $payload ) {
+		// Prix selon le diamètre
+		$diameter_prices = array(
+			30 => 49,
+			40 => 59,
+			50 => 69,
+		);
+		
+		$diameter = isset( $payload['diameter'] ) ? absint( $payload['diameter'] ) : 40;
+		if ( ! in_array( $diameter, array( 30, 40, 50 ), true ) ) {
+			$diameter = 40; // Valeur par défaut
+		}
+		
+		$second_hand = isset( $payload['second_hand'] ) ? sanitize_text_field( $payload['second_hand'] ) : 'black';
+		if ( ! in_array( $second_hand, array( 'red', 'black', 'none' ), true ) ) {
+			$second_hand = 'black';
+		}
+		
 		$clean = array(
 			'hands'  => isset( $payload['hands'] ) ? sanitize_text_field( $payload['hands'] ) : 'classic',
 			'color'  => isset( $payload['color'] ) ? sanitize_hex_color( $payload['color'] ) : '#111111',
+			'second_hand' => $second_hand,
+			'diameter' => $diameter,
+			'diameter_price' => isset( $diameter_prices[ $diameter ] ) ? $diameter_prices[ $diameter ] : 59,
 			'slots'  => array(),
 			'center' => array(),
 			'ring_size' => isset( $payload['ring_size'] ) ? absint( $payload['ring_size'] ) : 110,

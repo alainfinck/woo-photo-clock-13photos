@@ -53,6 +53,8 @@ const CENTER_COVER_THRESHOLD = 3;
 	const state = {
 		currentSlot: 'center',
 		color: '#111111',
+		secondHand: 'black', // 'red', 'black', ou 'none'
+		diameter: 40, // Diamètre par défaut en cm
 		slots: {},
 		center: {
 			attachment_id: 0,
@@ -1134,6 +1136,16 @@ let jsPDFLoader = null;
 			centerRemoveBtn.disabled = !state.center.image_url;
 		}
 
+		// Afficher/masquer le bloc éditeur selon la sélection
+		const slotEditor = configurator.querySelector('.wc-pc13-slot-editor');
+		if (slotEditor) {
+			if (state.currentSlot) {
+				slotEditor.classList.add('has-selection');
+			} else {
+				slotEditor.classList.remove('has-selection');
+			}
+		}
+
 		if (centerPanel) {
 			centerPanel.classList.add('is-active');
 		}
@@ -1147,6 +1159,8 @@ let jsPDFLoader = null;
 
 		const payload = {
 			color: state.color,
+			second_hand: state.secondHand,
+			diameter: state.diameter,
 			slots: state.slots,
 			center: state.center,
 			ring_size: state.ringSize,
@@ -1689,17 +1703,61 @@ function handleNumbersDistanceChange(event) {
 			});
 			updateHandsColor();
 		}
+
+		// Gérer le changement de diamètre
+		const diameterInput = document.querySelector('#wc-pc13-diameter');
+		if (diameterInput) {
+			// Initialiser le diamètre depuis la valeur sélectionnée
+			state.diameter = parseInt(diameterInput.value, 10) || 40;
+			
+			diameterInput.addEventListener('change', (event) => {
+				state.diameter = parseInt(event.target.value, 10) || 40;
+				savePayload();
+			});
+		}
+
+		// Gérer le changement de la trotteuse
+		const secondHandInput = document.querySelector('#wc-pc13-second-hand');
+		if (secondHandInput) {
+			// Initialiser la trotteuse depuis la valeur sélectionnée
+			state.secondHand = secondHandInput.value || 'black';
+			updateSecondHand();
+			
+			secondHandInput.addEventListener('change', (event) => {
+				state.secondHand = event.target.value || 'black';
+				updateSecondHand();
+				savePayload();
+			});
+		}
 	}
 
 	function updateHandsColor() {
 		const color = (state.color || '#111111').toLowerCase();
-		const hands = document.querySelectorAll('.wc-pc13-hand');
+		const hands = document.querySelectorAll('.wc-pc13-hand.hour, .wc-pc13-hand.minute');
 		const needsOutline = '#ffffff' === color;
 
 		hands.forEach((hand) => {
 			hand.style.background = color;
 			hand.style.boxShadow = needsOutline ? '0 0 0 1px rgba(0, 0, 0, 0.2)' : 'none';
 		});
+		
+		updateSecondHand();
+	}
+
+	function updateSecondHand() {
+		const secondHand = document.querySelector('.wc-pc13-hand.second');
+		if (!secondHand) {
+			return;
+		}
+
+		if (state.secondHand === 'none') {
+			secondHand.style.display = 'none';
+		} else {
+			secondHand.style.display = '';
+			const color = state.secondHand === 'red' ? '#cc1f1a' : '#111111';
+			secondHand.style.background = color;
+			secondHand.style.boxShadow = 'none';
+		}
 	}
 
 	function setHandsRotation(date) {
@@ -1715,10 +1773,12 @@ function handleNumbersDistanceChange(event) {
 		const hours = date.getHours() % 12;
 		const minutes = date.getMinutes();
 		const seconds = date.getSeconds();
+		const milliseconds = date.getMilliseconds();
 
 		const hourAngle = (hours * 30) + (minutes * 0.5);
 		const minuteAngle = (minutes * 6) + (seconds * 0.1);
-		const secondAngle = seconds * 6;
+		// Rotation fluide de la trotteuse avec les millisecondes
+		const secondAngle = (seconds * 6) + (milliseconds * 0.006);
 
 		if (hourHand) {
 			hourHand.style.transform = `rotate(${hourAngle}deg)`;
@@ -1728,7 +1788,7 @@ function handleNumbersDistanceChange(event) {
 			minuteHand.style.transform = `rotate(${minuteAngle}deg)`;
 		}
 
-		if (secondHand) {
+		if (secondHand && state.secondHand !== 'none') {
 			secondHand.style.transform = `rotate(${secondAngle}deg)`;
 		}
 	}
@@ -1737,20 +1797,32 @@ function handleNumbersDistanceChange(event) {
 		const handsWrapper = document.querySelector('.wc-pc13-hands');
 		if (!handsWrapper) {
 			if (handsTimer) {
-				clearInterval(handsTimer);
+				cancelAnimationFrame(handsTimer);
 				handsTimer = null;
 			}
 			return;
 		}
 
 		if (handsTimer) {
-			clearInterval(handsTimer);
+			cancelAnimationFrame(handsTimer);
 			handsTimer = null;
 		}
 
-		const tick = () => setHandsRotation(new Date());
-		tick();
-		handsTimer = window.setInterval(tick, 1000);
+		// Animation fluide avec requestAnimationFrame pour la trotteuse
+		let lastTime = performance.now();
+		const animate = (currentTime) => {
+			if (handsTimer) {
+				// Mettre à jour toutes les 50ms pour une animation fluide
+				if (currentTime - lastTime >= 50) {
+					setHandsRotation(new Date());
+					lastTime = currentTime;
+				}
+				handsTimer = requestAnimationFrame(animate);
+			}
+		};
+		
+		setHandsRotation(new Date());
+		handsTimer = requestAnimationFrame(animate);
 	}
 
 	function bindDragging() {

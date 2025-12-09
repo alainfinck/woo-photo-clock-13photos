@@ -82,10 +82,58 @@ $button_text = isset( $button_text ) ? $button_text : __( 'Ajouter au panier', '
 				</button>
 				<p class="wc-pc13-add-to-cart-note"><?php esc_html_e( 'Vos réglages seront ajoutés au panier avec ce produit.', 'wc-photo-clock-13' ); ?></p>
 			</div>
+			<div class="wc-pc13-tutorial">
+				<h4 class="wc-pc13-tutorial-title"><?php esc_html_e( 'Comment utiliser le configurateur', 'wc-photo-clock-13' ); ?></h4>
+				<div class="wc-pc13-tutorial-steps">
+					<div class="wc-pc13-tutorial-step">
+						<span class="wc-pc13-tutorial-icon">1️⃣</span>
+						<div class="wc-pc13-tutorial-content">
+							<strong><?php esc_html_e( 'Ajoutez vos photos', 'wc-photo-clock-13' ); ?></strong>
+							<p><?php esc_html_e( 'Cliquez sur une zone de l\'horloge (centre ou périphérie) puis sélectionnez une image depuis votre ordinateur ou glissez-déposez-la directement.', 'wc-photo-clock-13' ); ?></p>
+						</div>
+					</div>
+					<div class="wc-pc13-tutorial-step">
+						<span class="wc-pc13-tutorial-icon">2️⃣</span>
+						<div class="wc-pc13-tutorial-content">
+							<strong><?php esc_html_e( 'Ajustez vos photos', 'wc-photo-clock-13' ); ?></strong>
+							<p><?php esc_html_e( 'Utilisez les contrôles à droite pour ajuster le zoom, la position et la taille de chaque photo selon vos préférences.', 'wc-photo-clock-13' ); ?></p>
+						</div>
+					</div>
+					<div class="wc-pc13-tutorial-step">
+						<span class="wc-pc13-tutorial-icon">3️⃣</span>
+						<div class="wc-pc13-tutorial-content">
+							<strong><?php esc_html_e( 'Personnalisez l\'horloge', 'wc-photo-clock-13' ); ?></strong>
+							<p><?php esc_html_e( 'Choisissez le diamètre, la couleur des aiguilles, la trotteuse et les options d\'affichage des chiffres.', 'wc-photo-clock-13' ); ?></p>
+						</div>
+					</div>
+					<div class="wc-pc13-tutorial-step">
+						<span class="wc-pc13-tutorial-icon">4️⃣</span>
+						<div class="wc-pc13-tutorial-content">
+							<strong><?php esc_html_e( 'Prévisualisez et ajoutez au panier', 'wc-photo-clock-13' ); ?></strong>
+							<p><?php esc_html_e( 'Votre horloge se met à jour en temps réel. Téléchargez un aperçu si besoin, puis ajoutez votre création au panier.', 'wc-photo-clock-13' ); ?></p>
+						</div>
+					</div>
+				</div>
+				<div class="wc-pc13-tutorial-tips">
+					<p><strong>💡 <?php esc_html_e( 'Astuce', 'wc-photo-clock-13' ); ?>:</strong> <?php esc_html_e( 'Utilisez les boutons "Remplir avec les images de démonstration" ou "Charger des photos Unsplash" pour tester rapidement le configurateur.', 'wc-photo-clock-13' ); ?></p>
+				</div>
+			</div>
 		</div>
 
 		<div class="wc-pc13-controls-column">
 			<div class="wc-pc13-global-settings">
+				<label for="wc-pc13-diameter">
+					<span><?php esc_html_e( 'Diamètre de l\'horloge', 'wc-photo-clock-13' ); ?></span>
+					<select id="wc-pc13-diameter" name="wc_pc13_diameter">
+						<option value="30" data-price="49">30 cm - 49€</option>
+						<option value="40" data-price="59" selected>40 cm - 59€</option>
+						<option value="50" data-price="69">50 cm - 69€</option>
+					</select>
+					<small class="wc-pc13-diameter-note">
+						<?php esc_html_e( 'Impression sur support alu dibond', 'wc-photo-clock-13' ); ?>
+						<span class="wc-pc13-info-icon" data-tooltip="<?php echo esc_attr( __( 'L\'alu dibond est un matériau composite constitué de deux feuilles d\'aluminium encadrant une âme en polyéthylène. Ce support rigide et léger offre une excellente résistance aux intempéries et une finition de qualité professionnelle pour vos impressions.', 'wc-photo-clock-13' ) ); ?>">ℹ️</span>
+					</small>
+				</label>
 				<label for="wc-pc13-color"><?php esc_html_e( 'Couleur des aiguilles', 'wc-photo-clock-13' ); ?></label>
 				<select id="wc-pc13-color" name="wc_pc13_color">
 					<?php foreach ( $hands_colors as $color_value => $color_label ) : ?>
@@ -94,6 +142,15 @@ $button_text = isset( $button_text ) ? $button_text : __( 'Ajouter au panier', '
 						</option>
 					<?php endforeach; ?>
 				</select>
+				<label for="wc-pc13-second-hand"><?php esc_html_e( 'Trotteuse (aiguille des secondes)', 'wc-photo-clock-13' ); ?></label>
+				<select id="wc-pc13-second-hand" name="wc_pc13_second_hand">
+					<option value="red"><?php esc_html_e( 'Rouge', 'wc-photo-clock-13' ); ?></option>
+					<option value="black" selected><?php esc_html_e( 'Noir', 'wc-photo-clock-13' ); ?></option>
+					<option value="none"><?php esc_html_e( 'Pas de trotteuse', 'wc-photo-clock-13' ); ?></option>
+				</select>
+				<small class="wc-pc13-silent-note" style="display: block; margin-top: 6px; font-size: 12px; color: #666; font-style: italic;">
+					🔇 <?php esc_html_e( 'Horloge silencieuse (pas de tic-tac)', 'wc-photo-clock-13' ); ?>
+				</small>
 				<div class="wc-pc13-center-panel">
 					<div class="wc-pc13-center-actions">
 						<button type="button" class="button button-secondary wc-pc13-select-center">

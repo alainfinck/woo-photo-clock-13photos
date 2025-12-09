@@ -70,6 +70,14 @@ class WC_PC13_Cart {
 		echo '</div>';
 
 		echo '<div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:10px;margin-bottom:15px;">';
+		
+		// Afficher le diamètre avec prix et support
+		if ( ! empty( $data['diameter'] ) ) {
+			$diameter = absint( $data['diameter'] );
+			$price = isset( $data['diameter_price'] ) ? floatval( $data['diameter_price'] ) : 59;
+			echo '<div style="padding:8px;background:#fff;border-radius:4px;border:1px solid #e0e0e0;"><strong>' . esc_html__( 'Diamètre', 'wc-photo-clock-13' ) . ':</strong><br><span style="color:#666;">' . esc_html( $diameter ) . ' cm - ' . number_format_i18n( $price, 0 ) . '€</span><br><small style="color:#999;font-size:11px;">' . esc_html__( 'Impression sur support alu dibond', 'wc-photo-clock-13' ) . '</small></div>';
+		}
+		
 		if ( ! empty( $data['hands'] ) ) {
 			$hands_label = ucfirst( sanitize_text_field( $data['hands'] ) );
 			echo '<div style="padding:8px;background:#fff;border-radius:4px;border:1px solid #e0e0e0;"><strong>' . esc_html__( 'Style d\'aiguilles', 'wc-photo-clock-13' ) . ':</strong><br><span style="color:#666;">' . esc_html( $hands_label ) . '</span></div>';
