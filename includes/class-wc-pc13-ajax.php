@@ -139,10 +139,19 @@ class WC_PC13_Ajax {
 			}
 		}
 
+		// Utiliser wp_get_attachment_url pour obtenir l'URL correcte de l'image originale
+		$full_url = $uploaded['url'];
+		if ( ! is_wp_error( $attachment_id ) && $attachment_id > 0 ) {
+			$attachment_url = wp_get_attachment_url( $attachment_id );
+			if ( $attachment_url ) {
+				$full_url = $attachment_url;
+			}
+		}
+
 		wp_send_json_success(
 			array(
 				'url'           => $thumb_url,
-				'full_url'      => $uploaded['url'],
+				'full_url'      => $full_url,
 				'attachment_id' => $attachment_id,
 			)
 		);

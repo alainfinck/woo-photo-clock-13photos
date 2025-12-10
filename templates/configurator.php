@@ -241,6 +241,7 @@ $button_text = isset( $button_text ) ? $button_text : __( 'Ajouter au panier', '
 					<label for="wc-pc13-center-size">
 						<span><?php esc_html_e( 'Diamètre du visuel central', 'wc-photo-clock-13' ); ?></span>
 						<input type="range" id="wc-pc13-center-size" name="wc_pc13_center_size" min="120" max="520" step="1" value="180" data-center-size>
+						<span class="wc-pc13-range-value" id="wc-pc13-center-size-value">0%</span>
 					</label>
 				</div>
 				<label class="wc-pc13-toggle">
@@ -263,6 +264,7 @@ $button_text = isset( $button_text ) ? $button_text : __( 'Ajouter au panier', '
 					<label for="wc-pc13-number-distance">
 						<span><?php esc_html_e( 'Distance des chiffres depuis le centre', 'wc-photo-clock-13' ); ?></span>
 						<input type="range" id="wc-pc13-number-distance" name="wc_pc13_number_distance" min="0" max="400" step="1" value="0">
+						<span class="wc-pc13-range-value" id="wc-pc13-number-distance-value">0%</span>
 					</label>
 				</div>
 					<label for="wc-pc13-slot-size"><?php esc_html_e( 'Taille des photos périphériques', 'wc-photo-clock-13' ); ?></label>
