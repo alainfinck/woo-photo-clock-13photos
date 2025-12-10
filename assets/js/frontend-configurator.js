@@ -114,6 +114,7 @@ let handsTimer = null;
 let html2canvasLoader = null;
 let jsPDFLoader = null;
 let uploadTargetSlot = null;
+let shareLoading = false;
 
 	let livePreviewUpdateTimer = null;
 	let livePreviewUpdating = false;
@@ -2193,7 +2194,10 @@ function handleNumbersDistanceChange(event) {
 		if (shareBtn) {
 			shareBtn.addEventListener('click', (event) => {
 				event.preventDefault();
-				openShareModal();
+			if (shareLoading) {
+				return;
+			}
+			openShareModal(shareBtn);
 			});
 		}
 
@@ -3017,75 +3021,109 @@ function handleNumbersDistanceChange(event) {
 		}, 5000);
 	}
 
-	// Fonctions de partage
-	let currentShareUrl = '';
+// Fonctions de partage
+let currentShareUrl = '';
 
-	async function openShareModal() {
-		const configurator = document.querySelector(selectors.configurator);
-		if (!configurator) {
-			return;
-		}
-
-		const productId = configurator.dataset.product;
-		if (!productId) {
-			window.alert('ID produit manquant');
-			return;
-		}
-
-		// Sauvegarder la configuration et obtenir le lien de partage
-		try {
-			const payload = savePayload();
-			
-			// Vérifier que le payload est valide
-			if (!payload || typeof payload !== 'object') {
-				throw new Error('Configuration invalide : payload manquant');
-			}
-			
-			const payloadJson = JSON.stringify(payload);
-			if (!payloadJson || payloadJson === '{}') {
-				throw new Error('Configuration invalide : payload vide');
-			}
-			
-			const formData = new FormData();
-			formData.append('action', 'wc_pc13_save_share');
-			formData.append('nonce', WCPC13.nonce);
-			formData.append('product_id', productId);
-			formData.append('payload', payloadJson);
-
-			const response = await fetch(WCPC13.ajax_url, {
-				method: 'POST',
-				credentials: 'same-origin',
-				body: formData,
-			});
-
-			if (!response.ok) {
-				throw new Error('Erreur lors de la sauvegarde');
-			}
-
-			const data = await response.json();
-			if (!data || !data.success || !data.data) {
-				throw new Error(data?.data?.message || 'Erreur lors de la sauvegarde');
-			}
-
-			currentShareUrl = data.data.share_url || '';
-			const shareUrlInput = configurator.querySelector(selectors.shareUrlInput);
-			if (shareUrlInput) {
-				shareUrlInput.value = currentShareUrl;
-			}
-
-			// Mettre à jour les liens de partage social
-			updateSocialShareLinks();
-
-			// Afficher le modal
-			const shareModal = configurator.querySelector(selectors.shareModal);
-			if (shareModal) {
-				shareModal.style.display = 'flex';
-			}
-		} catch (error) {
-			console.error('Erreur lors de l\'ouverture du modal de partage:', error);
-			window.alert(error?.message || 'Erreur lors de la génération du lien de partage');
-		}
+function setShareLoadingState(isLoading, shareBtn) {
+	shareLoading = !!isLoading;
+	if (!shareBtn) {
+		return;
 	}
+	if (!shareBtn.dataset.originalText) {
+		shareBtn.dataset.originalText = shareBtn.textContent.trim();
+	}
+	if (shareLoading) {
+		shareBtn.disabled = true;
+		shareBtn.innerHTML = `<span class="wc-pc13-spinner"></span> ${shareBtn.dataset.originalText}`;
+	} else {
+		shareBtn.disabled = false;
+		shareBtn.innerHTML = shareBtn.dataset.originalText || shareBtn.textContent;
+	}
+}
+
+async function openShareModal(shareBtn = null) {
+	const configurator = document.querySelector(selectors.configurator);
+	if (!configurator) {
+		return;
+	}
+
+	const productId = configurator.dataset.product;
+	if (!productId) {
+		window.alert('ID produit manquant');
+		return;
+	}
+
+	const shareModal = configurator.querySelector(selectors.shareModal);
+	const shareUrlInput = configurator.querySelector(selectors.shareUrlInput);
+
+	// Afficher le modal rapidement avec un état de chargement
+	if (shareModal) {
+		shareModal.style.display = 'flex';
+	}
+	if (shareUrlInput) {
+		shareUrlInput.value = WCPC13.labels?.loading || 'Génération du lien...';
+		shareUrlInput.disabled = true;
+	}
+	setShareLoadingState(true, shareBtn);
+
+	// Sauvegarder la configuration et obtenir le lien de partage
+	try {
+		const payload = savePayload();
+		
+		// Vérifier que le payload est valide
+		if (!payload || typeof payload !== 'object') {
+			throw new Error('Configuration invalide : payload manquant');
+		}
+		
+		const payloadJson = JSON.stringify(payload);
+		if (!payloadJson || payloadJson === '{}') {
+			throw new Error('Configuration invalide : payload vide');
+		}
+		
+		const formData = new FormData();
+		formData.append('action', 'wc_pc13_save_share');
+		formData.append('nonce', WCPC13.nonce);
+		formData.append('product_id', productId);
+		formData.append('payload', payloadJson);
+
+		const response = await fetch(WCPC13.ajax_url, {
+			method: 'POST',
+			credentials: 'same-origin',
+			body: formData,
+		});
+
+		if (!response.ok) {
+			throw new Error('Erreur lors de la sauvegarde');
+		}
+
+		const data = await response.json();
+		if (!data || !data.success || !data.data) {
+			throw new Error(data?.data?.message || 'Erreur lors de la sauvegarde');
+		}
+
+		currentShareUrl = data.data.share_url || '';
+		if (shareUrlInput) {
+			shareUrlInput.value = currentShareUrl;
+			shareUrlInput.disabled = false;
+		}
+
+		// Mettre à jour les liens de partage social
+		updateSocialShareLinks();
+
+		// Afficher le modal (déjà affiché, mais on s'assure de l'état)
+		if (shareModal) {
+			shareModal.style.display = 'flex';
+		}
+	} catch (error) {
+		console.error('Erreur lors de l\'ouverture du modal de partage:', error);
+		window.alert(error?.message || 'Erreur lors de la génération du lien de partage');
+		if (shareModal) {
+			shareModal.style.display = 'none';
+		}
+	} finally {
+		setShareLoadingState(false, shareBtn);
+	}
+}
 
 	function closeShareModal() {
 		const configurator = document.querySelector(selectors.configurator);
