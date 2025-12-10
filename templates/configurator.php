@@ -166,6 +166,7 @@ $button_text = isset( $button_text ) ? $button_text : __( 'Ajouter au panier', '
 			</div>
 			<div class="wc-pc13-demo-actions">
 				<button type="button" class="button wc-pc13-fill-unsplash">
+					<span class="wc-pc13-fill-unsplash-icon">🎲</span>
 					<?php esc_html_e( 'Charger des photos aléatoires', 'wc-photo-clock-13' ); ?>
 				</button>
 			</div>
