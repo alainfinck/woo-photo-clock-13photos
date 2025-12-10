@@ -1046,6 +1046,7 @@ let sharedConfigLoaded = false;
 		shareWhatsapp: '.wc-pc13-share-whatsapp',
 		shareFacebook: '.wc-pc13-share-facebook',
 		shareX: '.wc-pc13-share-x',
+		saveEmailBtn: '.wc-pc13-save-email-btn',
 		livePreviewImage: '.wc-pc13-live-preview-image',
 		livePreviewPlaceholder: '.wc-pc13-live-preview-placeholder',
 		fillUnsplash: '.wc-pc13-fill-unsplash',
@@ -2202,6 +2203,21 @@ function handleNumbersDistanceChange(event) {
 			});
 		}
 
+	const saveEmailBtn = configurator.querySelector(selectors.saveEmailBtn);
+	if (saveEmailBtn) {
+		saveEmailBtn.addEventListener('click', async (event) => {
+			event.preventDefault();
+			if (shareLoading) {
+				return;
+			}
+			const email = window.prompt(WCPC13.labels?.enter_email || 'Entrez votre email pour recevoir le lien :');
+			if (!email || !email.trim()) {
+				return;
+			}
+			await saveShareAndSendEmail(email.trim(), saveEmailBtn);
+		});
+	}
+
 		// Gestion du modal de partage
 		const shareModal = configurator.querySelector(selectors.shareModal);
 		const shareModalClose = configurator.querySelector(selectors.shareModalClose);
@@ -3125,6 +3141,62 @@ async function openShareModal(shareBtn = null) {
 		}
 	} finally {
 		setShareLoadingState(false, shareBtn);
+	}
+}
+
+async function saveShareAndSendEmail(email, triggerBtn = null) {
+	const configurator = document.querySelector(selectors.configurator);
+	if (!configurator) {
+		return;
+	}
+
+	const productId = configurator.dataset.product;
+	if (!productId) {
+		window.alert('ID produit manquant');
+		return;
+	}
+
+	setShareLoadingState(true, triggerBtn);
+	try {
+		const payload = savePayload();
+		if (!payload || typeof payload !== 'object') {
+			throw new Error('Configuration invalide : payload manquant');
+		}
+
+		const payloadJson = JSON.stringify(payload);
+		if (!payloadJson || payloadJson === '{}') {
+			throw new Error('Configuration invalide : payload vide');
+		}
+
+		const formData = new FormData();
+		formData.append('action', 'wc_pc13_save_share_email');
+		formData.append('nonce', WCPC13.nonce);
+		formData.append('product_id', productId);
+		formData.append('payload', payloadJson);
+		formData.append('email', email);
+
+		const response = await fetch(WCPC13.ajax_url, {
+			method: 'POST',
+			credentials: 'same-origin',
+			body: formData,
+		});
+
+		if (!response.ok) {
+			throw new Error('Erreur lors de la sauvegarde');
+		}
+
+		const data = await response.json();
+		if (!data || !data.success || !data.data) {
+			throw new Error(data?.data?.message || 'Erreur lors de la sauvegarde');
+		}
+
+		currentShareUrl = data.data.share_url || '';
+		window.alert(WCPC13.labels?.email_sent || 'Lien envoyé par email.');
+	} catch (error) {
+		console.error('Erreur lors de l’envoi du lien par email:', error);
+		window.alert(error?.message || 'Erreur lors de l’envoi du lien par email');
+	} finally {
+		setShareLoadingState(false, triggerBtn);
 	}
 }
 

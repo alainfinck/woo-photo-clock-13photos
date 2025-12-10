@@ -97,6 +97,9 @@ $button_text = isset( $button_text ) ? $button_text : __( 'Ajouter au panier', '
 				<button type="button" class="button button-secondary wc-pc13-share-btn">
 					<?php esc_html_e( 'Partager', 'wc-photo-clock-13' ); ?>
 				</button>
+				<button type="button" class="button button-secondary wc-pc13-save-email-btn">
+					<?php esc_html_e( 'Sauvegarder par email', 'wc-photo-clock-13' ); ?>
+				</button>
 			</div>
 			<div class="wc-pc13-share-modal" style="display: none;">
 				<div class="wc-pc13-share-modal-content">

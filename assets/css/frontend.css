@@ -920,6 +920,11 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
+.wc-pc13-save-email-btn {
+	white-space: normal;
+	line-height: 1.3;
+}
+
 .wc-pc13-download-actions .button:hover {
 	transform: translateY(-1px);
 	box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);

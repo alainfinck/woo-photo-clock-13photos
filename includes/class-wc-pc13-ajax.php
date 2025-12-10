@@ -47,6 +47,8 @@ class WC_PC13_Ajax {
 		add_action( 'wp_ajax_nopriv_wc_pc13_save_share', array( $this, 'handle_save_share' ) );
 		add_action( 'wp_ajax_wc_pc13_load_share', array( $this, 'handle_load_share' ) );
 		add_action( 'wp_ajax_nopriv_wc_pc13_load_share', array( $this, 'handle_load_share' ) );
+		add_action( 'wp_ajax_wc_pc13_save_share_email', array( $this, 'handle_save_share_email' ) );
+		add_action( 'wp_ajax_nopriv_wc_pc13_save_share_email', array( $this, 'handle_save_share_email' ) );
 	}
 
 	/**
@@ -368,6 +370,79 @@ class WC_PC13_Ajax {
 			),
 			get_permalink( $product_id )
 		);
+
+		wp_send_json_success(
+			array(
+				'share_id'  => $share_id,
+				'share_url' => $share_url,
+			)
+		);
+	}
+
+	/**
+	 * Sauvegarde une configuration et envoie le lien par email.
+	 */
+	public function handle_save_share_email() {
+		check_ajax_referer( 'wc_pc13_nonce', 'nonce' );
+
+		$email      = isset( $_POST['email'] ) ? sanitize_email( wp_unslash( $_POST['email'] ) ) : '';
+		$product_id = isset( $_POST['product_id'] ) ? absint( $_POST['product_id'] ) : 0;
+		$payload    = isset( $_POST['payload'] ) ? wp_unslash( $_POST['payload'] ) : '';
+
+		if ( ! $product_id ) {
+			wp_send_json_error( array( 'message' => __( 'ID produit manquant.', 'wc-photo-clock-13' ) ) );
+		}
+
+		if ( ! is_email( $email ) ) {
+			wp_send_json_error( array( 'message' => __( 'Email invalide.', 'wc-photo-clock-13' ) ) );
+		}
+
+		if ( ! $payload || empty( trim( $payload ) ) ) {
+			wp_send_json_error( array( 'message' => __( 'Configuration manquante.', 'wc-photo-clock-13' ) ) );
+		}
+
+		$payload_decoded = json_decode( $payload, true );
+		if ( ! is_array( $payload_decoded ) || json_last_error() !== JSON_ERROR_NONE ) {
+			wp_send_json_error(
+				array(
+					'message' => __( 'Configuration invalide.', 'wc-photo-clock-13' ),
+					'debug'   => json_last_error_msg(),
+				)
+			);
+		}
+
+		// Réutiliser la logique de sauvegarde (transient + URL)
+		$share_id = wp_generate_password( 32, false );
+		$config   = WC_PC13_Frontend::sanitize_payload( $payload_decoded );
+
+		$data = array(
+			'product_id' => $product_id,
+			'config'     => $config,
+			'created_at' => current_time( 'mysql' ),
+		);
+
+		$transient_key = 'wc_pc13_share_' . $share_id;
+		set_transient( $transient_key, $data, 30 * DAY_IN_SECONDS );
+
+		$share_url = add_query_arg(
+			array(
+				'share' => $share_id,
+			),
+			get_permalink( $product_id )
+		);
+
+		// Envoyer l'email
+		$subject = sprintf( __( 'Votre lien de sauvegarde - %s', 'wc-photo-clock-13' ), get_bloginfo( 'name' ) );
+		$body    = sprintf(
+			/* translators: %s: share URL */
+			__( "Bonjour,\n\nVoici le lien pour reprendre votre composition : %s\n\nÀ bientôt !", 'wc-photo-clock-13' ),
+			$share_url
+		);
+
+		$sent = wp_mail( $email, $subject, $body );
+		if ( ! $sent ) {
+			wp_send_json_error( array( 'message' => __( 'Erreur lors de l’envoi de l’email.', 'wc-photo-clock-13' ) ) );
+		}
 
 		wp_send_json_success(
 			array(
