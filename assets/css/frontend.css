@@ -1636,6 +1636,154 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	}
 }
 
+.wc-pc13-help-btn {
+	display: inline-block;
+	margin-top: 12px;
+	padding: 8px 16px;
+	background: #f0f0f0;
+	border: 1px solid #ddd;
+	border-radius: 6px;
+	font-size: 12px;
+	color: #666;
+	cursor: pointer;
+	transition: all 0.2s ease;
+	text-decoration: none;
+}
+
+.wc-pc13-help-btn:hover {
+	background: #e0e0e0;
+	border-color: #21759b;
+	color: #21759b;
+}
+
+.wc-pc13-help-modal {
+	display: none;
+	position: fixed;
+	z-index: 10000;
+	left: 0;
+	top: 0;
+	width: 100%;
+	height: 100%;
+	background-color: rgba(0, 0, 0, 0.6);
+	align-items: center;
+	justify-content: center;
+	animation: fadeIn 0.3s ease;
+}
+
+.wc-pc13-help-modal-content {
+	background-color: #fff;
+	padding: 30px;
+	border-radius: 12px;
+	max-width: 600px;
+	width: 90%;
+	max-height: 90vh;
+	overflow-y: auto;
+	position: relative;
+	box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+	animation: slideUp 0.3s ease;
+}
+
+.wc-pc13-help-modal-close {
+	position: absolute;
+	right: 15px;
+	top: 15px;
+	font-size: 28px;
+	font-weight: bold;
+	color: #999;
+	cursor: pointer;
+	line-height: 1;
+	transition: color 0.2s ease;
+}
+
+.wc-pc13-help-modal-close:hover {
+	color: #333;
+}
+
+.wc-pc13-help-modal-content h3 {
+	margin: 0 0 20px 0;
+	font-size: 22px;
+	color: #333;
+}
+
+.wc-pc13-help-form {
+	display: flex;
+	flex-direction: column;
+	gap: 15px;
+}
+
+.wc-pc13-help-form label {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	font-weight: 600;
+	color: #555;
+	font-size: 14px;
+}
+
+.wc-pc13-help-form label span {
+	font-weight: 600;
+	color: #555;
+}
+
+.wc-pc13-help-form input[type="text"],
+.wc-pc13-help-form input[type="email"],
+.wc-pc13-help-form select,
+.wc-pc13-help-form textarea {
+	width: 100%;
+	padding: 12px;
+	border: 1px solid #ddd;
+	border-radius: 6px;
+	font-size: 14px;
+	font-family: inherit;
+	transition: border-color 0.2s ease;
+	box-sizing: border-box;
+}
+
+.wc-pc13-help-form input[type="text"]:focus,
+.wc-pc13-help-form input[type="email"]:focus,
+.wc-pc13-help-form select:focus,
+.wc-pc13-help-form textarea:focus {
+	outline: none;
+	border-color: #21759b;
+	box-shadow: 0 0 0 3px rgba(33, 117, 155, 0.1);
+}
+
+.wc-pc13-help-form textarea {
+	resize: vertical;
+	min-height: 120px;
+}
+
+.wc-pc13-help-modal-actions {
+	display: flex;
+	gap: 10px;
+	justify-content: flex-end;
+	margin-top: 10px;
+}
+
+.wc-pc13-help-modal-actions .button {
+	padding: 10px 20px;
+	font-size: 14px;
+}
+
+.wc-pc13-help-modal-message {
+	padding: 12px;
+	border-radius: 6px;
+	margin-top: 15px;
+	font-size: 14px;
+}
+
+.wc-pc13-help-modal-message.success {
+	background-color: #d4edda;
+	color: #155724;
+	border: 1px solid #c3e6cb;
+}
+
+.wc-pc13-help-modal-message.error {
+	background-color: #f8d7da;
+	color: #721c24;
+	border: 1px solid #f5c6cb;
+}
+
 .wc-pc13-copyright {
 	margin-top: 32px;
 	padding-top: 20px;

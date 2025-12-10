@@ -1252,6 +1252,12 @@ let sharedConfigLoaded = false;
 
 	const selectors = {
 		configurator: '.wc-pc13-configurator',
+		helpBtn: '.wc-pc13-help-btn',
+		helpModal: '.wc-pc13-help-modal',
+		helpModalClose: '.wc-pc13-help-modal-close',
+		helpModalCancel: '.wc-pc13-help-modal-cancel',
+		helpForm: '.wc-pc13-help-form',
+		helpModalMessage: '.wc-pc13-help-modal-message',
 		slot: '.wc-pc13-slot',
 		center: '.wc-pc13-center',
 		slotImage: '.wc-pc13-slot-image',
@@ -3180,20 +3186,57 @@ function handleIntermediatePointsChange(event) {
 		});
 	}
 
-	const showSlotsToggle = configurator.querySelector(selectors.showSlotsToggle);
-	if (showSlotsToggle) {
-		showSlotsToggle.checked = !!state.showSlots;
-		showSlotsToggle.addEventListener('change', (e) => {
-			state.showSlots = !!e.target.checked;
-			// Si on masque les slots, forcer la sélection sur le centre
-			if (!state.showSlots) {
-				selectSlot('center');
-			}
-			applyTransforms();
-			updateSelectionUI();
-			savePayload();
-		});
-	}
+		const showSlotsToggle = configurator.querySelector(selectors.showSlotsToggle);
+		if (showSlotsToggle) {
+			showSlotsToggle.checked = !!state.showSlots;
+			showSlotsToggle.addEventListener('change', (e) => {
+				state.showSlots = !!e.target.checked;
+				// Si on masque les slots, forcer la sélection sur le centre
+				if (!state.showSlots) {
+					selectSlot('center');
+				}
+				applyTransforms();
+				updateSelectionUI();
+				savePayload();
+			});
+		}
+
+		// Gestion du modal d'aide
+		const helpBtn = configurator.querySelector(selectors.helpBtn);
+		const helpModal = configurator.querySelector(selectors.helpModal);
+		const helpModalClose = configurator.querySelector(selectors.helpModalClose);
+		const helpModalCancel = configurator.querySelector(selectors.helpModalCancel);
+		const helpForm = configurator.querySelector(selectors.helpForm);
+
+		if (helpBtn) {
+			helpBtn.addEventListener('click', () => {
+				openHelpModal();
+			});
+		}
+
+		if (helpModalClose) {
+			helpModalClose.addEventListener('click', () => {
+				closeHelpModal();
+			});
+		}
+
+		if (helpModalCancel) {
+			helpModalCancel.addEventListener('click', () => {
+				closeHelpModal();
+			});
+		}
+
+		if (helpModal) {
+			helpModal.addEventListener('click', (event) => {
+				if (event.target === helpModal) {
+					closeHelpModal();
+				}
+			});
+		}
+
+		if (helpForm) {
+			helpForm.addEventListener('submit', submitHelpForm);
+		}
 
 		// Gestion du modal de partage
 		const shareModal = configurator.querySelector(selectors.shareModal);
@@ -4598,6 +4641,116 @@ async function saveShareAndSendEmail(email, triggerBtn = null) {
 		}
 		if (emailInput) {
 			emailInput.value = '';
+		}
+	}
+
+	function openHelpModal() {
+		const configurator = document.querySelector(selectors.configurator);
+		if (!configurator) {
+			return;
+		}
+		const helpModal = configurator.querySelector(selectors.helpModal);
+		if (helpModal) {
+			helpModal.style.display = 'flex';
+			const emailInput = helpModal.querySelector('#wc-pc13-help-email');
+			if (emailInput) {
+				emailInput.focus();
+			}
+		}
+	}
+
+	function closeHelpModal() {
+		const configurator = document.querySelector(selectors.configurator);
+		if (!configurator) {
+			return;
+		}
+		const helpModal = configurator.querySelector(selectors.helpModal);
+		const helpForm = configurator.querySelector(selectors.helpForm);
+		const helpMessage = configurator.querySelector(selectors.helpModalMessage);
+		if (helpModal) {
+			helpModal.style.display = 'none';
+		}
+		if (helpForm) {
+			helpForm.reset();
+		}
+		if (helpMessage) {
+			helpMessage.style.display = 'none';
+			helpMessage.textContent = '';
+			helpMessage.className = 'wc-pc13-help-modal-message';
+		}
+	}
+
+	async function submitHelpForm(event) {
+		event.preventDefault();
+		const configurator = document.querySelector(selectors.configurator);
+		if (!configurator) {
+			return;
+		}
+
+		const form = event.target;
+		const submitBtn = form.querySelector('.wc-pc13-help-modal-submit');
+		const helpMessage = configurator.querySelector(selectors.helpModalMessage);
+
+		if (!submitBtn || !helpMessage) {
+			return;
+		}
+
+		const formData = new FormData(form);
+		const data = {
+			action: 'wc_pc13_send_help',
+			nonce: WCPC13.nonce,
+			type: formData.get('type'),
+			email: formData.get('email'),
+			subject: formData.get('subject'),
+			message: formData.get('message'),
+		};
+
+		// Validation côté client
+		if (!data.type || !data.email || !data.subject || !data.message) {
+			helpMessage.textContent = WCPC13.labels?.help_required_fields || 'Tous les champs sont requis.';
+			helpMessage.className = 'wc-pc13-help-modal-message error';
+			helpMessage.style.display = 'block';
+			return;
+		}
+
+		// Désactiver le bouton pendant l'envoi
+		submitBtn.disabled = true;
+		submitBtn.textContent = WCPC13.labels?.sending || 'Envoi en cours...';
+		helpMessage.style.display = 'none';
+
+		try {
+			const response = await fetch(WCPC13.ajax_url, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/x-www-form-urlencoded',
+				},
+				body: new URLSearchParams(data),
+			});
+
+			const result = await response.json();
+
+			if (result.success) {
+				helpMessage.textContent = result.data.message || WCPC13.labels?.help_success || 'Message envoyé avec succès !';
+				helpMessage.className = 'wc-pc13-help-modal-message success';
+				helpMessage.style.display = 'block';
+				form.reset();
+				
+				// Fermer le modal après 3 secondes
+				setTimeout(() => {
+					closeHelpModal();
+				}, 3000);
+			} else {
+				helpMessage.textContent = result.data.message || WCPC13.labels?.help_error || 'Une erreur est survenue.';
+				helpMessage.className = 'wc-pc13-help-modal-message error';
+				helpMessage.style.display = 'block';
+			}
+		} catch (error) {
+			helpMessage.textContent = WCPC13.labels?.help_error || 'Une erreur est survenue lors de l\'envoi.';
+			helpMessage.className = 'wc-pc13-help-modal-message error';
+			helpMessage.style.display = 'block';
+		} finally {
+			submitBtn.disabled = false;
+			submitBtn.textContent = WCPC13.labels?.help_submit || 'Envoyer';
 		}
 	}
 

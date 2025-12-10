@@ -48,6 +48,8 @@ class WC_PC13_Frontend {
 		add_filter( 'woocommerce_order_item_thumbnail', array( $this, 'filter_order_item_thumbnail' ), 10, 3 );
 		add_action( 'woocommerce_before_add_to_cart_quantity', array( $this, 'hide_quantity_selector' ), 5 );
 		add_action( 'woocommerce_after_add_to_cart_quantity', array( $this, 'hide_quantity_selector_end' ), 5 );
+		add_action( 'wp_ajax_wc_pc13_send_help', array( $this, 'handle_help_request' ) );
+		add_action( 'wp_ajax_nopriv_wc_pc13_send_help', array( $this, 'handle_help_request' ) );
 	}
 
 	/**
@@ -769,6 +771,67 @@ class WC_PC13_Frontend {
 	 */
 	public function hide_quantity_selector_end() {
 		// Le style est déjà ajouté dans hide_quantity_selector
+	}
+
+	/**
+	 * Gère l'envoi d'une demande d'aide ou de signalement de bug.
+	 */
+	public function handle_help_request() {
+		check_ajax_referer( 'wc_pc13_nonce', 'nonce' );
+
+		$type    = isset( $_POST['type'] ) ? sanitize_text_field( wp_unslash( $_POST['type'] ) ) : '';
+		$email   = isset( $_POST['email'] ) ? sanitize_email( wp_unslash( $_POST['email'] ) ) : '';
+		$subject = isset( $_POST['subject'] ) ? sanitize_text_field( wp_unslash( $_POST['subject'] ) ) : '';
+		$message = isset( $_POST['message'] ) ? sanitize_textarea_field( wp_unslash( $_POST['message'] ) ) : '';
+
+		if ( empty( $type ) || empty( $email ) || empty( $subject ) || empty( $message ) ) {
+			wp_send_json_error( array( 'message' => __( 'Tous les champs sont requis.', 'wc-photo-clock-13' ) ) );
+		}
+
+		if ( ! is_email( $email ) ) {
+			wp_send_json_error( array( 'message' => __( 'Adresse email invalide.', 'wc-photo-clock-13' ) ) );
+		}
+
+		// Email de destination
+		$admin_email = 'contact@mohorloge.fr';
+
+		// Préparer le sujet de l'email
+		$email_subject = sprintf(
+			'[%s] %s: %s',
+			get_bloginfo( 'name' ),
+			$type === 'bug' ? __( 'Signalement de bug', 'wc-photo-clock-13' ) : __( 'Question', 'wc-photo-clock-13' ),
+			$subject
+		);
+
+		// Préparer le corps de l'email
+		$email_body = sprintf(
+			"%s\n\n%s: %s\n\n%s:\n%s\n\n%s:\n%s\n\n%s:\n%s",
+			$type === 'bug' ? __( 'Un bug a été signalé via le configurateur d\'horloge.', 'wc-photo-clock-13' ) : __( 'Une question a été posée via le configurateur d\'horloge.', 'wc-photo-clock-13' ),
+			__( 'Type', 'wc-photo-clock-13' ),
+			$type === 'bug' ? __( 'Bug', 'wc-photo-clock-13' ) : __( 'Question', 'wc-photo-clock-13' ),
+			__( 'Email', 'wc-photo-clock-13' ),
+			$email,
+			__( 'Sujet', 'wc-photo-clock-13' ),
+			$subject,
+			__( 'Message', 'wc-photo-clock-13' ),
+			$message
+		);
+
+		// En-têtes de l'email
+		$headers = array(
+			'Content-Type: text/plain; charset=UTF-8',
+			'From: ' . get_bloginfo( 'name' ) . ' <' . $admin_email . '>',
+			'Reply-To: ' . $email,
+		);
+
+		// Envoyer l'email
+		$sent = wp_mail( $admin_email, $email_subject, $email_body, $headers );
+
+		if ( $sent ) {
+			wp_send_json_success( array( 'message' => __( 'Votre message a été envoyé avec succès. Nous vous répondrons dans les plus brefs délais.', 'wc-photo-clock-13' ) ) );
+		} else {
+			wp_send_json_error( array( 'message' => __( 'Une erreur est survenue lors de l\'envoi. Veuillez réessayer plus tard.', 'wc-photo-clock-13' ) ) );
+		}
 	}
 }
 

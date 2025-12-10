@@ -157,6 +157,11 @@ class WC_PC13_Assets {
 					'loading_unsplash' => __( 'Chargement des photos...', 'wc-photo-clock-13' ),
 					'unsplash_error'    => __( 'Erreur lors du chargement des photos Unsplash.', 'wc-photo-clock-13' ),
 					'fill_unsplash'     => __( 'Charger des photos aléatoires', 'wc-photo-clock-13' ),
+					'help_required_fields' => __( 'Tous les champs sont requis.', 'wc-photo-clock-13' ),
+					'help_success' => __( 'Message envoyé avec succès !', 'wc-photo-clock-13' ),
+					'help_error' => __( 'Une erreur est survenue lors de l\'envoi.', 'wc-photo-clock-13' ),
+					'help_submit' => __( 'Envoyer', 'wc-photo-clock-13' ),
+					'sending' => __( 'Envoi en cours...', 'wc-photo-clock-13' ),
 				),
 				'settings' => array(
 					'max_upload_bytes' => $max_upload_bytes,

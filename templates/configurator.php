@@ -420,6 +420,43 @@ $mode = isset( $mode ) ? $mode : 'peripheral';
 	
 	<div class="wc-pc13-copyright">
 		<p>&copy; <?php echo esc_html( date( 'Y' ) ); ?> Configurateur MonHorloge - Développé par la société MonHorloge</p>
+		<button type="button" class="wc-pc13-help-btn" aria-label="<?php esc_attr_e( 'Aide et support', 'wc-photo-clock-13' ); ?>">
+			<?php esc_html_e( '❓ Poser une question / Signaler un bug', 'wc-photo-clock-13' ); ?>
+		</button>
+	</div>
+	
+	<!-- Modal d'aide et support -->
+	<div class="wc-pc13-help-modal" style="display: none;">
+		<div class="wc-pc13-help-modal-content">
+			<span class="wc-pc13-help-modal-close">&times;</span>
+			<h3><?php esc_html_e( 'Poser une question ou signaler un bug', 'wc-photo-clock-13' ); ?></h3>
+			<form class="wc-pc13-help-form">
+				<label for="wc-pc13-help-type">
+					<span><?php esc_html_e( 'Type', 'wc-photo-clock-13' ); ?></span>
+					<select id="wc-pc13-help-type" name="type" required>
+						<option value="question"><?php esc_html_e( 'Question', 'wc-photo-clock-13' ); ?></option>
+						<option value="bug"><?php esc_html_e( 'Signaler un bug', 'wc-photo-clock-13' ); ?></option>
+					</select>
+				</label>
+				<label for="wc-pc13-help-email">
+					<span><?php esc_html_e( 'Votre email', 'wc-photo-clock-13' ); ?></span>
+					<input type="email" id="wc-pc13-help-email" name="email" required placeholder="<?php esc_attr_e( 'votre@email.com', 'wc-photo-clock-13' ); ?>">
+				</label>
+				<label for="wc-pc13-help-subject">
+					<span><?php esc_html_e( 'Sujet', 'wc-photo-clock-13' ); ?></span>
+					<input type="text" id="wc-pc13-help-subject" name="subject" required placeholder="<?php esc_attr_e( 'Résumé de votre question ou bug', 'wc-photo-clock-13' ); ?>">
+				</label>
+				<label for="wc-pc13-help-message">
+					<span><?php esc_html_e( 'Message', 'wc-photo-clock-13' ); ?></span>
+					<textarea id="wc-pc13-help-message" name="message" rows="6" required placeholder="<?php esc_attr_e( 'Décrivez votre question ou le bug rencontré...', 'wc-photo-clock-13' ); ?>"></textarea>
+				</label>
+				<div class="wc-pc13-help-modal-actions">
+					<button type="button" class="button button-secondary wc-pc13-help-modal-cancel"><?php esc_html_e( 'Annuler', 'wc-photo-clock-13' ); ?></button>
+					<button type="submit" class="button button-primary wc-pc13-help-modal-submit"><?php esc_html_e( 'Envoyer', 'wc-photo-clock-13' ); ?></button>
+				</div>
+				<div class="wc-pc13-help-modal-message" style="display: none;"></div>
+			</form>
+		</div>
 	</div>
 </div>
 
