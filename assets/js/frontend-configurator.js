@@ -50,6 +50,9 @@ const CENTER_COVER_THRESHOLD = 3;
 		}),
 	};
 
+	const MAX_SCALE = 5;
+	const MIN_SCALE = 1;
+
 	const state = {
 		currentSlot: 'center',
 		color: '#111111',
@@ -72,7 +75,39 @@ const CENTER_COVER_THRESHOLD = 3;
 			size: 32,
 			distance: 0,
 		},
+		slotBorder: {
+			enabled: false,
+			color: '#000000',
+			width: 2,
+		},
+		slotShadow: {
+			enabled: false,
+		},
 	};
+
+	function clampTransformValues(target) {
+		const transform = target || {};
+		const rawScale = Number.isFinite(transform.scale) ? transform.scale : MIN_SCALE;
+		const safeScale = Math.min(Math.max(rawScale, MIN_SCALE), MAX_SCALE);
+		transform.scale = safeScale;
+
+		if (safeScale <= 1) {
+			transform.x = 0;
+			transform.y = 0;
+			return { x: 0, y: 0, scale: safeScale, maxOffset: 0 };
+		}
+
+		const maxOffset = (safeScale - 1) * 50;
+		const rawX = Number.isFinite(transform.x) ? transform.x : 0;
+		const rawY = Number.isFinite(transform.y) ? transform.y : 0;
+		const x = Math.max(-maxOffset, Math.min(maxOffset, rawX));
+		const y = Math.max(-maxOffset, Math.min(maxOffset, rawY));
+		const clampedX = Math.max(-maxOffset, Math.min(maxOffset, x));
+		const clampedY = Math.max(-maxOffset, Math.min(maxOffset, y));
+		transform.x = clampedX;
+		transform.y = clampedY;
+		return { x: clampedX, y: clampedY, scale: safeScale, maxOffset };
+	}
 
 let dropzoneInstance = null;
 let handsTimer = null;
@@ -574,15 +609,27 @@ let jsPDFLoader = null;
 
 	function getRingRadiusValue(baseSize) {
 		const size = state.ringSize;
-		return Math.max((baseSize / 2) - (size / 2) - 12, 50);
+		return Math.max((baseSize / 2) - (size / 2) - 35, 50);
 	}
 
-	function drawCircularImage(ctx, centerX, centerY, diameter, image, transformState) {
+	function drawCircularImage(ctx, centerX, centerY, diameter, image, transformState, options = {}) {
 		if (!image) {
 			return;
 		}
 
 		const radius = diameter / 2;
+		const scaleFactor = options.scaleFactor || 1;
+		
+		// Dessiner l'ombre portée si activée
+		if (options.shadowEnabled) {
+			ctx.save();
+			ctx.beginPath();
+			ctx.arc(centerX + 4 * scaleFactor, centerY + 4 * scaleFactor, radius, 0, Math.PI * 2);
+			ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+			ctx.fill();
+			ctx.restore();
+		}
+		
 		ctx.save();
 		ctx.beginPath();
 		ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
@@ -605,6 +652,17 @@ let jsPDFLoader = null;
 
 		ctx.restore();
 		ctx.restore();
+		
+		// Dessiner la bordure si activée
+		if (options.borderEnabled && options.borderWidth && options.borderColor) {
+			ctx.save();
+			ctx.beginPath();
+			ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+			ctx.lineWidth = options.borderWidth * scaleFactor;
+			ctx.strokeStyle = options.borderColor;
+			ctx.stroke();
+			ctx.restore();
+		}
 	}
 
 	async function buildHighResPdfCanvas() {
@@ -697,9 +755,9 @@ let jsPDFLoader = null;
 			// Prioriser l'URL du DOM si elle existe, sinon utiliser celle du state
 			const resolvedUrl = (domInfo.imageUrl && domInfo.imageUrl.trim()) || (state.slots[i].image_url && state.slots[i].image_url.trim()) || '';
 			const resolvedTransform = {
-				x: typeof domInfo.x === 'number' ? domInfo.x : (typeof state.slots[i].x === 'number' ? state.slots[i].x : 0),
-				y: typeof domInfo.y === 'number' ? domInfo.y : (typeof state.slots[i].y === 'number' ? state.slots[i].y : 0),
-				scale: typeof domInfo.scale === 'number' && domInfo.scale > 0 ? domInfo.scale : (typeof state.slots[i].scale === 'number' && state.slots[i].scale > 0 ? state.slots[i].scale : 1),
+				x: Number.isFinite(domInfo.x) ? domInfo.x : (Number.isFinite(state.slots[i].x) ? state.slots[i].x : 0),
+				y: Number.isFinite(domInfo.y) ? domInfo.y : (Number.isFinite(state.slots[i].y) ? state.slots[i].y : 0),
+				scale: Number.isFinite(domInfo.scale) && domInfo.scale > 0 ? domInfo.scale : (Number.isFinite(state.slots[i].scale) && state.slots[i].scale > 0 ? state.slots[i].scale : MIN_SCALE),
 			};
 			slotEntries.push({
 				index: i,
@@ -805,7 +863,14 @@ let jsPDFLoader = null;
 			const slotCenterX = centerX + Math.sin(angleRad) * ringRadius;
 			const slotCenterY = centerY - Math.cos(angleRad) * ringRadius;
 
-			drawCircularImage(ctx, slotCenterX, slotCenterY, slotSize, image, entry.state);
+			const clampedState = clampTransformValues(entry.state);
+			drawCircularImage(ctx, slotCenterX, slotCenterY, slotSize, image, clampedState, {
+				scaleFactor: scaleFactor,
+				borderEnabled: state.slotBorder?.enabled || false,
+				borderWidth: state.slotBorder?.width || 2,
+				borderColor: state.slotBorder?.color || '#000000',
+				shadowEnabled: state.slotShadow?.enabled || false,
+			});
 			drawnSlotsCount++;
 			if (window.WCPC13_DEBUG) {
 				console.log(`[PDF] Slot ${entry.index}: image dessinée à (${slotCenterX.toFixed(1)}, ${slotCenterY.toFixed(1)})`);
@@ -817,7 +882,14 @@ let jsPDFLoader = null;
 		}
 
 		if (centerImage) {
-			drawCircularImage(ctx, centerX, centerY, centerSize, centerImage, centerTransformFallback);
+			const clampedCenter = clampTransformValues(centerTransformFallback);
+			drawCircularImage(ctx, centerX, centerY, centerSize, centerImage, clampedCenter, {
+				scaleFactor: scaleFactor,
+				shadowEnabled: state.slotShadow?.enabled || false,
+				borderEnabled: state.slotBorder?.enabled || false,
+				borderWidth: state.slotBorder?.width || 2,
+				borderColor: state.slotBorder?.color || '#000000',
+			});
 		}
 
 		if (state.showNumbers) {
@@ -974,6 +1046,11 @@ let jsPDFLoader = null;
 		livePreviewImage: '.wc-pc13-live-preview-image',
 		livePreviewPlaceholder: '.wc-pc13-live-preview-placeholder',
 		fillUnsplash: '.wc-pc13-fill-unsplash',
+		slotBorderEnabled: '#wc-pc13-slot-border-enabled',
+		slotBorderColor: '#wc-pc13-slot-border-color',
+		slotBorderWidth: '#wc-pc13-slot-border-width',
+		slotBorderFields: '.wc-pc13-slot-border-fields',
+		slotShadowEnabled: '#wc-pc13-slot-shadow-enabled',
 	};
 
 	function updateRingDimensions() {
@@ -989,7 +1066,7 @@ let jsPDFLoader = null;
 
 		const size = state.ringSize;
 		const previewWidth = preview.offsetWidth || 360;
-		const radius = Math.max((previewWidth / 2) - (size / 2) - 12, 50);
+		const radius = Math.max((previewWidth / 2) - (size / 2) - 35, 50);
 
 		preview.style.setProperty('--slot-size', `${size}px`);
 		preview.style.setProperty('--ring-radius', `${radius}px`);
@@ -1085,14 +1162,40 @@ let jsPDFLoader = null;
 				}
 			}
 
-			slot.style.transform = `translate(${slotState.x}%, ${slotState.y}%) scale(${slotState.scale})`;
-			slot.dataset.axisX = slotState.x;
-			slot.dataset.axisY = slotState.y;
-			slot.dataset.zoom = slotState.scale;
+			const { x, y, scale } = clampTransformValues(slotState);
+			slot.style.transform = 'none';
+			slot.style.backgroundSize = `${scale * 100}%`;
+			slot.style.backgroundPosition = `${50 + x}% ${50 + y}%`;
+			slot.dataset.axisX = x;
+			slot.dataset.axisY = y;
+			slot.dataset.zoom = scale;
+			
+			// Appliquer les styles de bordure et d'ombre (seulement si le slot n'est pas actif)
+			const slotElement = slot.closest(selectors.slot);
+			const isActive = slotElement && slotElement.classList.contains('active');
+			
+			if (!isActive) {
+				if (state.slotBorder.enabled) {
+					slot.style.border = `${state.slotBorder.width}px solid ${state.slotBorder.color}`;
+				} else {
+					slot.style.border = '';
+				}
+				
+				if (state.slotShadow.enabled) {
+					slot.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.3)';
+				} else {
+					slot.style.boxShadow = '';
+				}
+			} else {
+				// Réinitialiser les styles quand le slot est actif (le CSS gère le style actif)
+				slot.style.border = '';
+				slot.style.boxShadow = '';
+			}
+			
 			if (slotInner) {
-				slotInner.dataset.axisX = slotState.x;
-				slotInner.dataset.axisY = slotState.y;
-				slotInner.dataset.zoom = slotState.scale;
+				slotInner.dataset.axisX = x;
+				slotInner.dataset.axisY = y;
+				slotInner.dataset.zoom = scale;
 			}
 		});
 
@@ -1120,12 +1223,10 @@ let jsPDFLoader = null;
 				centerEl.style.backgroundImage = `url(${state.center.image_url})`;
 				centerEl.classList.remove('empty');
 
-				// Utiliser transform comme avant pour l'affichage normal
-				// Les valeurs x et y sont en pourcentage, où 0 = centre
-				const x = state.center.x || 0;
-				const y = state.center.y || 0;
-				const scale = state.center.scale || 1;
-				centerEl.style.transform = `translate(${x}%, ${y}%) scale(${scale})`;
+				const { x, y, scale } = clampTransformValues(state.center);
+				centerEl.style.transform = 'none';
+				centerEl.style.backgroundSize = `${scale * 100}%`;
+				centerEl.style.backgroundPosition = `${50 + x}% ${50 + y}%`;
 				centerEl.dataset.axisX = x;
 				centerEl.dataset.axisY = y;
 				centerEl.dataset.zoom = scale;
@@ -1318,6 +1419,8 @@ let jsPDFLoader = null;
 			ring_size: state.ringSize,
 			show_numbers: state.showNumbers,
 			numbers: state.numbers,
+			slot_border: state.slotBorder,
+			slot_shadow: state.slotShadow,
 		};
 
 		if (payloadInput) {
@@ -1582,6 +1685,7 @@ function handleFileChange(event) {
 	function handleZoomChange(event) {
 		const current = getCurrentSlotState();
 		current.scale = parseFloat(event.target.value);
+		clampTransformValues(current);
 		applyTransforms();
 		savePayload();
 	}
@@ -1590,10 +1694,11 @@ function handleFileChange(event) {
 		const axis = event.target.dataset.axis;
 		const current = getCurrentSlotState();
 		if ('x' === axis) {
-			current.x = parseFloat(event.target.value);
+			current.x = -parseFloat(event.target.value);
 		} else if ('y' === axis) {
-			current.y = parseFloat(event.target.value);
+			current.y = -parseFloat(event.target.value);
 		}
+		clampTransformValues(current);
 		applyTransforms();
 		savePayload();
 	}
@@ -1637,6 +1742,48 @@ function handleNumbersSizeChange(event) {
 		return;
 	}
 	state.numbers.size = Math.max(12, Math.min(96, value));
+	applyTransforms();
+	savePayload();
+}
+
+function handleNumbersDistanceChange(event) {
+	const value = parseInt(event.target.value, 10);
+	if (Number.isNaN(value)) {
+		return;
+	}
+}
+
+function handleSlotBorderEnabledChange(event) {
+	state.slotBorder.enabled = !!event.target.checked;
+	const configurator = document.querySelector(selectors.configurator);
+	if (configurator) {
+		const slotBorderFields = configurator.querySelector(selectors.slotBorderFields);
+		if (slotBorderFields) {
+			slotBorderFields.style.display = state.slotBorder.enabled ? 'block' : 'none';
+		}
+	}
+	applyTransforms();
+	savePayload();
+}
+
+function handleSlotBorderColorChange(event) {
+	state.slotBorder.color = event.target.value || '#000000';
+	applyTransforms();
+	savePayload();
+}
+
+function handleSlotBorderWidthChange(event) {
+	const value = parseInt(event.target.value, 10);
+	if (Number.isNaN(value)) {
+		return;
+	}
+	state.slotBorder.width = Math.max(1, Math.min(10, value));
+	applyTransforms();
+	savePayload();
+}
+
+function handleSlotShadowEnabledChange(event) {
+	state.slotShadow.enabled = !!event.target.checked;
 	applyTransforms();
 	savePayload();
 }
@@ -1873,7 +2020,7 @@ function handleNumbersDistanceChange(event) {
 			}
 		}
 
-		// Détecter les clics en dehors de l'horloge pour désélectionner
+		// Détecter les clics hors sélection périphérique pour fermer le panneau flottant
 		const preview = configurator.querySelector('.wc-pc13-preview');
 		const ring = configurator.querySelector('.wc-pc13-ring');
 		if (preview && ring) {
@@ -1884,12 +2031,18 @@ function handleNumbersDistanceChange(event) {
 					return;
 				}
 
-				// Vérifier si le clic est en dehors de l'horloge (ring)
-				if (!ring.contains(e.target)) {
-					// Si une photo périphérique est sélectionnée, désélectionner
-					if (state.currentSlot && state.currentSlot !== 'center' && parseInt(state.currentSlot, 10) >= 1 && parseInt(state.currentSlot, 10) <= 12) {
-						closeFloatingControls();
-					}
+				// Si une photo périphérique est sélectionnée, fermer si on clique ailleurs que sur cette photo
+				const isPeripheralSelection = state.currentSlot && state.currentSlot !== 'center' && parseInt(state.currentSlot, 10) >= 1 && parseInt(state.currentSlot, 10) <= 12;
+				if (!isPeripheralSelection) {
+					return;
+				}
+
+				const selectedSlotEl = configurator.querySelector(`${selectors.slot}[data-slot="${state.currentSlot}"]`);
+				const clickedInsideSelectedSlot = selectedSlotEl && selectedSlotEl.contains(e.target);
+
+				// Fermer si on clique en dehors du slot sélectionné, ou en dehors de l'horloge
+				if (!clickedInsideSelectedSlot || !ring.contains(e.target)) {
+					closeFloatingControls();
 				}
 			});
 		}
@@ -1917,6 +2070,35 @@ function handleNumbersDistanceChange(event) {
 
 	if (numbersDistanceInput) {
 		numbersDistanceInput.addEventListener('input', handleNumbersDistanceChange);
+	}
+
+	const slotBorderEnabled = configurator.querySelector(selectors.slotBorderEnabled);
+	const slotBorderColor = configurator.querySelector(selectors.slotBorderColor);
+	const slotBorderWidth = configurator.querySelector(selectors.slotBorderWidth);
+	const slotBorderFields = configurator.querySelector(selectors.slotBorderFields);
+	const slotShadowEnabled = configurator.querySelector(selectors.slotShadowEnabled);
+
+	if (slotBorderEnabled) {
+		slotBorderEnabled.checked = !!state.slotBorder.enabled;
+		slotBorderEnabled.addEventListener('change', handleSlotBorderEnabledChange);
+		if (slotBorderFields) {
+			slotBorderFields.style.display = state.slotBorder.enabled ? 'block' : 'none';
+		}
+	}
+
+	if (slotBorderColor) {
+		slotBorderColor.value = state.slotBorder.color;
+		slotBorderColor.addEventListener('change', handleSlotBorderColorChange);
+	}
+
+	if (slotBorderWidth) {
+		slotBorderWidth.value = state.slotBorder.width;
+		slotBorderWidth.addEventListener('input', handleSlotBorderWidthChange);
+	}
+
+	if (slotShadowEnabled) {
+		slotShadowEnabled.checked = !!state.slotShadow.enabled;
+		slotShadowEnabled.addEventListener('change', handleSlotShadowEnabledChange);
 	}
 
 	if (centerSelectBtn) {
@@ -2219,13 +2401,14 @@ function handleNumbersDistanceChange(event) {
 				}
 
 				// Convertir les pixels en pourcentage réel par rapport à la taille du conteneur
-				// 1 pixel de déplacement = (100 / containerSize) % de déplacement
-				const percentPerPixel = 100 / containerSize;
-				const deltaXPercent = deltaX * percentPerPixel;
-				const deltaYPercent = deltaY * percentPerPixel;
+				// Déplacement adouci et inversé pour une sensation plus fluide
+				const percentPerPixel = (100 / containerSize) * 0.65;
+				const deltaXPercent = -deltaX * percentPerPixel;
+				const deltaYPercent = -deltaY * percentPerPixel;
 
-				targetState.x = Math.max(-100, Math.min(100, initialX + deltaXPercent));
-				targetState.y = Math.max(-100, Math.min(100, initialY + deltaYPercent));
+				targetState.x = initialX + deltaXPercent;
+				targetState.y = initialY + deltaYPercent;
+				clampTransformValues(targetState);
 				applyTransforms();
 				savePayload();
 				updateSelectionUI();
@@ -2589,9 +2772,11 @@ function handleNumbersDistanceChange(event) {
 				const centerSizeRange = configurator ? configurator.querySelector(selectors.centerSizeRange) : null;
 				const centerMax = state.centerMax || (centerSizeRange ? parseInt(centerSizeRange.max || `${state.center.size}`, 10) : state.center.size);
 				if (centerMax) {
-					state.center.size = centerMax;
+					// Définir la taille à 45% de la taille maximale pour la démo
+					const demoSize = Math.round(centerMax * 0.45);
+					state.center.size = Math.max(CENTER_MIN_SIZE, demoSize);
 					if (centerSizeRange) {
-						centerSizeRange.value = centerMax;
+						centerSizeRange.value = state.center.size;
 					}
 				}
 			}
@@ -2687,6 +2872,27 @@ function handleNumbersDistanceChange(event) {
 			const initial = parseInt(preview.dataset.initialSlotSize || ringSizeInput.value || 80, 10);
 			state.ringSize = initial;
 			ringSizeInput.value = initial;
+		}
+
+		const slotBorderEnabled = configurator.querySelector(selectors.slotBorderEnabled);
+		const slotBorderColor = configurator.querySelector(selectors.slotBorderColor);
+		const slotBorderWidth = configurator.querySelector(selectors.slotBorderWidth);
+		const slotShadowEnabled = configurator.querySelector(selectors.slotShadowEnabled);
+		
+		if (slotBorderEnabled) {
+			state.slotBorder.enabled = !!slotBorderEnabled.checked;
+		}
+		if (slotBorderColor && slotBorderColor.value) {
+			state.slotBorder.color = slotBorderColor.value;
+		}
+		if (slotBorderWidth) {
+			const initialWidth = parseInt(slotBorderWidth.value || state.slotBorder.width, 10);
+			if (!Number.isNaN(initialWidth)) {
+				state.slotBorder.width = Math.max(1, Math.min(10, initialWidth));
+			}
+		}
+		if (slotShadowEnabled) {
+			state.slotShadow.enabled = !!slotShadowEnabled.checked;
 		}
 
 			updateRingDimensions();
@@ -2983,6 +3189,12 @@ function handleNumbersDistanceChange(event) {
 			if (sharedConfig.numbers) {
 				state.numbers = { ...state.numbers, ...sharedConfig.numbers };
 			}
+			if (sharedConfig.slot_border) {
+				state.slotBorder = { ...state.slotBorder, ...sharedConfig.slot_border };
+			}
+			if (sharedConfig.slot_shadow) {
+				state.slotShadow = { ...state.slotShadow, ...sharedConfig.slot_shadow };
+			}
 
 			// Appliquer la configuration
 			applyStateToUI();
@@ -3021,6 +3233,29 @@ function handleNumbersDistanceChange(event) {
 		if (secondHandSelect && state.secondHand) {
 			secondHandSelect.value = state.secondHand;
 			updateSecondHand();
+		}
+
+		// Appliquer les styles de bordure et d'ombre
+		const slotBorderEnabled = configurator.querySelector(selectors.slotBorderEnabled);
+		const slotBorderColor = configurator.querySelector(selectors.slotBorderColor);
+		const slotBorderWidth = configurator.querySelector(selectors.slotBorderWidth);
+		const slotBorderFields = configurator.querySelector(selectors.slotBorderFields);
+		const slotShadowEnabled = configurator.querySelector(selectors.slotShadowEnabled);
+		
+		if (slotBorderEnabled) {
+			slotBorderEnabled.checked = !!state.slotBorder.enabled;
+			if (slotBorderFields) {
+				slotBorderFields.style.display = state.slotBorder.enabled ? 'block' : 'none';
+			}
+		}
+		if (slotBorderColor && state.slotBorder.color) {
+			slotBorderColor.value = state.slotBorder.color;
+		}
+		if (slotBorderWidth && state.slotBorder.width) {
+			slotBorderWidth.value = state.slotBorder.width;
+		}
+		if (slotShadowEnabled) {
+			slotShadowEnabled.checked = !!state.slotShadow.enabled;
 		}
 
 		// Appliquer les images

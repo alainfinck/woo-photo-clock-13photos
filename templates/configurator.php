@@ -240,6 +240,27 @@ $button_text = isset( $button_text ) ? $button_text : __( 'Ajouter au panier', '
 				</div>
 					<label for="wc-pc13-slot-size"><?php esc_html_e( 'Taille des photos périphériques', 'wc-photo-clock-13' ); ?></label>
 					<input type="range" id="wc-pc13-slot-size" name="wc_pc13_slot_size" min="50" max="160" step="1" value="110">
+					<div class="wc-pc13-slot-styling">
+						<h5><?php esc_html_e( 'Style des photos périphériques', 'wc-photo-clock-13' ); ?></h5>
+						<label class="wc-pc13-toggle">
+							<input type="checkbox" id="wc-pc13-slot-border-enabled" name="wc_pc13_slot_border_enabled" value="1">
+							<span><?php esc_html_e( 'Activer le contour', 'wc-photo-clock-13' ); ?></span>
+						</label>
+						<div class="wc-pc13-slot-border-fields">
+							<label for="wc-pc13-slot-border-color">
+								<span><?php esc_html_e( 'Couleur du contour', 'wc-photo-clock-13' ); ?></span>
+								<input type="color" id="wc-pc13-slot-border-color" name="wc_pc13_slot_border_color" value="#000000">
+							</label>
+							<label for="wc-pc13-slot-border-width">
+								<span><?php esc_html_e( 'Épaisseur du contour', 'wc-photo-clock-13' ); ?></span>
+								<input type="range" id="wc-pc13-slot-border-width" name="wc_pc13_slot_border_width" min="1" max="10" step="1" value="2">
+							</label>
+						</div>
+						<label class="wc-pc13-toggle">
+							<input type="checkbox" id="wc-pc13-slot-shadow-enabled" name="wc_pc13_slot_shadow_enabled" value="1">
+							<span><?php esc_html_e( 'Activer l\'ombre portée', 'wc-photo-clock-13' ); ?></span>
+						</label>
+					</div>
 			</div>
 
 			<div class="wc-pc13-slot-editor">
@@ -256,7 +277,7 @@ $button_text = isset( $button_text ) ? $button_text : __( 'Ajouter au panier', '
 
 					<label>
 						<span><?php esc_html_e( 'Zoom', 'wc-photo-clock-13' ); ?></span>
-						<input type="range" min="0.5" max="2.5" step="0.01" value="1" data-zoom>
+						<input type="range" min="1" max="5" step="0.01" value="1" data-zoom>
 					</label>
 
 					<label>

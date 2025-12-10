@@ -571,6 +571,63 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	display: flex;
 }
 
+.wc-pc13-slot-styling {
+	margin-top: 20px;
+	padding-top: 20px;
+	border-top: 1px solid #e8e8e8;
+}
+
+.wc-pc13-slot-styling h5 {
+	margin: 0 0 16px 0;
+	font-size: 15px;
+	font-weight: 600;
+	color: #333;
+}
+
+.wc-pc13-slot-border-fields {
+	display: none;
+	flex-direction: column;
+	gap: 14px;
+	padding: 16px;
+	border: 1px solid #d0e5f5;
+	border-radius: 10px;
+	background: linear-gradient(135deg, #f8faff 0%, #f0f7ff 100%);
+	margin-top: 8px;
+}
+
+.wc-pc13-slot-border-fields label {
+	display: grid;
+	gap: 8px;
+	font-weight: 500;
+}
+
+.wc-pc13-slot-border-fields label span {
+	font-size: 13px;
+	color: #555;
+	font-weight: 500;
+}
+
+.wc-pc13-slot-border-fields input[type="range"] {
+	width: 100%;
+}
+
+.wc-pc13-slot-border-fields input[type="color"] {
+	width: 100%;
+	max-width: 80px;
+	height: 40px;
+	padding: 0;
+	border: 1px solid #ddd;
+	border-radius: 8px;
+	background: transparent;
+	cursor: pointer;
+	transition: all 0.2s ease;
+}
+
+.wc-pc13-slot-border-fields input[type="color"]:hover {
+	border-color: #21759b;
+	box-shadow: 0 0 0 3px rgba(33, 117, 155, 0.1);
+}
+
 .wc-pc13-global-settings select,
 .wc-pc13-global-settings input[type="color"] {
 	width: 100%;
