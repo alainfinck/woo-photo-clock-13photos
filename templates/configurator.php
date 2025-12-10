@@ -63,6 +63,7 @@ $button_text = isset( $button_text ) ? $button_text : __( 'Ajouter au panier', '
 						<div class="wc-pc13-hand hour"></div>
 						<div class="wc-pc13-hand minute"></div>
 						<div class="wc-pc13-hand second"></div>
+						<div class="wc-pc13-hands-center"></div>
 					</div>
 				</div>
 				<!-- Panneau flottant pour les contrôles de photo périphérique -->
@@ -107,6 +108,20 @@ $button_text = isset( $button_text ) ? $button_text : __( 'Ajouter au panier', '
 				<button type="button" class="button button-secondary wc-pc13-save-email-btn">
 					<?php esc_html_e( 'Sauvegarder par email', 'wc-photo-clock-13' ); ?>
 				</button>
+			</div>
+			<div class="wc-pc13-email-modal" style="display: none;">
+				<div class="wc-pc13-email-modal-content">
+					<span class="wc-pc13-email-modal-close">&times;</span>
+					<h3><?php esc_html_e( 'Sauvegarder par email', 'wc-photo-clock-13' ); ?></h3>
+					<div class="wc-pc13-email-form">
+						<label for="wc-pc13-email-input"><?php esc_html_e( 'Votre email', 'wc-photo-clock-13' ); ?></label>
+						<input type="email" id="wc-pc13-email-input" placeholder="<?php esc_attr_e( 'exemple@email.com', 'wc-photo-clock-13' ); ?>" required>
+						<div class="wc-pc13-email-modal-actions">
+							<button type="button" class="button button-secondary wc-pc13-email-modal-cancel"><?php esc_html_e( 'Annuler', 'wc-photo-clock-13' ); ?></button>
+							<button type="button" class="button button-primary wc-pc13-email-modal-submit"><?php esc_html_e( 'Envoyer', 'wc-photo-clock-13' ); ?></button>
+						</div>
+					</div>
+				</div>
 			</div>
 			<div class="wc-pc13-share-modal" style="display: none;">
 				<div class="wc-pc13-share-modal-content">

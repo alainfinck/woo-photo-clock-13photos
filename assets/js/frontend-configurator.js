@@ -1132,6 +1132,11 @@ let sharedConfigLoaded = false;
 		shareFacebook: '.wc-pc13-share-facebook',
 		shareX: '.wc-pc13-share-x',
 		saveEmailBtn: '.wc-pc13-save-email-btn',
+		emailModal: '.wc-pc13-email-modal',
+		emailModalClose: '.wc-pc13-email-modal-close',
+		emailModalCancel: '.wc-pc13-email-modal-cancel',
+		emailModalSubmit: '.wc-pc13-email-modal-submit',
+		emailInput: '#wc-pc13-email-input',
 		showSlotsToggle: '#wc-pc13-show-slots',
 		slotStyling: '.wc-pc13-slot-styling',
 		numbersOverlay: '.wc-pc13-numbers-overlay',
@@ -1990,9 +1995,30 @@ function handleCenterSizeChange(event) {
 
 function handleNumbersToggle(event) {
 	state.showNumbers = !!event.target.checked;
+	
+	// Si l'option est activée et que la distance n'est pas encore définie (ou est à 0), définir à 78% par défaut
+	if (state.showNumbers && (!state.numbers.distance || state.numbers.distance === 0)) {
+		const configurator = document.querySelector(selectors.configurator);
+		const numbersDistanceInput = configurator ? configurator.querySelector(selectors.numbersDistance) : null;
+		if (numbersDistanceInput) {
+			const maxValue = parseInt(numbersDistanceInput.max, 10);
+			if (maxValue > 0) {
+				const defaultDistance = Math.round(maxValue * 0.78); // 78% du max
+				state.numbers.distance = defaultDistance;
+				numbersDistanceInput.value = defaultDistance;
+				
+				// Mettre à jour l'affichage du pourcentage
+				const valueDisplay = configurator.querySelector('#wc-pc13-number-distance-value');
+				if (valueDisplay) {
+					valueDisplay.textContent = '78%';
+				}
+			}
+		}
+	}
+	
 	updateSelectionUI();
 	applyTransforms();
-		savePayload();
+	savePayload();
 }
 
 function handleNumbersColorChange(event) {
@@ -2461,16 +2487,61 @@ function handleNumbersDistanceChange(event) {
 
 	const saveEmailBtn = configurator.querySelector(selectors.saveEmailBtn);
 	if (saveEmailBtn) {
-		saveEmailBtn.addEventListener('click', async (event) => {
+		saveEmailBtn.addEventListener('click', (event) => {
 			event.preventDefault();
 			if (shareLoading) {
 				return;
 			}
-			const email = window.prompt(WCPC13.labels?.enter_email || 'Entrez votre email pour recevoir le lien :');
-			if (!email || !email.trim()) {
+			openEmailModal(saveEmailBtn);
+		});
+	}
+
+	// Gestion de la modale email
+	const emailModal = configurator.querySelector(selectors.emailModal);
+	const emailModalClose = configurator.querySelector(selectors.emailModalClose);
+	const emailModalCancel = configurator.querySelector(selectors.emailModalCancel);
+	const emailModalSubmit = configurator.querySelector(selectors.emailModalSubmit);
+	const emailInput = configurator.querySelector(selectors.emailInput);
+
+	if (emailModalClose) {
+		emailModalClose.addEventListener('click', () => {
+			closeEmailModal();
+		});
+	}
+	if (emailModalCancel) {
+		emailModalCancel.addEventListener('click', () => {
+			closeEmailModal();
+		});
+	}
+	if (emailModal) {
+		emailModal.addEventListener('click', (event) => {
+			if (event.target === emailModal) {
+				closeEmailModal();
+			}
+		});
+	}
+	if (emailModalSubmit && emailInput) {
+		emailModalSubmit.addEventListener('click', async () => {
+			const email = emailInput.value.trim();
+			if (!email) {
+				emailInput.focus();
 				return;
 			}
-			await saveShareAndSendEmail(email.trim(), saveEmailBtn);
+			// Validation basique de l'email
+			const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+			if (!emailRegex.test(email)) {
+				window.alert(WCPC13.labels?.invalid_email || 'Email invalide');
+				emailInput.focus();
+				return;
+			}
+			await saveShareAndSendEmail(email, saveEmailBtn);
+			closeEmailModal();
+		});
+		// Permettre la soumission avec Enter
+		emailInput.addEventListener('keypress', (event) => {
+			if (event.key === 'Enter') {
+				emailModalSubmit.click();
+			}
 		});
 	}
 
@@ -3218,21 +3289,23 @@ function handleNumbersDistanceChange(event) {
 			if (sharedConfigLoaded) {
 				initialDistance = (typeof state.numbers.distance === 'number' && Number.isFinite(state.numbers.distance) && state.numbers.distance >= 0)
 					? state.numbers.distance
-					: null; // null pour utiliser la valeur par défaut de 90%
+					: null; // null pour utiliser la valeur par défaut
 			} else {
 				const inputValue = parseInt(numbersDistanceInput.value, 10);
-				// Si la valeur est 0 (valeur par défaut du template), utiliser 90% du max
+				// Si la valeur est 0 (valeur par défaut du template), utiliser la valeur par défaut selon l'état de l'option
 				if (inputValue === 0 && !state.numbers.distance) {
-					initialDistance = null; // null pour utiliser la valeur par défaut de 90%
+					initialDistance = null; // null pour utiliser la valeur par défaut
 				} else {
 					initialDistance = (!Number.isNaN(inputValue) && inputValue >= 0) ? inputValue : null;
 				}
 			}
 			
-			// Si initialDistance est null, calculer 90% du max
+			// Si initialDistance est null, calculer selon l'état de l'option "Afficher les chiffres"
 			if (initialDistance === null || initialDistance === undefined) {
 				const maxValue = parseInt(numbersDistanceInput.max, 10) || 400;
-				initialDistance = Math.round(maxValue * 0.9); // 90% du max
+				// Si l'option "Afficher les chiffres" est activée, utiliser 78% par défaut, sinon 90%
+				const defaultPercentage = state.showNumbers ? 0.78 : 0.9;
+				initialDistance = Math.round(maxValue * defaultPercentage);
 			}
 			
 			state.numbers.distance = Math.max(0, initialDistance);
@@ -3522,6 +3595,40 @@ async function saveShareAndSendEmail(email, triggerBtn = null) {
 		const shareModal = configurator.querySelector(selectors.shareModal);
 		if (shareModal) {
 			shareModal.style.display = 'none';
+		}
+	}
+
+	function openEmailModal(triggerBtn = null) {
+		const configurator = document.querySelector(selectors.configurator);
+		if (!configurator) {
+			return;
+		}
+		const emailModal = configurator.querySelector(selectors.emailModal);
+		const emailInput = configurator.querySelector(selectors.emailInput);
+		if (emailModal) {
+			emailModal.style.display = 'flex';
+			if (emailInput) {
+				emailInput.value = '';
+				// Focus sur l'input après un court délai pour que la modale soit visible
+				setTimeout(() => {
+					emailInput.focus();
+				}, 100);
+			}
+		}
+	}
+
+	function closeEmailModal() {
+		const configurator = document.querySelector(selectors.configurator);
+		if (!configurator) {
+			return;
+		}
+		const emailModal = configurator.querySelector(selectors.emailModal);
+		const emailInput = configurator.querySelector(selectors.emailInput);
+		if (emailModal) {
+			emailModal.style.display = 'none';
+		}
+		if (emailInput) {
+			emailInput.value = '';
 		}
 	}
 
