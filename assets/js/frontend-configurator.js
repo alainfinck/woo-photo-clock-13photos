@@ -17,6 +17,27 @@ const CENTER_COVER_THRESHOLD = 3;
 		return '';
 	}
 
+	function updateNumbersOverlay(configurator, ringRadius) {
+		if (!configurator) {
+			return;
+		}
+		const overlay = configurator.querySelector(selectors.numbersOverlay);
+		if (!overlay) {
+			return;
+		}
+		const labels = overlay.querySelectorAll(selectors.numbersOverlayLabel);
+		const numbersDistance = (typeof state.numbers.distance === 'number' && state.numbers.distance > 0)
+			? state.numbers.distance
+			: ringRadius;
+		const numbersDelta = numbersDistance - ringRadius;
+
+		labels.forEach((label) => {
+			label.style.setProperty('--numbers-color', state.numbers.color || '#222222');
+			label.style.setProperty('--numbers-size', `${state.numbers.size || 32}px`);
+			label.style.setProperty('--numbers-offset', `${numbersDelta}px`);
+		});
+	}
+
 	const PLUGIN_URL = determinePluginBaseUrl();
 	// Liste des fichiers de démonstration disponibles (vérifier qu'ils existent dans assets/demo/)
 	const DEMO_IMAGE_FILES = [
@@ -1050,6 +1071,8 @@ let sharedConfigLoaded = false;
 		saveEmailBtn: '.wc-pc13-save-email-btn',
 		showSlotsToggle: '#wc-pc13-show-slots',
 		slotStyling: '.wc-pc13-slot-styling',
+		numbersOverlay: '.wc-pc13-numbers-overlay',
+		numbersOverlayLabel: '.wc-pc13-number-label',
 		livePreviewImage: '.wc-pc13-live-preview-image',
 		livePreviewPlaceholder: '.wc-pc13-live-preview-placeholder',
 		fillUnsplash: '.wc-pc13-fill-unsplash',
@@ -1089,6 +1112,8 @@ let sharedConfigLoaded = false;
 		if (slotStyling) {
 			slotStyling.style.display = displayValue;
 		}
+
+		updateNumbersOverlay(configurator, radius);
 
 		state.currentRingRadius = radius;
 		if (typeof state.numbers.distance !== 'number' || state.numbers.distance <= 0) {
@@ -1599,7 +1624,7 @@ function applyUploadedImage(data, targetSlot = null) {
 		target.y = 0;
 		target.scale = 1;
 
-		if (state.currentSlot === 'center') {
+		if (slotKey === 'center') {
 			const configurator = document.querySelector(selectors.configurator);
 			const centerSizeRange = configurator ? configurator.querySelector(selectors.centerSizeRange) : null;
 			const centerMax = state.centerMax || (centerSizeRange ? parseInt(centerSizeRange.max || `${state.center.size}`, 10) : state.center.size);
@@ -2179,6 +2204,8 @@ function handleNumbersDistanceChange(event) {
 			selectSlot('center');
 			const fileInput = configurator.querySelector(selectors.fileInput);
 			if (fileInput) {
+				uploadTargetSlot = 'center';
+				fileInput.dataset.targetSlot = 'center';
 				fileInput.click();
 			}
 		});
