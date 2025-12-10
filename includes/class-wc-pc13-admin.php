@@ -86,6 +86,15 @@ class WC_PC13_Admin {
 			'wc-pc13-projects',
 			array( $this, 'render_projects_page' )
 		);
+
+		add_submenu_page(
+			'woocommerce',
+			__( 'Emails partages Horloge 13', 'wc-photo-clock-13' ),
+			__( 'Emails partages Horloge 13', 'wc-photo-clock-13' ),
+			'manage_woocommerce',
+			'wc-pc13-share-emails',
+			array( $this, 'render_share_emails_page' )
+		);
 	}
 
 	/**
@@ -144,6 +153,63 @@ class WC_PC13_Admin {
 			'wc_pc13_settings',
 			'wc_pc13_main_section'
 		);
+	}
+
+	/**
+	 * Rendu de la page des emails collectés.
+	 */
+	public function render_share_emails_page() {
+		$entries = get_option( 'wc_pc13_share_emails', array() );
+		if ( ! is_array( $entries ) ) {
+			$entries = array();
+		}
+		?>
+		<div class="wrap">
+			<h1><?php esc_html_e( 'Emails collectés via partage', 'wc-photo-clock-13' ); ?></h1>
+			<?php if ( empty( $entries ) ) : ?>
+				<p><?php esc_html_e( 'Aucun email collecté pour le moment.', 'wc-photo-clock-13' ); ?></p>
+			<?php else : ?>
+				<table class="widefat striped">
+					<thead>
+						<tr>
+							<th><?php esc_html_e( 'Email', 'wc-photo-clock-13' ); ?></th>
+							<th><?php esc_html_e( 'Share ID', 'wc-photo-clock-13' ); ?></th>
+							<th><?php esc_html_e( 'Produit', 'wc-photo-clock-13' ); ?></th>
+							<th><?php esc_html_e( 'Date', 'wc-photo-clock-13' ); ?></th>
+							<th><?php esc_html_e( 'Lien', 'wc-photo-clock-13' ); ?></th>
+						</tr>
+					</thead>
+					<tbody>
+						<?php foreach ( $entries as $entry ) : ?>
+							<tr>
+								<td><?php echo esc_html( isset( $entry['email'] ) ? $entry['email'] : '' ); ?></td>
+								<td><code><?php echo esc_html( isset( $entry['share_id'] ) ? $entry['share_id'] : '' ); ?></code></td>
+								<td>
+									<?php
+									$product_id = isset( $entry['product_id'] ) ? absint( $entry['product_id'] ) : 0;
+									if ( $product_id ) {
+										$title = get_the_title( $product_id );
+										echo '<a href="' . esc_url( get_edit_post_link( $product_id ) ) . '">' . esc_html( $title ? $title : sprintf( __( 'Produit #%d', 'wc-photo-clock-13' ), $product_id ) ) . '</a>';
+									} else {
+										esc_html_e( 'Non renseigné', 'wc-photo-clock-13' );
+									}
+									?>
+								</td>
+								<td><?php echo esc_html( isset( $entry['created_at'] ) ? $entry['created_at'] : '—' ); ?></td>
+								<td>
+									<?php if ( ! empty( $entry['share_url'] ) ) : ?>
+										<a href="<?php echo esc_url( $entry['share_url'] ); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Ouvrir', 'wc-photo-clock-13' ); ?></a>
+									<?php else : ?>
+										—
+									<?php endif; ?>
+								</td>
+							</tr>
+						<?php endforeach; ?>
+					</tbody>
+				</table>
+			<?php endif; ?>
+		</div>
+		<?php
 	}
 
 	/**

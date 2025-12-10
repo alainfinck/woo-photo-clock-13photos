@@ -466,6 +466,20 @@ class WC_PC13_Ajax {
 			wp_send_json_error( array( 'message' => __( 'Erreur lors de l’envoi de l’email.', 'wc-photo-clock-13' ) ) );
 		}
 
+		// Enregistrer le partage + email collecté
+		$share_emails = get_option( 'wc_pc13_share_emails', array() );
+		if ( ! is_array( $share_emails ) ) {
+			$share_emails = array();
+		}
+		$share_emails[] = array(
+			'share_id'   => $share_id,
+			'product_id' => $product_id,
+			'email'      => $email,
+			'created_at' => current_time( 'mysql' ),
+			'share_url'  => $share_url,
+		);
+		update_option( 'wc_pc13_share_emails', $share_emails, false );
+
 		wp_send_json_success(
 			array(
 				'share_id'  => $share_id,
