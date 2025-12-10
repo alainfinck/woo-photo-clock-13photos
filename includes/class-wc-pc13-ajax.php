@@ -69,8 +69,13 @@ class WC_PC13_Ajax {
 
 		$settings = class_exists( 'WC_PC13_Admin' ) ? WC_PC13_Admin::instance()->get_settings() : array(
 			'max_upload_size' => 10,
+			'thumb_max_size'  => 2000,
 		);
 		$max_size_bytes = absint( $settings['max_upload_size'] ) * 1024 * 1024;
+		$thumb_max_size = isset( $settings['thumb_max_size'] ) ? absint( $settings['thumb_max_size'] ) : 2000;
+		if ( $thumb_max_size < 200 ) {
+			$thumb_max_size = 200;
+		}
 
 		if ( $max_size_bytes && $file['size'] > $max_size_bytes ) {
 			wp_send_json_error(
@@ -118,9 +123,26 @@ class WC_PC13_Ajax {
 			wp_update_attachment_metadata( $attachment_id, $metadata );
 		}
 
+		// Créer une vignette redimensionnée (max côté = $thumb_max_size)
+		$thumb_url = $uploaded['url'];
+		if ( ! is_wp_error( $attachment_id ) ) {
+			$image_editor = wp_get_image_editor( $uploaded['file'] );
+			if ( ! is_wp_error( $image_editor ) ) {
+				$image_editor->resize( $thumb_max_size, $thumb_max_size, false );
+				$saved = $image_editor->save();
+				if ( ! is_wp_error( $saved ) && ! empty( $saved['path'] ) ) {
+					$upload_dir = wp_upload_dir();
+					if ( ! empty( $saved['file'] ) ) {
+						$thumb_url = trailingslashit( $upload_dir['baseurl'] ) . $saved['file'];
+					}
+				}
+			}
+		}
+
 		wp_send_json_success(
 			array(
-				'url'           => $uploaded['url'],
+				'url'           => $thumb_url,
+				'full_url'      => $uploaded['url'],
 				'attachment_id' => $attachment_id,
 			)
 		);

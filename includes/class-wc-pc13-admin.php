@@ -77,6 +77,15 @@ class WC_PC13_Admin {
 			'wc-pc13-settings',
 			array( $this, 'render_settings_page' )
 		);
+
+		add_submenu_page(
+			'woocommerce',
+			__( 'Projets Horloge 13', 'wc-photo-clock-13' ),
+			__( 'Projets Horloge 13', 'wc-photo-clock-13' ),
+			'manage_woocommerce',
+			'wc-pc13-projects',
+			array( $this, 'render_projects_page' )
+		);
 	}
 
 	/**
@@ -121,6 +130,14 @@ class WC_PC13_Admin {
 		);
 
 		add_settings_field(
+			'thumb_max_size',
+			__( 'Taille max des vignettes (px)', 'wc-photo-clock-13' ),
+			array( $this, 'render_field_thumb_max' ),
+			'wc_pc13_settings',
+			'wc_pc13_main_section'
+		);
+
+		add_settings_field(
 			'default_diameter',
 			__( 'Diamètre par défaut (cm)', 'wc-photo-clock-13' ),
 			array( $this, 'render_field_diameter' ),
@@ -143,6 +160,7 @@ class WC_PC13_Admin {
 			'default_hands'   => isset( $input['default_hands'] ) ? sanitize_text_field( $input['default_hands'] ) : $defaults['default_hands'],
 			'default_color'   => isset( $input['default_color'] ) ? sanitize_hex_color( $input['default_color'] ) : $defaults['default_color'],
 			'max_upload_size' => isset( $input['max_upload_size'] ) ? max( 1, absint( $input['max_upload_size'] ) ) : $defaults['max_upload_size'],
+			'thumb_max_size'  => isset( $input['thumb_max_size'] ) ? max( 200, absint( $input['thumb_max_size'] ) ) : $defaults['thumb_max_size'],
 			'default_diameter' => isset( $input['default_diameter'] ) ? $this->sanitize_diameter( $input['default_diameter'], $defaults['default_diameter'] ) : $defaults['default_diameter'],
 		);
 	}
@@ -209,6 +227,17 @@ class WC_PC13_Admin {
 	}
 
 	/**
+	 * Rendu du champ taille max vignette.
+	 */
+	public function render_field_thumb_max() {
+		$options = $this->get_settings();
+		?>
+		<input type="number" min="200" max="4000" step="50" name="<?php echo esc_attr( self::OPTION_KEY ); ?>[thumb_max_size]" value="<?php echo esc_attr( $options['thumb_max_size'] ); ?>">
+		<p class="description"><?php esc_html_e( 'Dimension maximale (px) du plus grand côté pour la vignette générée côté serveur.', 'wc-photo-clock-13' ); ?></p>
+		<?php
+	}
+
+	/**
 	 * Rendu de la page de réglages.
 	 */
 	public function render_settings_page() {
@@ -241,6 +270,7 @@ class WC_PC13_Admin {
 			'default_hands'   => 'classic',
 			'default_color'   => '#111111',
 			'max_upload_size' => 10,
+			'thumb_max_size'  => 2000,
 			'default_diameter' => 30,
 		);
 
@@ -251,6 +281,79 @@ class WC_PC13_Admin {
 		}
 
 		return wp_parse_args( $options, $defaults );
+	}
+
+	/**
+	 * Rendu de la page des projets (liens de partage enregistrés).
+	 */
+	public function render_projects_page() {
+		global $wpdb;
+
+		$prefix   = '_transient_wc_pc13_share_';
+		$like     = $wpdb->esc_like( $prefix ) . '%';
+		$rows     = $wpdb->get_col( $wpdb->prepare( "SELECT option_name FROM {$wpdb->options} WHERE option_name LIKE %s", $like ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		$projects = array();
+
+		if ( $rows ) {
+			foreach ( $rows as $option_name ) {
+				$key       = str_replace( '_transient_', '', $option_name );
+				$share_id  = str_replace( 'wc_pc13_share_', '', $key );
+				$payload   = get_transient( $key );
+				if ( false === $payload || empty( $payload['config'] ) ) {
+					continue;
+				}
+				$product_id = isset( $payload['product_id'] ) ? absint( $payload['product_id'] ) : 0;
+				$created_at = isset( $payload['created_at'] ) ? $payload['created_at'] : '';
+				$projects[] = array(
+					'share_id'   => $share_id,
+					'product_id' => $product_id,
+					'created_at' => $created_at,
+					'url'        => add_query_arg(
+						array( 'share' => $share_id ),
+						get_permalink( $product_id )
+					),
+				);
+			}
+		}
+
+		?>
+		<div class="wrap">
+			<h1><?php esc_html_e( 'Projets horloge (liens sauvegardés)', 'wc-photo-clock-13' ); ?></h1>
+			<?php if ( empty( $projects ) ) : ?>
+				<p><?php esc_html_e( 'Aucun projet trouvé pour le moment.', 'wc-photo-clock-13' ); ?></p>
+			<?php else : ?>
+				<table class="widefat striped">
+					<thead>
+						<tr>
+							<th><?php esc_html_e( 'Share ID', 'wc-photo-clock-13' ); ?></th>
+							<th><?php esc_html_e( 'Produit', 'wc-photo-clock-13' ); ?></th>
+							<th><?php esc_html_e( 'Date de création', 'wc-photo-clock-13' ); ?></th>
+							<th><?php esc_html_e( 'Lien', 'wc-photo-clock-13' ); ?></th>
+						</tr>
+					</thead>
+					<tbody>
+						<?php foreach ( $projects as $project ) : ?>
+							<tr>
+								<td><code><?php echo esc_html( $project['share_id'] ); ?></code></td>
+								<td>
+									<?php
+									if ( $project['product_id'] ) {
+										$title = get_the_title( $project['product_id'] );
+										echo '<a href="' . esc_url( get_edit_post_link( $project['product_id'] ) ) . '">' . esc_html( $title ? $title : sprintf( __( 'Produit #%d', 'wc-photo-clock-13' ), $project['product_id'] ) ) . '</a>';
+									} else {
+										esc_html_e( 'Non renseigné', 'wc-photo-clock-13' );
+									}
+									?>
+								</td>
+								<td><?php echo esc_html( $project['created_at'] ? $project['created_at'] : '—' ); ?></td>
+								<td><a href="<?php echo esc_url( $project['url'] ); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Ouvrir', 'wc-photo-clock-13' ); ?></a></td>
+							</tr>
+						<?php endforeach; ?>
+					</tbody>
+				</table>
+			<?php endif; ?>
+		</div>
+		<?php
 	}
 
 	/**
