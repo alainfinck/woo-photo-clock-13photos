@@ -197,6 +197,10 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	padding: 4px 8px;
 }
 
+.wc-pc13-preview.hide-slots .wc-pc13-ring {
+	display: none;
+}
+
 .wc-pc13-clock-face {
 	position: relative;
 	width: 100%;
@@ -280,7 +284,7 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	padding: 4px 6px;
 	border-radius: 12px;
 	transition: transform 0.2s ease, font-size 0.2s ease, color 0.2s ease;
-	z-index: 10;
+	z-index: 25;
 }
 
 .wc-pc13-preview.show-numbers .wc-pc13-slot-label {

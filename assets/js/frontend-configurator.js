@@ -83,6 +83,7 @@ const CENTER_COVER_THRESHOLD = 3;
 		slotShadow: {
 			enabled: false,
 		},
+		showSlots: true,
 	};
 
 	function clampTransformValues(target) {
@@ -1047,6 +1048,7 @@ let sharedConfigLoaded = false;
 		shareFacebook: '.wc-pc13-share-facebook',
 		shareX: '.wc-pc13-share-x',
 		saveEmailBtn: '.wc-pc13-save-email-btn',
+		showSlotsToggle: '#wc-pc13-show-slots',
 		livePreviewImage: '.wc-pc13-live-preview-image',
 		livePreviewPlaceholder: '.wc-pc13-live-preview-placeholder',
 		fillUnsplash: '.wc-pc13-fill-unsplash',
@@ -1074,6 +1076,7 @@ let sharedConfigLoaded = false;
 
 		preview.style.setProperty('--slot-size', `${size}px`);
 		preview.style.setProperty('--ring-radius', `${radius}px`);
+		preview.classList.toggle('hide-slots', !state.showSlots);
 
 		state.currentRingRadius = radius;
 		if (typeof state.numbers.distance !== 'number' || state.numbers.distance <= 0) {
@@ -1152,7 +1155,7 @@ let sharedConfigLoaded = false;
 				return;
 			}
 
-			if (slotState.image_url) {
+			if (slotState.image_url && state.showSlots) {
 				slot.style.backgroundImage = `url(${slotState.image_url})`;
 				slot.classList.remove('empty');
 				if (slotInner) {
@@ -1425,6 +1428,7 @@ let sharedConfigLoaded = false;
 			slots: state.slots,
 			center: state.center,
 			ring_size: state.ringSize,
+			show_slots: state.showSlots,
 			show_numbers: state.showNumbers,
 			numbers: state.numbers,
 			slot_border: state.slotBorder,
@@ -1439,7 +1443,12 @@ let sharedConfigLoaded = false;
 	}
 
 	function selectSlot(slot) {
-		state.currentSlot = slot;
+		// Si les slots sont masqués, forcer le centre
+		if (!state.showSlots && slot !== 'center') {
+			state.currentSlot = 'center';
+		} else {
+			state.currentSlot = slot;
+		}
 		updateSelectionUI();
 	}
 
@@ -1465,6 +1474,10 @@ let sharedConfigLoaded = false;
 		if (!configurator) {
 			return;
 		}
+
+	if (!state.showSlots) {
+		return;
+	}
 
 		const floatingControls = configurator.querySelector('.wc-pc13-floating-controls');
 		const preview = configurator.querySelector('.wc-pc13-preview');
@@ -2076,6 +2089,9 @@ function handleNumbersDistanceChange(event) {
 				}
 
 				// Si une photo périphérique est sélectionnée, fermer si on clique ailleurs que sur cette photo
+				if (!state.showSlots) {
+					return;
+				}
 				const isPeripheralSelection = state.currentSlot && state.currentSlot !== 'center' && parseInt(state.currentSlot, 10) >= 1 && parseInt(state.currentSlot, 10) <= 12;
 				if (!isPeripheralSelection) {
 					return;
@@ -2215,6 +2231,21 @@ function handleNumbersDistanceChange(event) {
 				return;
 			}
 			await saveShareAndSendEmail(email.trim(), saveEmailBtn);
+		});
+	}
+
+	const showSlotsToggle = configurator.querySelector(selectors.showSlotsToggle);
+	if (showSlotsToggle) {
+		showSlotsToggle.checked = !!state.showSlots;
+		showSlotsToggle.addEventListener('change', (e) => {
+			state.showSlots = !!e.target.checked;
+			// Si on masque les slots, forcer la sélection sur le centre
+			if (!state.showSlots) {
+				selectSlot('center');
+			}
+			applyTransforms();
+			updateSelectionUI();
+			savePayload();
 		});
 	}
 
@@ -2914,6 +2945,14 @@ function handleNumbersDistanceChange(event) {
 		if (numbersToggle && !sharedConfigLoaded) {
 			state.showNumbers = !!numbersToggle.checked;
 		}
+		if (numbersToggle && sharedConfigLoaded) {
+			numbersToggle.checked = !!state.showNumbers;
+		}
+
+		const showSlotsToggle = configurator.querySelector(selectors.showSlotsToggle);
+		if (showSlotsToggle) {
+			showSlotsToggle.checked = !!state.showSlots;
+		}
 
 		if (numbersColor && numbersColor.value && !sharedConfigLoaded) {
 			state.numbers.color = numbersColor.value;
@@ -3353,6 +3392,9 @@ async function saveShareAndSendEmail(email, triggerBtn = null) {
 			}
 			if (sharedConfig.slot_shadow) {
 				state.slotShadow = { ...state.slotShadow, ...sharedConfig.slot_shadow };
+			}
+			if (sharedConfig.show_slots !== undefined) {
+				state.showSlots = !!sharedConfig.show_slots;
 			}
 
 			// Appliquer la configuration

@@ -383,6 +383,7 @@ class WC_PC13_Frontend {
 			'slots'  => array(),
 			'center' => array(),
 			'ring_size' => isset( $payload['ring_size'] ) ? absint( $payload['ring_size'] ) : 110,
+			'show_slots' => isset( $payload['show_slots'] ) ? (bool) $payload['show_slots'] : true,
 			'show_numbers' => ! empty( $payload['show_numbers'] ),
 			'numbers' => array(
 				'color'    => '#222222',

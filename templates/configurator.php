@@ -234,6 +234,10 @@ $button_text = isset( $button_text ) ? $button_text : __( 'Ajouter au panier', '
 					<input type="checkbox" id="wc-pc13-show-numbers" name="wc_pc13_show_numbers" value="1">
 					<span><?php esc_html_e( 'Afficher les chiffres des heures', 'wc-photo-clock-13' ); ?></span>
 				</label>
+				<label class="wc-pc13-toggle">
+					<input type="checkbox" id="wc-pc13-show-slots" name="wc_pc13_show_slots" value="1" checked>
+					<span><?php esc_html_e( 'Afficher les photos périphériques', 'wc-photo-clock-13' ); ?></span>
+				</label>
 				<div class="wc-pc13-numbers-fields">
 					<label for="wc-pc13-number-color">
 						<span><?php esc_html_e( 'Couleur des chiffres', 'wc-photo-clock-13' ); ?></span>
