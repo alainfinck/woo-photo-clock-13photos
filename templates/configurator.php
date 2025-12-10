@@ -65,7 +65,7 @@ $button_text = isset( $button_text ) ? $button_text : __( 'Ajouter au panier', '
 						<h5 class="wc-pc13-floating-controls-title"><?php esc_html_e( 'Ajuster la photo', 'wc-photo-clock-13' ); ?></h5>
 						<label>
 							<span><?php esc_html_e( 'Zoom', 'wc-photo-clock-13' ); ?></span>
-							<input type="range" min="0.5" max="2.5" step="0.01" value="1" data-zoom>
+							<input type="range" min="1" max="5" step="0.01" value="1" data-zoom>
 						</label>
 						<label>
 							<span><?php esc_html_e( 'Position horizontale', 'wc-photo-clock-13' ); ?></span>
@@ -75,7 +75,14 @@ $button_text = isset( $button_text ) ? $button_text : __( 'Ajouter au panier', '
 							<span><?php esc_html_e( 'Position verticale', 'wc-photo-clock-13' ); ?></span>
 							<input type="range" min="-100" max="100" step="1" value="0" data-axis="y">
 						</label>
-						<button type="button" class="button wc-pc13-floating-remove" disabled><?php esc_html_e( 'Supprimer la photo', 'wc-photo-clock-13' ); ?></button>
+						<div class="wc-pc13-floating-actions">
+							<button type="button" class="button button-secondary wc-pc13-floating-upload">
+								<?php esc_html_e( 'Charger une photo', 'wc-photo-clock-13' ); ?>
+							</button>
+							<button type="button" class="button wc-pc13-floating-remove" disabled>
+								<?php esc_html_e( 'Supprimer la photo', 'wc-photo-clock-13' ); ?>
+							</button>
+						</div>
 					</div>
 				</div>
 			</div>

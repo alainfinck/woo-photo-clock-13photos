@@ -113,6 +113,7 @@ let dropzoneInstance = null;
 let handsTimer = null;
 let html2canvasLoader = null;
 let jsPDFLoader = null;
+let uploadTargetSlot = null;
 
 	let livePreviewUpdateTimer = null;
 	let livePreviewUpdating = false;
@@ -1396,6 +1397,10 @@ let jsPDFLoader = null;
 				if (floatingRemove) {
 					floatingRemove.disabled = !current.image_url;
 				}
+				const floatingUpload = floatingControls.querySelector('.wc-pc13-floating-upload');
+				if (floatingUpload) {
+					floatingUpload.disabled = false;
+				}
 			} else {
 				// Masquer le panneau flottant
 				floatingControls.style.display = 'none';
@@ -1553,12 +1558,13 @@ let jsPDFLoader = null;
 		});
 	}
 
-	function applyUploadedImage(data) {
+function applyUploadedImage(data, targetSlot = null) {
 		if (!data) {
 			return;
 		}
 
-		const target = getCurrentSlotState();
+	const slotKey = targetSlot || state.currentSlot || 'center';
+	const target = slotKey === 'center' ? state.center : state.slots[slotKey] || state.center;
 		target.attachment_id = data.attachment_id || 0;
 		target.image_url = data.url || '';
 		target.x = 0;
@@ -1613,8 +1619,24 @@ function processFile(file, inputEl) {
 		return;
 	}
 
-	const slotKey = state.currentSlot;
+	const slotKey = uploadTargetSlot
+		|| (inputEl && inputEl.dataset && inputEl.dataset.targetSlot)
+		|| state.currentSlot;
 	const configurator = document.querySelector(selectors.configurator);
+	// Nettoyer le targetSlot pour les prochains uploads
+	if (inputEl && inputEl.dataset) {
+		delete inputEl.dataset.targetSlot;
+	}
+	uploadTargetSlot = null;
+
+	const slotElement = configurator
+		? (slotKey === 'center'
+			? configurator.querySelector(selectors.center)
+			: configurator.querySelector(`${selectors.slot}[data-slot="${slotKey}"]`))
+		: null;
+	if (slotElement) {
+		slotElement.classList.add('wc-pc13-slot-loading');
+	}
 	
 	// Afficher le loader
 	let loadingButton = null;
@@ -1640,12 +1662,15 @@ function processFile(file, inputEl) {
 
 	uploadFile(slotKey, file)
 		.then((response) => {
-			applyUploadedImage(response);
+			applyUploadedImage(response, slotKey);
 		})
 		.catch((error) => {
 			window.alert(error);
 		})
 		.finally(() => {
+			if (slotElement) {
+				slotElement.classList.remove('wc-pc13-slot-loading');
+			}
 			// Masquer le loader
 			if (loadingButton && originalText) {
 				loadingButton.disabled = false;
@@ -1994,6 +2019,8 @@ function handleNumbersDistanceChange(event) {
 			const floatingAxisY = floatingControls.querySelector('input[data-axis="y"]');
 			const floatingRemove = floatingControls.querySelector('.wc-pc13-floating-remove');
 			const floatingClose = floatingControls.querySelector('.wc-pc13-floating-controls-close');
+			const floatingUpload = floatingControls.querySelector('.wc-pc13-floating-upload');
+			const fileInput = configurator.querySelector(selectors.fileInput);
 
 			if (floatingZoom) {
 				floatingZoom.addEventListener('input', handleZoomChange);
@@ -2009,6 +2036,20 @@ function handleNumbersDistanceChange(event) {
 
 			if (floatingRemove) {
 				floatingRemove.addEventListener('click', handleRemove);
+			}
+
+			if (floatingUpload && fileInput) {
+				floatingUpload.addEventListener('click', (e) => {
+					e.preventDefault();
+					// S'assurer que le slot courant reste sélectionné
+					if (state.currentSlot && state.currentSlot !== 'center') {
+						selectSlot(state.currentSlot);
+					}
+					// Forcer l'upload sur le slot sélectionné (périphérique)
+					uploadTargetSlot = state.currentSlot;
+					fileInput.dataset.targetSlot = state.currentSlot;
+					fileInput.click();
+				});
 			}
 
 			// Bouton de fermeture
@@ -2126,6 +2167,11 @@ function handleNumbersDistanceChange(event) {
 	if (uploadButton && fileInput) {
 		uploadButton.addEventListener('click', (event) => {
 			event.preventDefault();
+			// Forcer l'upload sur le slot sélectionné (centre ou périphérique)
+			uploadTargetSlot = state.currentSlot || 'center';
+			if (fileInput && fileInput.dataset) {
+				fileInput.dataset.targetSlot = uploadTargetSlot;
+			}
 			fileInput.click();
 		});
 	}

@@ -156,11 +156,45 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	height: 4px;
 }
 
-.wc-pc13-floating-remove {
-	width: 100%;
-	margin-top: 2px;
+.wc-pc13-slot-loading {
+	position: relative;
+	pointer-events: none;
+}
+
+.wc-pc13-slot-loading::after {
+	content: '';
+	position: absolute;
+	inset: -4px;
+	border-radius: 50%;
+	background: rgba(255, 255, 255, 0.6);
+	border: 2px solid #21759b;
+	border-top-color: transparent;
+	animation: wc-pc13-spin 0.8s linear infinite;
+	z-index: 15;
+}
+
+@keyframes wc-pc13-spin {
+	from { transform: rotate(0deg); }
+	to { transform: rotate(360deg); }
+}
+
+.wc-pc13-floating-actions {
+	display: flex;
+	gap: 6px;
+	margin-top: 4px;
+}
+
+.wc-pc13-floating-actions .button {
+	flex: 1;
 	font-size: 11px;
-	padding: 5px 10px;
+	padding: 5px 8px;
+	line-height: 1.2;
+}
+
+.wc-pc13-floating-remove {
+	flex: 1;
+	font-size: 10px;
+	padding: 4px 8px;
 }
 
 .wc-pc13-clock-face {
