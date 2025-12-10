@@ -200,3 +200,5 @@ Pour signaler un bug ou demander une fonctionnalité, veuillez créer une [issue
 **Note** : Ce plugin nécessite WooCommerce pour fonctionner. Assurez-vous que WooCommerce est installé et activé avant d'utiliser ce plugin.
 
 
+
+
