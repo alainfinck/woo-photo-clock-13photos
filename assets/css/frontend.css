@@ -1549,11 +1549,8 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	display: block;
 }
 
-/* S'assurer que le conteneur de la vignette dans le mini panier est carré */
 /* Vignette d'aperçu dans le panier - doit être carrée */
-.woocommerce-cart-form .wc-pc13-preview-thumb,
-.widget_shopping_cart .wc-pc13-preview-thumb,
-.woocommerce-mini-cart .wc-pc13-preview-thumb {
+.woocommerce-cart-form .wc-pc13-preview-thumb {
 	width: 100% !important;
 	aspect-ratio: 1 / 1 !important;
 	object-fit: cover !important;
@@ -1561,13 +1558,22 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	display: block;
 }
 
-/* S'assurer que le conteneur de la vignette dans le mini panier est carré */
-.woocommerce-cart-form .wc-pc13-preview-thumb,
+/* Mini panier - vignette fixe petite, pas en background */
 .widget_shopping_cart .wc-pc13-preview-thumb,
 .woocommerce-mini-cart .wc-pc13-preview-thumb {
-	width: 100% !important;
+	width: 60px !important;
+	height: 60px !important;
+	max-width: 60px !important;
+	max-height: 60px !important;
+	min-width: 60px !important;
+	min-height: 60px !important;
 	aspect-ratio: 1 / 1 !important;
 	object-fit: cover !important;
+	border-radius: 8px;
+	display: block !important;
+	position: relative !important;
+	z-index: 1;
+	flex-shrink: 0;
 }
 
 @media (max-width: 1024px) {
@@ -1890,32 +1896,46 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	box-shadow: 0 2px 4px rgba(33, 117, 155, 0.25);
 }
 
-/* Afficher l'aperçu personnalisé dans le mini panier avec une taille adaptée */
+/* Afficher l'aperçu personnalisé dans le mini panier avec une petite vignette */
 .widget_shopping_cart .cart_list li .product-thumbnail .wc-pc13-cart-clock-wrapper,
 .woocommerce-mini-cart .product-thumbnail .wc-pc13-cart-clock-wrapper {
-	padding: 3px;
-	background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
-	border-radius: 10px;
-	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1), inset 0 0 0 1px rgba(0, 0, 0, 0.05);
+	padding: 2px;
+	background: #ffffff;
+	border-radius: 6px;
+	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
 	display: inline-block;
 	transition: all 0.2s ease;
+	border: 1px solid #e0e0e0;
+	position: relative;
+	z-index: 2;
+	max-width: 60px;
+	max-height: 60px;
+	width: 60px;
+	height: 60px;
+	overflow: hidden;
 }
 
 .widget_shopping_cart .cart_list li .product-thumbnail .wc-pc13-cart-clock-wrapper:hover,
 .woocommerce-mini-cart .product-thumbnail .wc-pc13-cart-clock-wrapper:hover {
-	box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15), inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+	box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
 	transform: scale(1.05);
+	border-color: #21759b;
 }
 
 .widget_shopping_cart .cart_list li .product-thumbnail img.wc-pc13-preview-thumb,
 .woocommerce-mini-cart .product-thumbnail img.wc-pc13-preview-thumb {
-	max-width: 54px;
-	max-height: 54px;
-	width: 54px;
-	height: 54px;
-	object-fit: cover;
-	border-radius: 7px;
-	display: block;
+	max-width: 56px !important;
+	max-height: 56px !important;
+	width: 56px !important;
+	height: 56px !important;
+	min-width: 56px !important;
+	min-height: 56px !important;
+	object-fit: cover !important;
+	border-radius: 4px;
+	display: block !important;
+	position: relative !important;
+	z-index: 1;
+	flex-shrink: 0;
 }
 
 /* Panier latéral (widget) - Afficher la vignette personnalisée */
@@ -1927,9 +1947,11 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	display: flex;
 	align-items: center;
 	justify-content: center;
+	position: relative;
+	background: transparent !important;
 }
 
-/* Mini panier - Afficher la vignette personnalisée */
+/* Mini panier - Afficher la vignette personnalisée petite */
 .woocommerce-mini-cart .product-thumbnail {
 	min-width: 60px;
 	width: 60px;
@@ -1938,6 +1960,18 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	display: flex;
 	align-items: center;
 	justify-content: center;
+	margin-right: 12px;
+	position: relative;
+	background: transparent !important;
+	background-image: none !important;
+}
+
+/* S'assurer qu'aucun background-image n'est appliqué sur le thumbnail */
+.woocommerce-mini-cart .product-thumbnail,
+.widget_shopping_cart .cart_list li .product-thumbnail {
+	background-image: none !important;
+	background-size: auto !important;
+	background-position: center !important;
 }
 
 /* S'assurer qu'il n'y a qu'une seule vignette - masquer l'image produit par défaut si notre vignette est présente */
@@ -1954,8 +1988,25 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 
 .woocommerce-mini-cart .product-thumbnail:has(.wc-pc13-cart-clock-wrapper) img:not(.wc-pc13-preview-thumb),
 .woocommerce-mini-cart .product-thumbnail .wc-pc13-cart-clock-wrapper ~ img,
-.woocommerce-mini-cart .product-thumbnail:has(.wc-pc13-cart-clock-wrapper) img.wp-post-image {
+.woocommerce-mini-cart .product-thumbnail:has(.wc-pc13-cart-clock-wrapper) img.wp-post-image,
+.woocommerce-mini-cart .product-thumbnail:has(.wc-pc13-cart-clock-wrapper) a img:not(.wc-pc13-preview-thumb) {
 	display: none !important;
+}
+
+.widget_shopping_cart .cart_list li .product-thumbnail:has(.wc-pc13-cart-clock-wrapper) img:not(.wc-pc13-preview-thumb),
+.widget_shopping_cart .cart_list li .product-thumbnail:has(.wc-pc13-cart-clock-wrapper) a img:not(.wc-pc13-preview-thumb) {
+	display: none !important;
+}
+
+/* Forcer la suppression de tout background-image sur le thumbnail dans le mini panier */
+.woocommerce-mini-cart .product-thumbnail,
+.woocommerce-mini-cart .product-thumbnail a,
+.widget_shopping_cart .cart_list li .product-thumbnail,
+.widget_shopping_cart .cart_list li .product-thumbnail a {
+	background-image: none !important;
+	background-size: auto !important;
+	background-position: center !important;
+	background-repeat: no-repeat !important;
 }
 
 /* Afficher l'aperçu personnalisé dans le panier complet */
@@ -2020,11 +2071,11 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 
 /* Améliorer la mise en page du panier latéral */
 .widget_shopping_cart .cart_list li {
-	padding: 12px 0;
-	border-bottom: 1px solid #eee;
+	padding: 16px 0;
+	border-bottom: 1px solid #e8e8e8;
 	display: flex;
 	align-items: flex-start;
-	gap: 12px;
+	gap: 14px;
 }
 
 .widget_shopping_cart .cart_list li:last-child {
@@ -2037,14 +2088,16 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 }
 
 .widget_shopping_cart .cart_list li .product-name {
-	font-size: 13px;
-	line-height: 1.4;
+	font-size: 14px;
+	line-height: 1.5;
 	flex: 1;
 	min-width: 0;
+	font-weight: 500;
+	color: #333;
 }
 
 .widget_shopping_cart .cart_list li .variation {
-	margin-top: 6px;
+	margin-top: 8px;
 	font-size: 11px;
 }
 
@@ -2057,8 +2110,13 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 .woocommerce-mini-cart-item {
 	display: flex;
 	align-items: flex-start;
-	gap: 12px;
-	padding: 12px 0;
+	gap: 14px;
+	padding: 16px 0;
+	border-bottom: 1px solid #e8e8e8;
+}
+
+.woocommerce-mini-cart-item:last-child {
+	border-bottom: none;
 }
 
 .woocommerce-mini-cart-item .product-thumbnail {
@@ -2069,6 +2127,21 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 .woocommerce-mini-cart-item .product-name {
 	flex: 1;
 	min-width: 0;
+	font-size: 14px;
+	line-height: 1.5;
+	font-weight: 500;
+	color: #333;
+}
+
+.woocommerce-mini-cart-item .quantity {
+	font-size: 13px;
+	color: #666;
+	margin-top: 4px;
+}
+
+.woocommerce-mini-cart-item .amount {
+	font-weight: 600;
+	color: #333;
 }
 
 .widget_shopping_cart .cart_list li .variation dd {
