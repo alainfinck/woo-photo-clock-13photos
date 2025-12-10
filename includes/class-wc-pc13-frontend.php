@@ -672,9 +672,16 @@ class WC_PC13_Frontend {
 		$attachment_id = ! empty( $preview['id'] ) ? absint( $preview['id'] ) : 0;
 		$url           = ! empty( $preview['url'] ) ? esc_url( $preview['url'] ) : '';
 
-		// Utiliser l'URL originale pour éviter les redimensionnements non carrés
+		// Utiliser une taille WordPress optimisée pour la vignette du panier
 		if ( $attachment_id ) {
-			$url = wp_get_attachment_url( $attachment_id );
+			// Essayer d'abord la taille 'woocommerce_thumbnail' (généralement 300x300px)
+			$thumbnail_url = wp_get_attachment_image_url( $attachment_id, 'woocommerce_thumbnail' );
+			if ( $thumbnail_url ) {
+				$url = $thumbnail_url;
+			} else {
+				// Fallback sur l'URL originale
+				$url = wp_get_attachment_url( $attachment_id );
+			}
 		}
 
 		if ( $url ) {

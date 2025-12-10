@@ -35,9 +35,11 @@ const CENTER_COVER_THRESHOLD = 3;
 				// Image introuvable (404), nettoyer le state silencieusement
 				if (slotKey === 'center') {
 					state.center.image_url = '';
+					state.center.image_url_display = '';
 					state.center.attachment_id = 0;
 				} else if (slotKey && state.slots[slotKey]) {
 					state.slots[slotKey].image_url = '';
+					state.slots[slotKey].image_url_display = '';
 					state.slots[slotKey].attachment_id = 0;
 				}
 				resolve(false);
@@ -145,6 +147,7 @@ const CENTER_COVER_THRESHOLD = 3;
 		center: {
 			attachment_id: 0,
 			image_url: '',
+			image_url_display: '', // URL pour l'affichage (thumbnail)
 			x: 0,
 			y: 0,
 			scale: 1,
@@ -591,7 +594,18 @@ let sharedConfigLoaded = false;
 		try {
 			// Utiliser scale 1 et qualité réduite pour un upload plus rapide
 			const canvas = await capturePreview(1, { printMode: false, skipLivePreviewUpdate: true });
-			const blob = await canvasToJpegBlob(canvas, 0.75);
+			
+			// Créer une vignette de taille fixe (300x300px) pour le panier
+			const thumbnailSize = 300;
+			const thumbnailCanvas = document.createElement('canvas');
+			thumbnailCanvas.width = thumbnailSize;
+			thumbnailCanvas.height = thumbnailSize;
+			const thumbnailCtx = thumbnailCanvas.getContext('2d');
+			
+			// Dessiner le canvas original redimensionné dans la vignette
+			thumbnailCtx.drawImage(canvas, 0, 0, thumbnailSize, thumbnailSize);
+			
+			const blob = await canvasToJpegBlob(thumbnailCanvas, 0.75);
 
 			const formData = new FormData();
 			formData.append('action', 'wc_pc13_upload_preview');
@@ -833,7 +847,8 @@ let sharedConfigLoaded = false;
 			if (!state.slots[i]) {
 				state.slots[i] = {
 					attachment_id: 0,
-					image_url: '',
+					image_url: '', // URL complète pour le PDF/export
+					image_url_display: '', // URL thumbnail pour l'affichage (optimisation performance)
 					x: 0,
 					y: 0,
 					scale: 1,
@@ -841,7 +856,9 @@ let sharedConfigLoaded = false;
 			}
 			const domInfo = slotDomMap.get(i) || {};
 			// Prioriser l'URL du DOM si elle existe, sinon utiliser celle du state
-			const resolvedUrl = (domInfo.imageUrl && domInfo.imageUrl.trim()) || (state.slots[i].image_url && state.slots[i].image_url.trim()) || '';
+			// Pour l'affichage, utiliser image_url_display si disponible
+			const displayUrl = state.slots[i].image_url_display || state.slots[i].image_url || '';
+			const resolvedUrl = (domInfo.imageUrl && domInfo.imageUrl.trim()) || displayUrl;
 			const resolvedTransform = {
 				x: Number.isFinite(domInfo.x) ? domInfo.x : (Number.isFinite(state.slots[i].x) ? state.slots[i].x : 0),
 				y: Number.isFinite(domInfo.y) ? domInfo.y : (Number.isFinite(state.slots[i].y) ? state.slots[i].y : 0),
@@ -1263,7 +1280,8 @@ let sharedConfigLoaded = false;
 		for (let i = 1; i <= 12; i++) {
 			state.slots[i] = {
 				attachment_id: 0,
-				image_url: '',
+				image_url: '', // URL complète pour le PDF/export
+				image_url_display: '', // URL thumbnail pour l'affichage (optimisation performance)
 				x: 0,
 				y: 0,
 				scale: 1,
@@ -1278,7 +1296,10 @@ let sharedConfigLoaded = false;
 		return state.slots[state.currentSlot];
 	}
 
-	function applyTransforms() {
+	// Variable pour suivre si on est en train de déplacer (drag actif)
+	let isDragging = false;
+
+	function applyTransforms(skipExpensiveUpdates = false) {
 		const configurator = document.querySelector(selectors.configurator);
 		if (!configurator) {
 			return;
@@ -1289,7 +1310,10 @@ let sharedConfigLoaded = false;
 			previewEl.classList.toggle('show-numbers', !!state.showNumbers);
 		}
 
-		updateRingDimensions();
+		// Éviter updateRingDimensions pendant le drag (coûteux)
+		if (!skipExpensiveUpdates) {
+			updateRingDimensions();
+		}
 
 		Object.keys(state.slots).forEach((key) => {
 			const slotState = state.slots[key];
@@ -1300,7 +1324,9 @@ let sharedConfigLoaded = false;
 			}
 
 			if (slotState.image_url && state.showSlots) {
-				slot.style.backgroundImage = `url(${slotState.image_url})`;
+				// Utiliser image_url_display (thumbnail) pour l'affichage si disponible, sinon image_url
+				const displayUrl = slotState.image_url_display || slotState.image_url;
+				slot.style.backgroundImage = `url(${displayUrl})`;
 				slot.classList.remove('empty');
 				if (slotInner) {
 					slotInner.classList.add('has-image');
@@ -1316,6 +1342,12 @@ let sharedConfigLoaded = false;
 			const { x, y, scale } = clampTransformValues(slotState);
 			slot.style.transform = 'none';
 			slot.style.backgroundSize = `${scale * 100}%`;
+			// Utiliser requestAnimationFrame pour optimiser les mises à jour de backgroundPosition
+			// qui sont coûteuses en termes de performance
+			if (isDragging) {
+				// Pendant le drag, désactiver les transitions pour de meilleures performances
+				slot.style.transition = 'none';
+			}
 			slot.style.backgroundPosition = `${50 + x}% ${50 + y}%`;
 			slot.dataset.axisX = x;
 			slot.dataset.axisY = y;
@@ -1371,12 +1403,23 @@ let sharedConfigLoaded = false;
 		const centerEl = configurator.querySelector(selectors.centerImage);
 		if (centerEl) {
 			if (state.center.image_url) {
-				centerEl.style.backgroundImage = `url(${state.center.image_url})`;
+				// Pour le centre, utiliser image_url_display si disponible, sinon image_url
+				const centerDisplayUrl = state.center.image_url_display || state.center.image_url;
+				centerEl.style.backgroundImage = `url(${centerDisplayUrl})`;
 				centerEl.classList.remove('empty');
+				
+				// Pendant le drag, désactiver les transitions pour de meilleures performances
+				if (isDragging) {
+					centerEl.style.transition = 'none';
+				}
 
 				const { x, y, scale } = clampTransformValues(state.center);
 				centerEl.style.transform = 'none';
 				centerEl.style.backgroundSize = `${scale * 100}%`;
+				// Pendant le drag, désactiver les transitions pour de meilleures performances
+				if (isDragging) {
+					centerEl.style.transition = 'none';
+				}
 				centerEl.style.backgroundPosition = `${50 + x}% ${50 + y}%`;
 				centerEl.dataset.axisX = x;
 				centerEl.dataset.axisY = y;
@@ -1762,8 +1805,16 @@ function applyUploadedImage(data, targetSlot = null) {
 	console.log('applyUploadedImage - target avant:', JSON.parse(JSON.stringify(target)));
 	
 	target.attachment_id = data.attachment_id || 0;
-	// Utiliser full_url si disponible (image originale), sinon url (thumbnail)
-	target.image_url = data.full_url || data.url || '';
+	// Pour les slots périphériques, utiliser thumbnail pour l'affichage (performance)
+	// Pour le centre, utiliser full_url car l'image est plus grande
+	if (slotKey === 'center') {
+		target.image_url = data.full_url || data.url || '';
+		target.image_url_display = data.full_url || data.url || '';
+	} else {
+		// Slots périphériques : utiliser thumbnail pour l'affichage, full_url pour le PDF
+		target.image_url = data.full_url || data.url || ''; // Pour le PDF/export
+		target.image_url_display = data.url || data.full_url || ''; // Thumbnail pour l'affichage
+	}
 	target.x = 0;
 	target.y = 0;
 	target.scale = 1;
@@ -2796,6 +2847,7 @@ function handleNumbersDistanceChange(event) {
 				}
 			}
 
+			let rafId = null;
 			const handleMove = (moveEvent) => {
 				if (moveEvent.pointerId !== pointerId) {
 					return;
@@ -2807,6 +2859,11 @@ function handleNumbersDistanceChange(event) {
 					hasMoved = true;
 					// Empêcher le comportement par défaut seulement quand on drag
 					moveEvent.preventDefault();
+					
+					// Marquer qu'on est en train de déplacer
+					if (!isDragging) {
+						isDragging = true;
+					}
 				}
 
 				// Convertir les pixels en pourcentage réel par rapport à la taille du conteneur
@@ -2818,9 +2875,15 @@ function handleNumbersDistanceChange(event) {
 				targetState.x = initialX + deltaXPercent;
 				targetState.y = initialY + deltaYPercent;
 				clampTransformValues(targetState);
-				applyTransforms();
-				savePayload();
-				updateSelectionUI();
+				
+				// Utiliser requestAnimationFrame pour optimiser les mises à jour pendant le drag
+				// skipExpensiveUpdates = true pour éviter updateRingDimensions pendant le drag
+				if (rafId === null) {
+					rafId = requestAnimationFrame(() => {
+						applyTransforms(true); // skipExpensiveUpdates = true pendant le drag
+						rafId = null;
+					});
+				}
 			};
 
 			const handleUp = (upEvent) => {
@@ -2829,6 +2892,29 @@ function handleNumbersDistanceChange(event) {
 				}
 				document.removeEventListener('pointermove', handleMove);
 				document.removeEventListener('pointerup', handleUp);
+				
+				// Annuler le requestAnimationFrame en cours si nécessaire
+				if (rafId !== null) {
+					cancelAnimationFrame(rafId);
+					rafId = null;
+				}
+				
+				// Si on a déplacé, sauvegarder et mettre à jour l'UI une seule fois à la fin
+				if (hasMoved) {
+					isDragging = false; // Réactiver les transitions
+					// Réactiver les transitions sur tous les éléments
+					const configurator = document.querySelector(selectors.configurator);
+					if (configurator) {
+						configurator.querySelectorAll('.wc-pc13-slot-image, .wc-pc13-center-image').forEach((el) => {
+							el.style.transition = ''; // Réactiver les transitions CSS
+						});
+					}
+					applyTransforms(false); // Réappliquer toutes les mises à jour
+					savePayload();
+					updateSelectionUI();
+				} else {
+					isDragging = false;
+				}
 				
 				// Si c'était juste un clic (pas un drag), ne rien faire de plus
 				// Le clic normal sera géré par bindSlotClicks
@@ -3078,6 +3164,7 @@ function handleNumbersDistanceChange(event) {
 		const centerDemo = DEMO_IMAGES.center;
 		if (centerDemo && centerDemo.image_url) {
 			state.center.image_url = centerDemo.image_url;
+			state.center.image_url_display = centerDemo.image_url; // Pour les démos, utiliser la même URL
 			state.center.attachment_id = 0;
 			state.center.scale = centerDemo.scale ?? 1;
 			state.center.x = centerDemo.x ?? 0;
@@ -3107,6 +3194,7 @@ function handleNumbersDistanceChange(event) {
 			if (slotDemo && slotDemo.image_url) {
 				state.slots[i].attachment_id = 0;
 				state.slots[i].image_url = slotDemo.image_url;
+				state.slots[i].image_url_display = slotDemo.image_url; // Pour les démos, utiliser la même URL
 				state.slots[i].x = slotDemo.x ?? 0;
 				state.slots[i].y = slotDemo.y ?? 0;
 				state.slots[i].scale = slotDemo.scale ?? 1;
@@ -3115,6 +3203,7 @@ function handleNumbersDistanceChange(event) {
 				// Fallback: utiliser l'image centrale si pas d'image disponible pour ce slot
 				state.slots[i].attachment_id = 0;
 				state.slots[i].image_url = centerDemo.image_url;
+				state.slots[i].image_url_display = centerDemo.image_url;
 				state.slots[i].x = 0;
 				state.slots[i].y = 0;
 				state.slots[i].scale = 1;
@@ -3172,7 +3261,10 @@ function handleNumbersDistanceChange(event) {
 
 			// Remplir l'image centrale (première image)
 			if (images[0] && images[0].url) {
-				state.center.image_url = images[0].url;
+				// Pour le centre, utiliser l'URL complète (regular/full) pour le PDF et l'affichage
+				// car c'est une image de plus haute résolution
+				state.center.image_url = images[0].url; // URL haute résolution (regular/full)
+				state.center.image_url_display = images[0].url; // Utiliser la même URL haute résolution pour l'affichage
 				state.center.attachment_id = 0;
 				state.center.scale = 1;
 				state.center.x = 0;
@@ -3207,7 +3299,10 @@ function handleNumbersDistanceChange(event) {
 				
 				if (image && image.url) {
 					state.slots[i].attachment_id = 0;
-					state.slots[i].image_url = image.url;
+					// Pour les slots périphériques, utiliser l'URL complète (regular) pour l'affichage
+					// car les images 'small' étaient trop petites et causaient des problèmes de performance
+					state.slots[i].image_url = image.url; // URL complète pour le PDF
+					state.slots[i].image_url_display = image.url; // Utiliser la même URL haute résolution pour l'affichage
 					state.slots[i].x = 0;
 					state.slots[i].y = 0;
 					state.slots[i].scale = 1;
@@ -3747,9 +3842,19 @@ async function saveShareAndSendEmail(email, triggerBtn = null) {
 			// Charger la configuration partagée
 			if (sharedConfig.center) {
 				state.center = { ...state.center, ...sharedConfig.center };
+				// S'assurer que image_url_display est défini (fallback sur image_url si absent)
+				if (!state.center.image_url_display && state.center.image_url) {
+					state.center.image_url_display = state.center.image_url;
+				}
 			}
 			if (sharedConfig.slots) {
 				state.slots = { ...state.slots, ...sharedConfig.slots };
+				// S'assurer que image_url_display est défini pour tous les slots
+				Object.keys(state.slots).forEach((slotKey) => {
+					if (state.slots[slotKey] && !state.slots[slotKey].image_url_display && state.slots[slotKey].image_url) {
+						state.slots[slotKey].image_url_display = state.slots[slotKey].image_url;
+					}
+				});
 			}
 			if (sharedConfig.color) {
 				state.color = sharedConfig.color;

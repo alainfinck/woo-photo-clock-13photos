@@ -156,7 +156,7 @@ class WC_PC13_Assets {
 					'preview_error'    => __( 'Impossible de préparer la prévisualisation.', 'wc-photo-clock-13' ),
 					'loading_unsplash' => __( 'Chargement des photos...', 'wc-photo-clock-13' ),
 					'unsplash_error'    => __( 'Erreur lors du chargement des photos Unsplash.', 'wc-photo-clock-13' ),
-					'fill_unsplash'     => __( 'Charger des photos aléatoires Unsplash', 'wc-photo-clock-13' ),
+					'fill_unsplash'     => __( 'Charger des photos aléatoires', 'wc-photo-clock-13' ),
 				),
 				'settings' => array(
 					'max_upload_bytes' => $max_upload_bytes,

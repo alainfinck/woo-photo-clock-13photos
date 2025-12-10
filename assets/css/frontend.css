@@ -376,6 +376,9 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	cursor: pointer;
 	pointer-events: auto;
 	border-radius: 50%;
+	will-change: transform, background-position, background-size;
+	contain: layout style paint;
+	transform: translateZ(0); /* Force l'accélération GPU */
 }
 
 .wc-pc13-slot-image.empty {
@@ -412,6 +415,9 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	transition: transform 0.2s ease, inset 0.2s ease;
 	cursor: move;
 	border-radius: 50%;
+	will-change: transform, background-position, background-size;
+	contain: layout style paint;
+	transform: translateZ(0); /* Force l'accélération GPU */
 }
 
 .wc-pc13-center.wc-pc13-center-cover {

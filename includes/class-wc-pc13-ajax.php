@@ -239,19 +239,48 @@ class WC_PC13_Ajax {
 		}
 
 		$images = array();
-		foreach ( $data as $photo ) {
-			// Utiliser 'small' au lieu de 'regular' pour des images moins lourdes (environ 400px au lieu de 1080px)
-			if ( isset( $photo['urls']['small'] ) ) {
-				$images[] = array(
-					'url' => $photo['urls']['small'],
-					'thumb' => isset( $photo['urls']['thumb'] ) ? $photo['urls']['thumb'] : $photo['urls']['small'],
-				);
-			} elseif ( isset( $photo['urls']['regular'] ) ) {
-				// Fallback sur regular si small n'est pas disponible
-				$images[] = array(
-					'url' => $photo['urls']['regular'],
-					'thumb' => isset( $photo['urls']['thumb'] ) ? $photo['urls']['thumb'] : $photo['urls']['regular'],
-				);
+		foreach ( $data as $index => $photo ) {
+			// Pour la première image (centrale), utiliser 'regular' ou 'full' pour une résolution plus élevée
+			// Pour les autres images (périphériques), utiliser 'small' pour des images moins lourdes
+			if ( $index === 0 ) {
+				// Photo centrale : utiliser 'regular' (1080px) ou 'full' si disponible
+				if ( isset( $photo['urls']['regular'] ) ) {
+					$images[] = array(
+						'url' => $photo['urls']['regular'],
+						'thumb' => isset( $photo['urls']['small'] ) ? $photo['urls']['small'] : $photo['urls']['regular'],
+					);
+				} elseif ( isset( $photo['urls']['full'] ) ) {
+					$images[] = array(
+						'url' => $photo['urls']['full'],
+						'thumb' => isset( $photo['urls']['small'] ) ? $photo['urls']['small'] : $photo['urls']['full'],
+					);
+				} elseif ( isset( $photo['urls']['small'] ) ) {
+					// Fallback sur small si regular/full ne sont pas disponibles
+					$images[] = array(
+						'url' => $photo['urls']['small'],
+						'thumb' => isset( $photo['urls']['thumb'] ) ? $photo['urls']['thumb'] : $photo['urls']['small'],
+					);
+				}
+			} else {
+				// Photos périphériques : utiliser 'regular' (1080px) pour de meilleures performances lors du déplacement
+				if ( isset( $photo['urls']['regular'] ) ) {
+					$images[] = array(
+						'url' => $photo['urls']['regular'],
+						'thumb' => isset( $photo['urls']['small'] ) ? $photo['urls']['small'] : $photo['urls']['regular'],
+					);
+				} elseif ( isset( $photo['urls']['full'] ) ) {
+					// Fallback sur full si regular n'est pas disponible
+					$images[] = array(
+						'url' => $photo['urls']['full'],
+						'thumb' => isset( $photo['urls']['small'] ) ? $photo['urls']['small'] : $photo['urls']['full'],
+					);
+				} elseif ( isset( $photo['urls']['small'] ) ) {
+					// Fallback sur small si regular/full ne sont pas disponibles
+					$images[] = array(
+						'url' => $photo['urls']['small'],
+						'thumb' => isset( $photo['urls']['thumb'] ) ? $photo['urls']['thumb'] : $photo['urls']['small'],
+					);
+				}
 			}
 		}
 
