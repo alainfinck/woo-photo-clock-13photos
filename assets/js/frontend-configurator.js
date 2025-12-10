@@ -115,6 +115,7 @@ let html2canvasLoader = null;
 let jsPDFLoader = null;
 let uploadTargetSlot = null;
 let shareLoading = false;
+let sharedConfigLoaded = false;
 
 	let livePreviewUpdateTimer = null;
 	let livePreviewUpdating = false;
@@ -2888,22 +2889,22 @@ function handleNumbersDistanceChange(event) {
 		const numbersSize = configurator.querySelector(selectors.numbersSize);
 		const numbersDistanceInput = configurator.querySelector(selectors.numbersDistance);
 		if (centerSizeRange) {
-			const initialCenterSize = parseInt(centerSizeRange.value || 180, 10);
-			const sanitized = Number.isNaN(initialCenterSize) ? 180 : initialCenterSize;
+			const initialCenterSize = sharedConfigLoaded ? state.center.size : parseInt(centerSizeRange.value || 180, 10);
+			const sanitized = Number.isNaN(initialCenterSize) ? (state.center.size || 180) : initialCenterSize;
 			state.center.size = Math.max(CENTER_MIN_SIZE, sanitized);
 			centerSizeRange.value = state.center.size;
 		}
 
-		if (numbersToggle) {
+		if (numbersToggle && !sharedConfigLoaded) {
 			state.showNumbers = !!numbersToggle.checked;
 		}
 
-		if (numbersColor && numbersColor.value) {
+		if (numbersColor && numbersColor.value && !sharedConfigLoaded) {
 			state.numbers.color = numbersColor.value;
 		}
 
 		if (numbersSize) {
-			const initialSize = parseInt(numbersSize.value || state.numbers.size, 10);
+			const initialSize = sharedConfigLoaded ? state.numbers.size : parseInt(numbersSize.value || state.numbers.size, 10);
 			if (!Number.isNaN(initialSize)) {
 				state.numbers.size = Math.max(12, Math.min(96, initialSize));
 			}
@@ -2911,7 +2912,7 @@ function handleNumbersDistanceChange(event) {
 		}
 
 		if (numbersDistanceInput) {
-			const initialDistance = parseInt(numbersDistanceInput.value || state.numbers.distance, 10);
+			const initialDistance = sharedConfigLoaded ? state.numbers.distance : parseInt(numbersDistanceInput.value || state.numbers.distance, 10);
 			if (!Number.isNaN(initialDistance)) {
 				state.numbers.distance = Math.max(0, initialDistance);
 			}
@@ -2919,7 +2920,9 @@ function handleNumbersDistanceChange(event) {
 		}
 
 		if (preview && ringSizeInput) {
-			const initial = parseInt(preview.dataset.initialSlotSize || ringSizeInput.value || 80, 10);
+			const initial = sharedConfigLoaded
+				? state.ringSize
+				: parseInt(preview.dataset.initialSlotSize || ringSizeInput.value || 80, 10);
 			state.ringSize = initial;
 			ringSizeInput.value = initial;
 		}
@@ -3283,6 +3286,7 @@ async function openShareModal(shareBtn = null) {
 			// Appliquer la configuration
 			applyStateToUI();
 			updatePreview();
+			sharedConfigLoaded = true;
 		} catch (error) {
 			console.error('Erreur lors du chargement de la configuration partagée:', error);
 			// Ne pas afficher d'alerte pour ne pas perturber l'utilisateur
