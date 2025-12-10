@@ -197,8 +197,15 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	padding: 4px 8px;
 }
 
-.wc-pc13-preview.hide-slots .wc-pc13-ring {
-	display: none;
+.wc-pc13-preview.hide-slots .wc-pc13-slot-image {
+	display: none !important;
+}
+
+.wc-pc13-preview.hide-slots .wc-pc13-slot-inner {
+	background: transparent;
+	border: 0;
+	box-shadow: none;
+	pointer-events: none;
 }
 
 .wc-pc13-clock-face {

@@ -1049,6 +1049,7 @@ let sharedConfigLoaded = false;
 		shareX: '.wc-pc13-share-x',
 		saveEmailBtn: '.wc-pc13-save-email-btn',
 		showSlotsToggle: '#wc-pc13-show-slots',
+		slotStyling: '.wc-pc13-slot-styling',
 		livePreviewImage: '.wc-pc13-live-preview-image',
 		livePreviewPlaceholder: '.wc-pc13-live-preview-placeholder',
 		fillUnsplash: '.wc-pc13-fill-unsplash',
@@ -1077,6 +1078,17 @@ let sharedConfigLoaded = false;
 		preview.style.setProperty('--slot-size', `${size}px`);
 		preview.style.setProperty('--ring-radius', `${radius}px`);
 		preview.classList.toggle('hide-slots', !state.showSlots);
+
+		// Afficher/masquer les contrôles liés aux slots
+		const slotSizeLabel = configurator.querySelector('label[for="wc-pc13-slot-size"]');
+		const slotStyling = configurator.querySelector(selectors.slotStyling);
+		const displayValue = state.showSlots ? '' : 'none';
+		if (slotSizeLabel) {
+			slotSizeLabel.style.display = displayValue;
+		}
+		if (slotStyling) {
+			slotStyling.style.display = displayValue;
+		}
 
 		state.currentRingRadius = radius;
 		if (typeof state.numbers.distance !== 'number' || state.numbers.distance <= 0) {
