@@ -305,6 +305,35 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	font-weight: 600;
 }
 
+/* Calque indépendant pour les chiffres */
+.wc-pc13-numbers-overlay {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	z-index: 30;
+}
+
+.wc-pc13-number-label {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%) rotate(var(--angle)) translateY(calc(-1 * var(--numbers-offset, 0px))) rotate(calc(-1 * var(--angle)));
+	font-size: var(--numbers-size, 32px);
+	font-weight: 600;
+	color: var(--numbers-color, rgba(0, 0, 0, 0.65));
+	text-shadow: 0 0 6px rgba(255, 255, 255, 0.85);
+	pointer-events: none;
+	padding: 4px 6px;
+	border-radius: 12px;
+	display: none;
+}
+
+.wc-pc13-preview.show-numbers .wc-pc13-number-label {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
 .wc-pc13-preview.print-mode {
 	background: #ffffff;
 	box-shadow: none;
@@ -486,6 +515,25 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	color: #333;
 	margin-bottom: 4px;
 	display: block;
+}
+
+.wc-pc13-hand-options {
+	display: flex;
+	gap: 12px;
+	flex-wrap: wrap;
+}
+
+.wc-pc13-hand-field {
+	flex: 1 1 200px;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.wc-pc13-hand-field label {
+	font-weight: 600;
+	font-size: 14px;
+	color: #333;
 }
 
 .wc-pc13-center-panel {

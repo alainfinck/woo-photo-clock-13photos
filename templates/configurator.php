@@ -43,10 +43,17 @@ $button_text = isset( $button_text ) ? $button_text : __( 'Ajouter au panier', '
 							?>
 							<div class="wc-pc13-slot" data-slot="<?php echo esc_attr( $i ); ?>" style="--angle: <?php echo esc_attr( $angle ); ?>deg;">
 								<div class="wc-pc13-slot-inner">
-									<span class="wc-pc13-slot-label"><?php echo esc_html( $i ); ?></span>
 									<div class="wc-pc13-slot-image"></div>
 								</div>
 							</div>
+						<?php endfor; ?>
+					</div>
+					<div class="wc-pc13-numbers-overlay">
+						<?php for ( $i = 1; $i <= 12; $i++ ) : ?>
+							<?php
+							$angle = ( $i % 12 ) * 30; // 0deg for 12h, 30deg increments.
+							?>
+							<div class="wc-pc13-number-label" data-number="<?php echo esc_attr( $i ); ?>" style="--angle: <?php echo esc_attr( $angle ); ?>deg;"><?php echo esc_html( $i ); ?></div>
 						<?php endfor; ?>
 					</div>
 					<div class="wc-pc13-center" data-slot="center">
@@ -198,20 +205,26 @@ $button_text = isset( $button_text ) ? $button_text : __( 'Ajouter au panier', '
 						<span class="wc-pc13-info-icon" data-tooltip="<?php echo esc_attr( __( 'L\'alu dibond est un matériau composite constitué de deux feuilles d\'aluminium encadrant une âme en polyéthylène. Ce support rigide et léger offre une excellente résistance aux intempéries et une finition de qualité professionnelle pour vos impressions.', 'wc-photo-clock-13' ) ); ?>">ℹ️</span>
 					</small>
 				</label>
-				<label for="wc-pc13-color"><?php esc_html_e( 'Couleur des aiguilles', 'wc-photo-clock-13' ); ?></label>
-				<select id="wc-pc13-color" name="wc_pc13_color">
-					<?php foreach ( $hands_colors as $color_value => $color_label ) : ?>
-						<option value="<?php echo esc_attr( $color_value ); ?>" <?php selected( strtolower( $default_color ), strtolower( $color_value ) ); ?>>
-							<?php echo esc_html( $color_label ); ?>
-						</option>
-					<?php endforeach; ?>
-				</select>
-				<label for="wc-pc13-second-hand"><?php esc_html_e( 'Trotteuse (aiguille des secondes)', 'wc-photo-clock-13' ); ?></label>
-				<select id="wc-pc13-second-hand" name="wc_pc13_second_hand">
-					<option value="red"><?php esc_html_e( 'Rouge', 'wc-photo-clock-13' ); ?></option>
-					<option value="black" selected><?php esc_html_e( 'Noir', 'wc-photo-clock-13' ); ?></option>
-					<option value="none"><?php esc_html_e( 'Pas de trotteuse', 'wc-photo-clock-13' ); ?></option>
-				</select>
+				<div class="wc-pc13-hand-options">
+					<div class="wc-pc13-hand-field">
+						<label for="wc-pc13-color"><?php esc_html_e( 'Couleur des aiguilles', 'wc-photo-clock-13' ); ?></label>
+						<select id="wc-pc13-color" name="wc_pc13_color">
+							<?php foreach ( $hands_colors as $color_value => $color_label ) : ?>
+								<option value="<?php echo esc_attr( $color_value ); ?>" <?php selected( strtolower( $default_color ), strtolower( $color_value ) ); ?>>
+									<?php echo esc_html( $color_label ); ?>
+								</option>
+							<?php endforeach; ?>
+						</select>
+					</div>
+					<div class="wc-pc13-hand-field">
+						<label for="wc-pc13-second-hand"><?php esc_html_e( 'Trotteuse (aiguille des secondes)', 'wc-photo-clock-13' ); ?></label>
+						<select id="wc-pc13-second-hand" name="wc_pc13_second_hand">
+							<option value="red"><?php esc_html_e( 'Rouge', 'wc-photo-clock-13' ); ?></option>
+							<option value="black" selected><?php esc_html_e( 'Noir', 'wc-photo-clock-13' ); ?></option>
+							<option value="none"><?php esc_html_e( 'Pas de trotteuse', 'wc-photo-clock-13' ); ?></option>
+						</select>
+					</div>
+				</div>
 				<small class="wc-pc13-silent-note" style="display: block; margin-top: 6px; font-size: 12px; color: #666; font-style: italic;">
 					🔇 <?php esc_html_e( 'Horloge silencieuse (pas de tic-tac)', 'wc-photo-clock-13' ); ?>
 				</small>
