@@ -394,6 +394,14 @@ class WC_PC13_Frontend {
 				'distance' => 0,
 				'number_type' => isset( $payload['numbers']['number_type'] ) ? sanitize_text_field( $payload['numbers']['number_type'] ) : 'arabic',
 				'intermediate_points' => isset( $payload['numbers']['intermediate_points'] ) ? sanitize_text_field( $payload['numbers']['intermediate_points'] ) : 'without',
+				'shadow' => array(
+					'enabled'    => false,
+					'intensity'  => 5,
+				),
+				'glow' => array(
+					'enabled'    => false,
+					'intensity'  => 10,
+				),
 			),
 		);
 
@@ -457,6 +465,32 @@ class WC_PC13_Frontend {
 				if ( in_array( $intermediate_points, array( 'with', 'without' ), true ) ) {
 					$clean['numbers']['intermediate_points'] = $intermediate_points;
 				}
+			}
+
+			// Gérer l'ombre portée
+			if ( isset( $payload['numbers']['shadow'] ) && is_array( $payload['numbers']['shadow'] ) ) {
+				$clean['numbers']['shadow'] = array(
+					'enabled'    => ! empty( $payload['numbers']['shadow']['enabled'] ),
+					'intensity'  => isset( $payload['numbers']['shadow']['intensity'] ) ? max( 0, min( 20, absint( $payload['numbers']['shadow']['intensity'] ) ) ) : 5,
+				);
+			} else {
+				$clean['numbers']['shadow'] = array(
+					'enabled'    => false,
+					'intensity'  => 5,
+				);
+			}
+
+			// Gérer le halo lumineux
+			if ( isset( $payload['numbers']['glow'] ) && is_array( $payload['numbers']['glow'] ) ) {
+				$clean['numbers']['glow'] = array(
+					'enabled'    => ! empty( $payload['numbers']['glow']['enabled'] ),
+					'intensity'  => isset( $payload['numbers']['glow']['intensity'] ) ? max( 0, min( 30, absint( $payload['numbers']['glow']['intensity'] ) ) ) : 10,
+				);
+			} else {
+				$clean['numbers']['glow'] = array(
+					'enabled'    => false,
+					'intensity'  => 10,
+				);
 			}
 
 			// Compatibilité avec l'ancien format dial_style

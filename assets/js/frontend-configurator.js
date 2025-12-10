@@ -148,6 +148,25 @@ const CENTER_COVER_THRESHOLD = 3;
 			label.style.setProperty('--numbers-color', state.numbers.color || '#222222');
 			label.style.setProperty('--numbers-size', `${state.numbers.size || 32}px`);
 			label.style.setProperty('--numbers-offset', `${numbersDelta}px`);
+			
+			// Appliquer l'ombre portée
+			const shadowEnabled = state.numbers.shadow && state.numbers.shadow.enabled === true;
+			if (shadowEnabled) {
+				const shadowIntensity = (state.numbers.shadow && state.numbers.shadow.intensity) || 5;
+				label.style.setProperty('--numbers-shadow', `0 ${shadowIntensity * 0.5}px ${shadowIntensity}px rgba(0, 0, 0, ${0.3 + shadowIntensity * 0.02})`);
+			} else {
+				label.style.setProperty('--numbers-shadow', 'none');
+			}
+			
+			// Appliquer le halo lumineux
+			const glowEnabled = state.numbers.glow && state.numbers.glow.enabled === true;
+			if (glowEnabled) {
+				const glowIntensity = (state.numbers.glow && state.numbers.glow.intensity) || 10;
+				const glowColor = state.numbers.color || '#222222';
+				label.style.setProperty('--numbers-glow', `0 0 ${glowIntensity * 2}px ${glowColor}, 0 0 ${glowIntensity * 3}px ${glowColor}`);
+			} else {
+				label.style.setProperty('--numbers-glow', 'none');
+			}
 		});
 	}
 
@@ -213,6 +232,14 @@ const CENTER_COVER_THRESHOLD = 3;
 			distance: 0, // 0 = au centre, max = à l'extrémité
 			numberType: 'arabic', // 'arabic' ou 'roman'
 			intermediatePoints: 'without', // 'with' ou 'without'
+			shadow: {
+				enabled: false,
+				intensity: 5, // 0-20
+			},
+			glow: {
+				enabled: false,
+				intensity: 10, // 0-30
+			},
 		},
 		slotBorder: {
 			enabled: false,
@@ -1066,13 +1093,19 @@ let sharedConfigLoaded = false;
 
 		if (state.showNumbers) {
 			ctx.save();
-			ctx.fillStyle = state.numbers.color || '#222222';
-			ctx.textAlign = 'center';
-			ctx.textBaseline = 'middle';
-			const fontSizePx = Math.max(12, state.numbers.size || 32) * scaleFactor;
-			ctx.font = `${Math.round(fontSizePx)}px "Helvetica Neue", "Arial", sans-serif`;
 			const numberType = state.numbers.numberType || 'arabic';
 			const intermediatePoints = state.numbers.intermediatePoints || 'without';
+			const fontSizePx = Math.max(12, state.numbers.size || 32) * scaleFactor;
+			ctx.font = `${Math.round(fontSizePx)}px "Helvetica Neue", "Arial", sans-serif`;
+			ctx.textAlign = 'center';
+			ctx.textBaseline = 'middle';
+			
+			// Préparer les effets d'ombre et halo
+			const shadowEnabled = state.numbers.shadow && state.numbers.shadow.enabled;
+			const shadowIntensity = shadowEnabled ? (state.numbers.shadow.intensity || 5) : 0;
+			const glowEnabled = state.numbers.glow && state.numbers.glow.enabled;
+			const glowIntensity = glowEnabled ? (state.numbers.glow.intensity || 10) : 0;
+			const numberColor = state.numbers.color || '#222222';
 			
 			for (let i = 1; i <= 12; i++) {
 				// Calculer l'angle pour positionner le 12 en haut (comme une vraie horloge)
@@ -1085,6 +1118,33 @@ let sharedConfigLoaded = false;
 				const numberY = centerY - Math.cos(angleRad) * numbersRadius;
 				
 				const displayText = getDialDisplayText(i, numberType, intermediatePoints);
+				
+				// Dessiner le halo lumineux d'abord (derrière)
+				if (glowEnabled && glowIntensity > 0) {
+					ctx.save();
+					ctx.shadowBlur = glowIntensity * 2 * scaleFactor;
+					ctx.shadowColor = numberColor;
+					ctx.shadowOffsetX = 0;
+					ctx.shadowOffsetY = 0;
+					ctx.fillStyle = numberColor;
+					ctx.fillText(displayText, numberX, numberY);
+					ctx.restore();
+				}
+				
+				// Dessiner l'ombre portée
+				if (shadowEnabled && shadowIntensity > 0) {
+					ctx.save();
+					ctx.shadowBlur = shadowIntensity * scaleFactor;
+					ctx.shadowColor = `rgba(0, 0, 0, ${0.3 + shadowIntensity * 0.02})`;
+					ctx.shadowOffsetX = 0;
+					ctx.shadowOffsetY = shadowIntensity * 0.5 * scaleFactor;
+					ctx.fillStyle = numberColor;
+					ctx.fillText(displayText, numberX, numberY);
+					ctx.restore();
+				}
+				
+				// Dessiner le texte principal
+				ctx.fillStyle = numberColor;
 				ctx.fillText(displayText, numberX, numberY);
 			}
 			ctx.restore();
@@ -1210,6 +1270,12 @@ let sharedConfigLoaded = false;
 		numbersColor: '#wc-pc13-number-color',
 		numbersSize: '#wc-pc13-number-size',
 		numbersDistance: '#wc-pc13-number-distance',
+		numberShadowEnabled: '#wc-pc13-number-shadow-enabled',
+		numberShadowIntensity: '#wc-pc13-number-shadow-intensity',
+		numberShadowFields: '.wc-pc13-number-shadow-fields',
+		numberGlowEnabled: '#wc-pc13-number-glow-enabled',
+		numberGlowIntensity: '#wc-pc13-number-glow-intensity',
+		numberGlowFields: '.wc-pc13-number-glow-fields',
 		numbersFields: '.wc-pc13-numbers-fields',
 		centerSelectButton: '.wc-pc13-select-center',
 		centerRemoveButton: '.wc-pc13-remove-center',
@@ -1666,6 +1732,42 @@ let sharedConfigLoaded = false;
 			intermediatePointsSelect.disabled = !numbersEnabled;
 		}
 
+		const numberShadowEnabled = configurator.querySelector(selectors.numberShadowEnabled);
+		const numberShadowIntensity = configurator.querySelector(selectors.numberShadowIntensity);
+		const numberShadowFields = configurator.querySelector(selectors.numberShadowFields);
+		
+		if (numberShadowEnabled) {
+			numberShadowEnabled.checked = !!(state.numbers.shadow && state.numbers.shadow.enabled);
+			numberShadowEnabled.disabled = !numbersEnabled;
+		}
+		
+		if (numberShadowIntensity) {
+			numberShadowIntensity.value = (state.numbers.shadow && state.numbers.shadow.intensity) || 5;
+			numberShadowIntensity.disabled = !numbersEnabled || !(state.numbers.shadow && state.numbers.shadow.enabled);
+		}
+		
+		if (numberShadowFields) {
+			numberShadowFields.style.display = (state.numbers.shadow && state.numbers.shadow.enabled) ? 'block' : 'none';
+		}
+
+		const numberGlowEnabled = configurator.querySelector(selectors.numberGlowEnabled);
+		const numberGlowIntensity = configurator.querySelector(selectors.numberGlowIntensity);
+		const numberGlowFields = configurator.querySelector(selectors.numberGlowFields);
+		
+		if (numberGlowEnabled) {
+			numberGlowEnabled.checked = !!(state.numbers.glow && state.numbers.glow.enabled);
+			numberGlowEnabled.disabled = !numbersEnabled;
+		}
+		
+		if (numberGlowIntensity) {
+			numberGlowIntensity.value = (state.numbers.glow && state.numbers.glow.intensity) || 10;
+			numberGlowIntensity.disabled = !numbersEnabled || !(state.numbers.glow && state.numbers.glow.enabled);
+		}
+		
+		if (numberGlowFields) {
+			numberGlowFields.style.display = (state.numbers.glow && state.numbers.glow.enabled) ? 'block' : 'none';
+		}
+
 		if (numbersSize) {
 			numbersSize.value = state.numbers.size;
 			numbersSize.disabled = !numbersEnabled;
@@ -1785,6 +1887,8 @@ let sharedConfigLoaded = false;
 				distance: state.numbers.distance,
 				numberType: state.numbers.numberType || 'arabic',
 				intermediatePoints: state.numbers.intermediatePoints || 'without',
+				shadow: state.numbers.shadow || { enabled: false, intensity: 5 },
+				glow: state.numbers.glow || { enabled: false, intensity: 10 },
 			},
 			slot_border: state.slotBorder,
 			slot_shadow: state.slotShadow,
@@ -2387,6 +2491,93 @@ function handleSlotShadowEnabledChange(event) {
 	savePayload();
 }
 
+function handleNumberShadowEnabledChange(event) {
+	if (!state.numbers.shadow) {
+		state.numbers.shadow = { enabled: false, intensity: 5 };
+	}
+	state.numbers.shadow.enabled = !!event.target.checked;
+	
+	const configurator = document.querySelector(selectors.configurator);
+	const shadowFields = configurator ? configurator.querySelector(selectors.numberShadowFields) : null;
+	const shadowIntensity = configurator ? configurator.querySelector(selectors.numberShadowIntensity) : null;
+	
+	if (shadowFields) {
+		shadowFields.style.display = state.numbers.shadow.enabled ? 'block' : 'none';
+	}
+	
+	if (shadowIntensity) {
+		shadowIntensity.disabled = !state.numbers.shadow.enabled;
+		if (!state.numbers.shadow.intensity) {
+			state.numbers.shadow.intensity = 5;
+			shadowIntensity.value = 5;
+		}
+	}
+	
+	updateNumbersOverlay(configurator, state.currentRingRadius);
+	applyTransforms();
+	savePayload();
+}
+
+function handleNumberShadowIntensityChange(event) {
+	if (!event || !event.target) {
+		return;
+	}
+	if (!state.numbers.shadow) {
+		state.numbers.shadow = { enabled: true, intensity: 5 };
+	}
+	const value = parseInt(event.target.value, 10);
+	if (!Number.isNaN(value)) {
+		state.numbers.shadow.intensity = Math.max(0, Math.min(20, value));
+	}
+	const configurator = document.querySelector(selectors.configurator);
+	updateNumbersOverlay(configurator, state.currentRingRadius);
+	applyTransforms();
+	savePayload();
+}
+
+function handleNumberGlowEnabledChange(event) {
+	if (!state.numbers.glow) {
+		state.numbers.glow = { enabled: false, intensity: 10 };
+	}
+	state.numbers.glow.enabled = !!event.target.checked;
+	
+	const configurator = document.querySelector(selectors.configurator);
+	const glowFields = configurator ? configurator.querySelector(selectors.numberGlowFields) : null;
+	const glowIntensity = configurator ? configurator.querySelector(selectors.numberGlowIntensity) : null;
+	
+	if (glowFields) {
+		glowFields.style.display = state.numbers.glow.enabled ? 'block' : 'none';
+	}
+	
+	if (glowIntensity) {
+		glowIntensity.disabled = !state.numbers.glow.enabled;
+		if (!state.numbers.glow.intensity) {
+			state.numbers.glow.intensity = 10;
+			glowIntensity.value = 10;
+		}
+	}
+	
+	updateNumbersOverlay(configurator, state.currentRingRadius);
+	applyTransforms();
+	savePayload();
+}
+
+function handleNumberGlowIntensityChange(event) {
+	if (!event || !event.target) {
+		return;
+	}
+	if (!state.numbers.glow) {
+		state.numbers.glow = { enabled: true, intensity: 10 };
+	}
+	const value = parseInt(event.target.value, 10);
+	if (!Number.isNaN(value)) {
+		state.numbers.glow.intensity = Math.max(0, Math.min(30, value));
+	}
+	const configurator = document.querySelector(selectors.configurator);
+	updateNumbersOverlay(configurator, state.currentRingRadius);
+	savePayload();
+}
+
 function handleNumbersDistanceChange(event) {
 	const value = parseInt(event.target.value, 10);
 	if (Number.isNaN(value)) {
@@ -2787,6 +2978,42 @@ function handleIntermediatePointsChange(event) {
 	if (intermediatePointsSelect) {
 		intermediatePointsSelect.value = state.numbers.intermediatePoints || 'without';
 		intermediatePointsSelect.addEventListener('change', handleIntermediatePointsChange);
+	}
+
+	const numberShadowEnabled = configurator.querySelector(selectors.numberShadowEnabled);
+	const numberShadowIntensity = configurator.querySelector(selectors.numberShadowIntensity);
+	const numberShadowFields = configurator.querySelector(selectors.numberShadowFields);
+	
+	if (numberShadowEnabled) {
+		numberShadowEnabled.checked = !!(state.numbers.shadow && state.numbers.shadow.enabled);
+		numberShadowEnabled.addEventListener('change', handleNumberShadowEnabledChange);
+		if (numberShadowFields) {
+			numberShadowFields.style.display = (state.numbers.shadow && state.numbers.shadow.enabled) ? 'block' : 'none';
+		}
+	}
+	
+	if (numberShadowIntensity) {
+		numberShadowIntensity.value = (state.numbers.shadow && state.numbers.shadow.intensity) || 5;
+		numberShadowIntensity.disabled = !(state.numbers.shadow && state.numbers.shadow.enabled);
+		numberShadowIntensity.addEventListener('input', handleNumberShadowIntensityChange);
+	}
+
+	const numberGlowEnabled = configurator.querySelector(selectors.numberGlowEnabled);
+	const numberGlowIntensity = configurator.querySelector(selectors.numberGlowIntensity);
+	const numberGlowFields = configurator.querySelector(selectors.numberGlowFields);
+	
+	if (numberGlowEnabled) {
+		numberGlowEnabled.checked = !!(state.numbers.glow && state.numbers.glow.enabled);
+		numberGlowEnabled.addEventListener('change', handleNumberGlowEnabledChange);
+		if (numberGlowFields) {
+			numberGlowFields.style.display = (state.numbers.glow && state.numbers.glow.enabled) ? 'block' : 'none';
+		}
+	}
+	
+	if (numberGlowIntensity) {
+		numberGlowIntensity.value = (state.numbers.glow && state.numbers.glow.intensity) || 10;
+		numberGlowIntensity.disabled = !(state.numbers.glow && state.numbers.glow.enabled);
+		numberGlowIntensity.addEventListener('input', handleNumberGlowIntensityChange);
 	}
 
 	const slotBorderEnabled = configurator.querySelector(selectors.slotBorderEnabled);
@@ -3909,6 +4136,56 @@ function handleIntermediatePointsChange(event) {
 			updateBackgroundColor();
 		}
 
+		// Initialiser l'ombre portée
+		const numberShadowEnabled = configurator.querySelector(selectors.numberShadowEnabled);
+		const numberShadowIntensity = configurator.querySelector(selectors.numberShadowIntensity);
+		const numberShadowFields = configurator.querySelector(selectors.numberShadowFields);
+		if (numberShadowEnabled) {
+			if (sharedConfigLoaded && state.numbers.shadow) {
+				numberShadowEnabled.checked = !!(state.numbers.shadow.enabled);
+			} else {
+				state.numbers.shadow = state.numbers.shadow || { enabled: false, intensity: 5 };
+				numberShadowEnabled.checked = state.numbers.shadow.enabled;
+			}
+		}
+		if (numberShadowIntensity) {
+			if (sharedConfigLoaded && state.numbers.shadow) {
+				numberShadowIntensity.value = state.numbers.shadow.intensity || 5;
+			} else {
+				state.numbers.shadow = state.numbers.shadow || { enabled: false, intensity: 5 };
+				numberShadowIntensity.value = state.numbers.shadow.intensity;
+			}
+			numberShadowIntensity.disabled = !(state.numbers.shadow && state.numbers.shadow.enabled);
+		}
+		if (numberShadowFields) {
+			numberShadowFields.style.display = (state.numbers.shadow && state.numbers.shadow.enabled) ? 'block' : 'none';
+		}
+
+		// Initialiser le halo lumineux
+		const numberGlowEnabled = configurator.querySelector(selectors.numberGlowEnabled);
+		const numberGlowIntensity = configurator.querySelector(selectors.numberGlowIntensity);
+		const numberGlowFields = configurator.querySelector(selectors.numberGlowFields);
+		if (numberGlowEnabled) {
+			if (sharedConfigLoaded && state.numbers.glow) {
+				numberGlowEnabled.checked = !!(state.numbers.glow.enabled);
+			} else {
+				state.numbers.glow = state.numbers.glow || { enabled: false, intensity: 10 };
+				numberGlowEnabled.checked = state.numbers.glow.enabled;
+			}
+		}
+		if (numberGlowIntensity) {
+			if (sharedConfigLoaded && state.numbers.glow) {
+				numberGlowIntensity.value = state.numbers.glow.intensity || 10;
+			} else {
+				state.numbers.glow = state.numbers.glow || { enabled: false, intensity: 10 };
+				numberGlowIntensity.value = state.numbers.glow.intensity;
+			}
+			numberGlowIntensity.disabled = !(state.numbers.glow && state.numbers.glow.enabled);
+		}
+		if (numberGlowFields) {
+			numberGlowFields.style.display = (state.numbers.glow && state.numbers.glow.enabled) ? 'block' : 'none';
+		}
+
 		if (numbersSize) {
 			const initialSize = sharedConfigLoaded ? state.numbers.size : parseInt(numbersSize.value || state.numbers.size, 10);
 			if (!Number.isNaN(initialSize)) {
@@ -4432,6 +4709,8 @@ async function saveShareAndSendEmail(email, triggerBtn = null) {
 					...sharedConfig.numbers,
 					numberType: sharedConfig.numbers.numberType || state.numbers.numberType || 'arabic',
 					intermediatePoints: sharedConfig.numbers.intermediatePoints || state.numbers.intermediatePoints || 'without',
+					shadow: sharedConfig.numbers.shadow || state.numbers.shadow || { enabled: false, intensity: 5 },
+					glow: sharedConfig.numbers.glow || state.numbers.glow || { enabled: false, intensity: 10 },
 				};
 			}
 			if (sharedConfig.slot_border) {

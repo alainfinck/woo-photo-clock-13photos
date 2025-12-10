@@ -321,7 +321,7 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	font-size: var(--numbers-size, 32px);
 	font-weight: 600;
 	color: var(--numbers-color, rgba(0, 0, 0, 0.65));
-	text-shadow: 0 0 6px rgba(255, 255, 255, 0.85);
+	text-shadow: 0 0 6px rgba(255, 255, 255, 0.85), var(--numbers-shadow, none), var(--numbers-glow, none);
 	pointer-events: none;
 	padding: 4px 6px;
 	border-radius: 12px;
@@ -666,6 +666,7 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 
 .wc-pc13-toggle {
 	display: flex;
+	flex-direction: row;
 	align-items: center;
 	gap: 10px;
 	font-weight: 500;
@@ -676,6 +677,16 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	cursor: pointer;
 	transition: all 0.2s ease;
 	flex-wrap: wrap;
+}
+
+.wc-pc13-toggle input[type="checkbox"] {
+	order: 1;
+	flex-shrink: 0;
+}
+
+.wc-pc13-toggle span {
+	order: 2;
+	flex: 1;
 }
 
 .wc-pc13-toggle:has(.wc-pc13-numbers-fields) {
@@ -698,6 +709,7 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	height: 20px;
 	cursor: pointer;
 	accent-color: #21759b;
+	margin: 0;
 }
 
 .wc-pc13-numbers-fields {
@@ -713,6 +725,13 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 }
 
 .wc-pc13-number-style-row {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 14px;
+	margin-bottom: 0;
+}
+
+.wc-pc13-number-effects-row {
 	display: grid;
 	grid-template-columns: 1fr 1fr;
 	gap: 14px;
@@ -763,6 +782,13 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 
 .wc-pc13-numbers-fields.is-active {
 	display: flex;
+}
+
+.wc-pc13-number-shadow-fields,
+.wc-pc13-number-glow-fields {
+	margin-top: 10px;
+	padding-left: 20px;
+	border-left: 2px solid #d0e5f5;
 }
 
 .wc-pc13-slot-styling {
@@ -1763,7 +1789,7 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 .wc-pc13-select-center {
 	border-radius: 20px !important;
 	padding: 8px 16px !important;
-	font-size: 13px !important;
+	font-size: 11px !important;
 	transition: all 0.2s ease !important;
 	position: relative;
 }

@@ -327,6 +327,28 @@ $button_text = isset( $button_text ) ? $button_text : __( 'Ajouter au panier', '
 							<input type="range" id="wc-pc13-number-distance" name="wc_pc13_number_distance" min="0" max="350" step="1" value="270">
 							<span class="wc-pc13-range-value" id="wc-pc13-number-distance-value">77%</span>
 						</label>
+						<div class="wc-pc13-number-effects-row">
+							<label class="wc-pc13-toggle">
+								<input type="checkbox" id="wc-pc13-number-shadow-enabled" name="wc_pc13_number_shadow_enabled" value="1">
+								<span><?php esc_html_e( 'Ombre portée', 'wc-photo-clock-13' ); ?></span>
+							</label>
+							<label class="wc-pc13-toggle">
+								<input type="checkbox" id="wc-pc13-number-glow-enabled" name="wc_pc13_number_glow_enabled" value="1">
+								<span><?php esc_html_e( 'Halo lumineux', 'wc-photo-clock-13' ); ?></span>
+							</label>
+						</div>
+						<div class="wc-pc13-number-shadow-fields" style="display: none;">
+							<label for="wc-pc13-number-shadow-intensity">
+								<span><?php esc_html_e( 'Intensité de l\'ombre', 'wc-photo-clock-13' ); ?></span>
+								<input type="range" id="wc-pc13-number-shadow-intensity" name="wc_pc13_number_shadow_intensity" min="0" max="20" step="1" value="5">
+							</label>
+						</div>
+						<div class="wc-pc13-number-glow-fields" style="display: none;">
+							<label for="wc-pc13-number-glow-intensity">
+								<span><?php esc_html_e( 'Intensité du halo', 'wc-photo-clock-13' ); ?></span>
+								<input type="range" id="wc-pc13-number-glow-intensity" name="wc_pc13_number_glow_intensity" min="0" max="30" step="1" value="10">
+							</label>
+						</div>
 					</div>
 				</label>
 				<label class="wc-pc13-toggle">
