@@ -2277,9 +2277,30 @@ function handleNumbersDistanceChange(event) {
 				customBtn.disabled = false;
 				customBtn.classList.remove('is-loading');
 
-				// Déclencher l'événement WooCommerce pour mettre à jour le panier
-				if (typeof jQuery !== 'undefined' && jQuery.fn.trigger) {
-					jQuery(document.body).trigger('added_to_cart', [data.data.fragments || {}, data.data.cart_hash || '', jQuery(customBtn)]);
+				// Mettre à jour le panier WooCommerce avec les fragments
+				if (data.data.fragments && typeof jQuery !== 'undefined') {
+					// Appliquer les fragments pour mettre à jour le mini panier
+					jQuery.each(data.data.fragments, function(selector, html) {
+						jQuery(selector).replaceWith(html);
+					});
+
+					// Déclencher l'événement WooCommerce pour mettre à jour le panier
+					jQuery(document.body).trigger('added_to_cart', [
+						data.data.fragments || {},
+						data.data.cart_hash || '',
+						jQuery(customBtn)
+					]);
+
+					// Déclencher aussi l'événement wc_fragment_refresh pour forcer la mise à jour
+					jQuery(document.body).trigger('wc_fragment_refresh');
+				}
+
+				// Mettre à jour le compteur du panier si présent
+				if (data.data.cart_count !== undefined) {
+					const cartCountElements = document.querySelectorAll('.cart-contents-count, .wc-block-mini-cart__badge, .cart-count');
+					cartCountElements.forEach((el) => {
+						el.textContent = data.data.cart_count;
+					});
 				}
 
 			} catch (error) {
@@ -3229,8 +3250,11 @@ function handleNumbersDistanceChange(event) {
 	async function fillUnsplashImages() {
 		const fillUnsplashBtn = document.querySelector(selectors.fillUnsplash);
 		if (fillUnsplashBtn) {
+			// Sauvegarder le contenu original
+			const originalContent = fillUnsplashBtn.innerHTML;
 			fillUnsplashBtn.disabled = true;
-			fillUnsplashBtn.textContent = WCPC13?.labels?.loading_unsplash || 'Chargement...';
+			fillUnsplashBtn.classList.add('is-loading');
+			fillUnsplashBtn.innerHTML = '<span class="wc-pc13-loading-spinner"></span> ' + (WCPC13?.labels?.loading_unsplash || 'Chargement...');
 		}
 
 		try {
@@ -3320,7 +3344,9 @@ function handleNumbersDistanceChange(event) {
 		} finally {
 			if (fillUnsplashBtn) {
 				fillUnsplashBtn.disabled = false;
-				fillUnsplashBtn.textContent = WCPC13?.labels?.fill_unsplash || 'Charger des photos aléatoires Unsplash';
+				fillUnsplashBtn.classList.remove('is-loading');
+				// Restaurer le contenu original avec l'icône
+				fillUnsplashBtn.innerHTML = '<span class="wc-pc13-fill-unsplash-icon">🎲</span> ' + (WCPC13?.labels?.fill_unsplash || 'Charger des photos aléatoires');
 			}
 		}
 	}

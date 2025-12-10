@@ -369,12 +369,29 @@ class WC_PC13_Ajax {
 		// Calculer le nombre d'articles dans le panier
 		$cart_count = WC()->cart->get_cart_contents_count();
 
+		// Obtenir les fragments WooCommerce pour mettre à jour le panier
+		ob_start();
+		woocommerce_mini_cart();
+		$mini_cart = ob_get_clean();
+
+		$fragments = apply_filters(
+			'woocommerce_add_to_cart_fragments',
+			array(
+				'div.widget_shopping_cart_content' => '<div class="widget_shopping_cart_content">' . $mini_cart . '</div>',
+			)
+		);
+
+		// Ajouter le hash du panier
+		$cart_hash = WC()->cart->get_cart_hash();
+
 		wp_send_json_success(
 			array(
 				'message'      => __( 'Produit ajouté au panier avec succès.', 'wc-photo-clock-13' ),
 				'cart_count'   => $cart_count,
 				'preview_url'  => $preview_image_url,
 				'product_name' => $product->get_name(),
+				'fragments'    => $fragments,
+				'cart_hash'    => $cart_hash,
 			)
 		);
 	}

@@ -576,42 +576,8 @@ class WC_PC13_Frontend {
 			return $thumbnail;
 		}
 
-		// Ne pas appliquer la vignette personnalisée dans le mini panier (widget)
-		// Vérifier si on est dans un contexte de widget shopping cart
-		$backtrace = debug_backtrace( DEBUG_BACKTRACE_IGNORE_ARGS, 15 );
-		$is_widget_context = false;
-		
-		foreach ( $backtrace as $trace ) {
-			if ( isset( $trace['function'] ) && (
-				strpos( $trace['function'], 'widget_shopping_cart' ) !== false ||
-				strpos( $trace['function'], 'woocommerce_mini_cart' ) !== false ||
-				strpos( $trace['function'], 'WC_Widget' ) !== false ||
-				( isset( $trace['class'] ) && (
-					strpos( $trace['class'], 'Widget' ) !== false ||
-					strpos( $trace['class'], 'WC_Widget_Shopping_Cart' ) !== false
-				) )
-			) ) {
-				$is_widget_context = true;
-				break;
-			}
-		}
-
-		// Vérifier aussi via les actions en cours
-		if ( ! $is_widget_context ) {
-			$is_widget_context = (
-				doing_action( 'woocommerce_widget_shopping_cart_before_buttons' ) ||
-				doing_action( 'woocommerce_widget_shopping_cart_item_start' ) ||
-				doing_action( 'woocommerce_mini_cart_contents' )
-			);
-		}
-
-		// Si on est dans un widget (mini panier), retourner la vignette par défaut
-		if ( $is_widget_context ) {
-			return $thumbnail;
-		}
-
-		// Retourner notre vignette personnalisée (avec aiguilles, même logique que downloadAsJpeg)
-		$html = $this->get_preview_thumbnail_html( $cart_item['wc_pc13_preview'] );
+		// Retourner notre vignette personnalisée pour le panier ET le mini panier
+		$html = $this->get_preview_thumbnail_html( $cart_item['wc_pc13_preview'], 'woocommerce_thumbnail' );
 
 		// Retourner notre vignette uniquement, remplacer complètement la vignette par défaut
 		return $html ? $html : $thumbnail;
@@ -686,10 +652,19 @@ class WC_PC13_Frontend {
 
 		if ( $url ) {
 			// Générer une image carrée avec object-fit pour éviter la déformation
+			// Version améliorée avec bordure et ombre pour plus de visibilité
+			// Utiliser une taille adaptée selon le contexte (mini cart ou panier complet)
+			$wrapper_class = 'wc-pc13-cart-clock-wrapper';
+			$img_class = 'wc-pc13-preview-thumb';
+			
 			return sprintf(
-				'<img src="%s" alt="%s" class="wc-pc13-preview-thumb" style="width: 100%%; aspect-ratio: 1 / 1; object-fit: cover; border-radius: 8px;" />',
+				'<div class="%s">
+					<img src="%s" alt="%s" class="%s" />
+				</div>',
+				esc_attr( $wrapper_class ),
 				esc_url( $url ),
-				esc_attr__( 'Aperçu personnalisé', 'wc-photo-clock-13' )
+				esc_attr__( 'Aperçu horloge personnalisée', 'wc-photo-clock-13' ),
+				esc_attr( $img_class )
 			);
 		}
 
