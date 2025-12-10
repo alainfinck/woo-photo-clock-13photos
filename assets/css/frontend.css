@@ -321,11 +321,23 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	font-size: var(--numbers-size, 32px);
 	font-weight: 600;
 	color: var(--numbers-color, rgba(0, 0, 0, 0.65));
-	text-shadow: 0 0 6px rgba(255, 255, 255, 0.85), var(--numbers-shadow, none), var(--numbers-glow, none);
+	text-shadow: 0 0 6px rgba(255, 255, 255, 0.85);
 	pointer-events: none;
 	padding: 4px 6px;
 	border-radius: 12px;
 	display: none;
+}
+
+.wc-pc13-number-label[data-shadow="true"] {
+	text-shadow: 0 0 6px rgba(255, 255, 255, 0.85), var(--numbers-shadow);
+}
+
+.wc-pc13-number-label[data-glow="true"] {
+	text-shadow: 0 0 6px rgba(255, 255, 255, 0.85), var(--numbers-glow);
+}
+
+.wc-pc13-number-label[data-shadow="true"][data-glow="true"] {
+	text-shadow: 0 0 6px rgba(255, 255, 255, 0.85), var(--numbers-shadow), var(--numbers-glow);
 }
 
 .wc-pc13-preview.show-numbers .wc-pc13-number-label {

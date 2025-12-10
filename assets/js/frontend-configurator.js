@@ -153,9 +153,11 @@ const CENTER_COVER_THRESHOLD = 3;
 			const shadowEnabled = state.numbers.shadow && state.numbers.shadow.enabled === true;
 			if (shadowEnabled) {
 				const shadowIntensity = (state.numbers.shadow && state.numbers.shadow.intensity) || 5;
-				label.style.setProperty('--numbers-shadow', `0 ${shadowIntensity * 0.5}px ${shadowIntensity}px rgba(0, 0, 0, ${0.3 + shadowIntensity * 0.02})`);
+				const shadowValue = `0 ${shadowIntensity * 0.5}px ${shadowIntensity}px rgba(0, 0, 0, ${Math.min(0.8, 0.3 + shadowIntensity * 0.02)})`;
+				label.style.setProperty('--numbers-shadow', shadowValue);
+				label.setAttribute('data-shadow', 'true');
 			} else {
-				label.style.setProperty('--numbers-shadow', 'none');
+				label.removeAttribute('data-shadow');
 			}
 			
 			// Appliquer le halo lumineux
@@ -163,9 +165,11 @@ const CENTER_COVER_THRESHOLD = 3;
 			if (glowEnabled) {
 				const glowIntensity = (state.numbers.glow && state.numbers.glow.intensity) || 10;
 				const glowColor = state.numbers.color || '#222222';
-				label.style.setProperty('--numbers-glow', `0 0 ${glowIntensity * 2}px ${glowColor}, 0 0 ${glowIntensity * 3}px ${glowColor}`);
+				const glowValue = `0 0 ${glowIntensity * 2}px ${glowColor}, 0 0 ${glowIntensity * 3}px ${glowColor}`;
+				label.style.setProperty('--numbers-glow', glowValue);
+				label.setAttribute('data-glow', 'true');
 			} else {
-				label.style.setProperty('--numbers-glow', 'none');
+				label.removeAttribute('data-glow');
 			}
 		});
 	}
