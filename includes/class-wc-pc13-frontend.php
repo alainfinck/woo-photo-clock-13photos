@@ -66,6 +66,7 @@ class WC_PC13_Frontend {
 		}
 
 		$default_color    = $product->get_meta( '_wc_pc13_default_color' );
+		$mode             = $product->get_meta( '_wc_pc13_mode' );
 
 		$settings = class_exists( 'WC_PC13_Admin' ) ? WC_PC13_Admin::instance()->get_settings() : array(
 			'default_color'    => '#111111',
@@ -74,6 +75,7 @@ class WC_PC13_Frontend {
 		$args = array(
 			'product_id'       => $product->get_id(),
 			'default_color'    => $default_color ? $default_color : $settings['default_color'],
+			'mode'              => $mode ? $mode : 'peripheral',
 			'button_text'      => $product->single_add_to_cart_text(),
 		);
 

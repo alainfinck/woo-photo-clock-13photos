@@ -28,8 +28,9 @@ if ( $default_color && ! array_key_exists( $default_color_key, $normalized_color
 }
 
 $button_text = isset( $button_text ) ? $button_text : __( 'Ajouter au panier', 'wc-photo-clock-13' );
+$mode = isset( $mode ) ? $mode : 'peripheral';
 ?>
-<div class="wc-pc13-configurator" data-product="<?php echo esc_attr( $product_id ); ?>">
+<div class="wc-pc13-configurator" data-product="<?php echo esc_attr( $product_id ); ?>" data-mode="<?php echo esc_attr( $mode ); ?>">
 	<h3><?php esc_html_e( 'Créez votre horloge photo personnalisée', 'wc-photo-clock-13' ); ?></h3>
 
 	<div class="wc-pc13-columns">

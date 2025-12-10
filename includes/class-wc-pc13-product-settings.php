@@ -143,11 +143,13 @@ class WC_PC13_Product_Settings {
 	 */
 	public function save_product_data( $product ) {
 		$enabled      = isset( $_POST['_wc_pc13_enabled'] ) ? 'yes' : 'no';
+		$mode         = isset( $_POST['_wc_pc13_mode'] ) ? sanitize_text_field( wp_unslash( $_POST['_wc_pc13_mode'] ) ) : 'peripheral';
 		$hands        = isset( $_POST['_wc_pc13_default_hands'] ) ? sanitize_text_field( wp_unslash( $_POST['_wc_pc13_default_hands'] ) ) : 'classic';
 		$accent_color = isset( $_POST['_wc_pc13_default_color'] ) ? sanitize_hex_color( wp_unslash( $_POST['_wc_pc13_default_color'] ) ) : '#111111';
 		$diameter     = isset( $_POST['_wc_pc13_default_diameter'] ) ? absint( wp_unslash( $_POST['_wc_pc13_default_diameter'] ) ) : 30;
 
 		$product->update_meta_data( '_wc_pc13_enabled', $enabled );
+		$product->update_meta_data( '_wc_pc13_mode', $mode );
 		$product->update_meta_data( '_wc_pc13_default_hands', $hands );
 
 		if ( $accent_color ) {

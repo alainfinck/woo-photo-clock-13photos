@@ -4027,8 +4027,16 @@ function handleIntermediatePointsChange(event) {
 			return;
 		}
 
+		// Détecter le mode (peripheral ou central)
+		const mode = configurator.dataset.mode || 'peripheral';
+
 		// Charger la configuration partagée si un paramètre share est présent
 		await loadSharedConfig();
+		
+		// Si mode central, désactiver les photos périphériques par défaut et mettre la taille centrale à 100%
+		if (mode === 'central' && !sharedConfigLoaded) {
+			state.showSlots = false;
+		}
 
 		const preview = configurator.querySelector(selectors.preview);
 		const ringSizeInput = configurator.querySelector(selectors.slotSizeRange);
@@ -4038,15 +4046,44 @@ function handleIntermediatePointsChange(event) {
 		const numbersSize = configurator.querySelector(selectors.numbersSize);
 		const numbersDistanceInput = configurator.querySelector(selectors.numbersDistance);
 		if (centerSizeRange) {
-			const initialCenterSize = sharedConfigLoaded ? state.center.size : parseInt(centerSizeRange.value || 180, 10);
-			const sanitized = Number.isNaN(initialCenterSize) ? (state.center.size || 180) : initialCenterSize;
-			state.center.size = Math.max(CENTER_MIN_SIZE, sanitized);
-			centerSizeRange.value = state.center.size;
+			// Si mode central, utiliser 100% de la taille maximale
+			if (mode === 'central' && !sharedConfigLoaded) {
+				// Attendre que le preview soit rendu pour calculer la taille
+				setTimeout(() => {
+					const preview = configurator.querySelector(selectors.preview);
+					if (preview) {
+						const previewWidth = preview.offsetWidth || 720;
+						state.centerMax = Math.round(previewWidth * 0.95);
+						state.center.size = state.centerMax;
+						centerSizeRange.max = state.centerMax;
+						centerSizeRange.value = state.center.size;
+						
+						// Mettre à jour l'affichage du pourcentage
+						const valueDisplay = configurator.querySelector('#wc-pc13-center-size-value');
+						if (valueDisplay && state.centerMax > 0) {
+							const percentage = Math.round((state.center.size / state.centerMax) * 100);
+							valueDisplay.textContent = `${percentage}%`;
+						}
+						
+						applyTransforms();
+					}
+				}, 100);
+				// Initialiser avec une valeur par défaut en attendant le calcul
+				const initialCenterSize = parseInt(centerSizeRange.value || 180, 10);
+				const sanitized = Number.isNaN(initialCenterSize) ? (state.center.size || 180) : initialCenterSize;
+				state.center.size = Math.max(CENTER_MIN_SIZE, sanitized);
+				centerSizeRange.value = state.center.size;
+			} else {
+				const initialCenterSize = sharedConfigLoaded ? state.center.size : parseInt(centerSizeRange.value || 180, 10);
+				const sanitized = Number.isNaN(initialCenterSize) ? (state.center.size || 180) : initialCenterSize;
+				state.center.size = Math.max(CENTER_MIN_SIZE, sanitized);
+				centerSizeRange.value = state.center.size;
+			}
 			
-			// Afficher ou masquer le label du slider selon si une image centrale est présente
+			// Afficher ou masquer le label du slider selon si une image centrale est présente ou si mode central
 			const centerSizeLabel = configurator.querySelector('.wc-pc13-center-size-label');
 			if (centerSizeLabel) {
-				if (state.center.image_url) {
+				if (state.center.image_url || mode === 'central') {
 					centerSizeLabel.style.display = 'block';
 				} else {
 					centerSizeLabel.style.display = 'none';
@@ -4106,7 +4143,24 @@ function handleIntermediatePointsChange(event) {
 
 		const showSlotsToggle = configurator.querySelector(selectors.showSlotsToggle);
 		if (showSlotsToggle) {
-			showSlotsToggle.checked = !!state.showSlots;
+			// Si mode central, forcer la désactivation des photos périphériques
+			if (mode === 'central') {
+				state.showSlots = false;
+				showSlotsToggle.checked = false;
+				showSlotsToggle.disabled = true; // Désactiver le toggle en mode central
+				// Masquer visuellement les slots
+				const preview = configurator.querySelector(selectors.preview);
+				if (preview) {
+					preview.classList.add('hide-slots');
+				}
+			} else {
+				if (!sharedConfigLoaded) {
+					showSlotsToggle.checked = !!state.showSlots;
+				} else {
+					showSlotsToggle.checked = !!state.showSlots;
+				}
+				showSlotsToggle.disabled = false;
+			}
 		}
 
 		if (numbersColor && numbersColor.value && !sharedConfigLoaded) {
