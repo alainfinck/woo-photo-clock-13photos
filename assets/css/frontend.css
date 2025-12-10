@@ -529,6 +529,30 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	border: 1px solid #e8e8e8;
 }
 
+.wc-pc13-total-price {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 16px 20px;
+	background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+	border-radius: 10px;
+	color: #fff;
+	font-weight: 600;
+	box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+	margin-bottom: 8px;
+}
+
+.wc-pc13-total-price-label {
+	font-size: 16px;
+	opacity: 0.95;
+}
+
+.wc-pc13-total-price-value {
+	font-size: 28px;
+	font-weight: 700;
+	letter-spacing: -0.5px;
+}
+
 .wc-pc13-global-settings > label {
 	font-weight: 600;
 	font-size: 14px;
@@ -540,11 +564,13 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 .wc-pc13-hand-options {
 	display: flex;
 	gap: 12px;
-	flex-wrap: wrap;
+	flex-wrap: nowrap;
+	align-items: flex-start;
 }
 
 .wc-pc13-hand-field {
-	flex: 1 1 200px;
+	flex: 1 1 auto;
+	min-width: 150px;
 	display: flex;
 	flex-direction: column;
 	gap: 6px;
@@ -611,6 +637,33 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
 }
 
+.wc-pc13-center-controls {
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+	margin-top: 12px;
+	padding: 16px;
+	border: 1px solid #d0e5f5;
+	border-radius: 10px;
+	background: linear-gradient(135deg, #f8faff 0%, #f0f7ff 100%);
+}
+
+.wc-pc13-center-controls label {
+	display: grid;
+	gap: 8px;
+	font-weight: 500;
+}
+
+.wc-pc13-center-controls label span {
+	font-size: 13px;
+	color: #555;
+	font-weight: 500;
+}
+
+.wc-pc13-center-controls input[type="range"] {
+	width: 100%;
+}
+
 .wc-pc13-toggle {
 	display: flex;
 	align-items: center;
@@ -622,6 +675,17 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	border: 1px solid #e0e0e0;
 	cursor: pointer;
 	transition: all 0.2s ease;
+	flex-wrap: wrap;
+}
+
+.wc-pc13-toggle:has(.wc-pc13-numbers-fields) {
+	flex-direction: column;
+	align-items: stretch;
+	cursor: default;
+}
+
+.wc-pc13-toggle:has(.wc-pc13-numbers-fields) > span {
+	cursor: pointer;
 }
 
 .wc-pc13-toggle:hover {
@@ -644,7 +708,15 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	border: 1px solid #d0e5f5;
 	border-radius: 10px;
 	background: linear-gradient(135deg, #f8faff 0%, #f0f7ff 100%);
-	margin-top: 8px;
+	margin-top: 12px;
+	width: 100%;
+}
+
+.wc-pc13-number-style-row {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 14px;
+	margin-bottom: 0;
 }
 
 .wc-pc13-numbers-fields label {
@@ -1607,15 +1679,85 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 .wc-pc13-remove,
 .wc-pc13-remove-center {
 	border-radius: 20px !important;
-	padding: 8px 16px !important;
+	padding: 8px !important;
 	font-size: 13px !important;
 	transition: all 0.2s ease !important;
+	min-width: 36px;
+	height: 36px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	position: relative;
+	cursor: pointer;
+}
+
+.wc-pc13-remove-center svg {
+	width: 18px;
+	height: 18px;
+}
+
+.wc-pc13-remove-center:disabled {
+	opacity: 0.4;
+	cursor: not-allowed;
 }
 
 .wc-pc13-remove:hover,
-.wc-pc13-remove-center:hover {
+.wc-pc13-remove-center:hover:not(:disabled) {
 	transform: translateY(-1px);
 	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+	background-color: #dc3232;
+	color: #fff;
+}
+
+/* Tooltip stylé pour le bouton de suppression */
+.wc-pc13-remove-center[data-tooltip] {
+	position: relative;
+}
+
+.wc-pc13-remove-center[data-tooltip]:hover:not(:disabled)::after {
+	content: attr(data-tooltip);
+	position: absolute;
+	bottom: 100%;
+	left: 50%;
+	transform: translateX(-50%);
+	margin-bottom: 8px;
+	padding: 6px 10px;
+	background-color: #333;
+	color: #fff;
+	font-size: 12px;
+	border-radius: 6px;
+	white-space: nowrap;
+	opacity: 0;
+	pointer-events: none;
+	animation: tooltipFadeIn 0.2s ease forwards;
+	z-index: 1000;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.wc-pc13-remove-center[data-tooltip]:hover:not(:disabled)::before {
+	content: '';
+	position: absolute;
+	bottom: 100%;
+	left: 50%;
+	transform: translateX(-50%);
+	margin-bottom: 2px;
+	border: 5px solid transparent;
+	border-top-color: #333;
+	opacity: 0;
+	pointer-events: none;
+	animation: tooltipFadeIn 0.2s ease forwards;
+	z-index: 1000;
+}
+
+@keyframes tooltipFadeIn {
+	from {
+		opacity: 0;
+		transform: translateX(-50%) translateY(-4px);
+	}
+	to {
+		opacity: 1;
+		transform: translateX(-50%) translateY(0);
+	}
 }
 
 .wc-pc13-select-center {

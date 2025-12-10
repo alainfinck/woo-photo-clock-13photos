@@ -71,6 +71,49 @@ const CENTER_COVER_THRESHOLD = 3;
 		await Promise.all(validationPromises);
 	}
 
+	// Convertir un nombre en chiffres romains (pour les nombres de 1 à 12)
+	function toRoman(num) {
+		const romanMap = {
+			1: 'I',
+			2: 'II',
+			3: 'III',
+			4: 'IV',
+			5: 'V',
+			6: 'VI',
+			7: 'VII',
+			8: 'VIII',
+			9: 'IX',
+			10: 'X',
+			11: 'XI',
+			12: 'XII'
+		};
+		return romanMap[num] || `${num}`;
+	}
+
+	// Obtenir le texte à afficher selon le type de chiffres et les points intermédiaires
+	function getDialDisplayText(num, numberType, intermediatePoints) {
+		// Si "avec points intermédiaires" est sélectionné, seules les heures 12, 3, 6, 9 affichent des chiffres
+		// Les autres heures affichent des points
+		if (intermediatePoints === 'with') {
+			if (num === 12 || num === 3 || num === 6 || num === 9) {
+				// Afficher le chiffre (arabe ou romain)
+				if (numberType === 'roman') {
+					return toRoman(num);
+				}
+				return `${num}`;
+			}
+			// Pour les autres heures, afficher un point
+			return '•';
+		}
+		
+		// Si "sans points intermédiaires", toutes les heures affichent des chiffres
+		if (numberType === 'roman') {
+			return toRoman(num);
+		}
+		
+		return `${num}`;
+	}
+
 	function updateNumbersOverlay(configurator, ringRadius) {
 		if (!configurator) {
 			return;
@@ -94,8 +137,14 @@ const CENTER_COVER_THRESHOLD = 3;
 		// Slider à droite (max) = au bord : offset = -max (négatif) → translateY(max) = vers l'extérieur
 		// Donc : offset = -numbersDistance
 		const numbersDelta = -numbersDistance;
+		const numberType = state.numbers.numberType || 'arabic';
+		const intermediatePoints = state.numbers.intermediatePoints || 'without';
 
 		labels.forEach((label) => {
+			const number = parseInt(label.dataset.number || label.textContent, 10);
+			const displayText = getDialDisplayText(number, numberType, intermediatePoints);
+			
+			label.textContent = displayText;
 			label.style.setProperty('--numbers-color', state.numbers.color || '#222222');
 			label.style.setProperty('--numbers-size', `${state.numbers.size || 32}px`);
 			label.style.setProperty('--numbers-offset', `${numbersDelta}px`);
@@ -141,8 +190,10 @@ const CENTER_COVER_THRESHOLD = 3;
 	const state = {
 		currentSlot: 'center',
 		color: '#111111',
+		backgroundColor: '#fafafa',
 		secondHand: 'black', // 'red', 'black', ou 'none'
 		diameter: 40, // Diamètre par défaut en cm
+		diameterPrice: 59, // Prix par défaut pour 40 cm
 		slots: {},
 		center: {
 			attachment_id: 0,
@@ -155,11 +206,13 @@ const CENTER_COVER_THRESHOLD = 3;
 		},
 		ringSize: 110,
 		centerMax: 520,
-		showNumbers: false,
+		showNumbers: true,
 		numbers: {
 			color: '#222222',
 			size: 32,
 			distance: 0, // 0 = au centre, max = à l'extrémité
+			numberType: 'arabic', // 'arabic' ou 'roman'
+			intermediatePoints: 'without', // 'with' ou 'without'
 		},
 		slotBorder: {
 			enabled: false,
@@ -796,11 +849,21 @@ let sharedConfigLoaded = false;
 		canvas.width = outputSize;
 		canvas.height = outputSize;
 		const ctx = canvas.getContext('2d');
+		// Fond blanc pour toute la toile
 		ctx.fillStyle = '#ffffff';
 		ctx.fillRect(0, 0, outputSize, outputSize);
 
 		const centerX = outputSize / 2;
 		const centerY = outputSize / 2;
+
+		// Dessiner le cercle de fond de l'horloge
+		ctx.save();
+		ctx.fillStyle = state.backgroundColor || '#fafafa';
+		ctx.beginPath();
+		ctx.arc(centerX, centerY, outputSize / 2, 0, Math.PI * 2);
+		ctx.closePath();
+		ctx.fill();
+		ctx.restore();
 
 		// Récupérer les informations DOM actuelles pour chaque vignette (fallback si l'état est incomplet)
 		const slotEntries = [];
@@ -963,7 +1026,11 @@ let sharedConfigLoaded = false;
 				}
 				return;
 			}
-			const angleDeg = (entry.index % 12) * 30;
+			// Calculer l'angle pour positionner le slot 12 en haut (comme une vraie horloge)
+			// Si le 6 est actuellement en haut (à 180°), il faut décaler de 180° pour avoir le 12 en haut
+			// Formule: angle = ((index == 12 ? 0 : index) * 30 + 180) % 360
+			const baseAngle = (entry.index === 12 ? 0 : entry.index) * 30;
+			const angleDeg = (baseAngle + 180) % 360;
 			const angleRad = (angleDeg * Math.PI) / 180;
 			const slotCenterX = centerX + Math.sin(angleRad) * ringRadius;
 			const slotCenterY = centerY - Math.cos(angleRad) * ringRadius;
@@ -990,7 +1057,7 @@ let sharedConfigLoaded = false;
 			const clampedCenter = clampTransformValues(centerTransformFallback);
 			drawCircularImage(ctx, centerX, centerY, centerSize, centerImage, clampedCenter, {
 				scaleFactor: scaleFactor,
-				shadowEnabled: state.slotShadow?.enabled || false,
+				shadowEnabled: false, // L'ombre portée s'applique uniquement aux images périphériques
 				borderEnabled: state.slotBorder?.enabled || false,
 				borderWidth: state.slotBorder?.width || 2,
 				borderColor: state.slotBorder?.color || '#000000',
@@ -1004,16 +1071,27 @@ let sharedConfigLoaded = false;
 			ctx.textBaseline = 'middle';
 			const fontSizePx = Math.max(12, state.numbers.size || 32) * scaleFactor;
 			ctx.font = `${Math.round(fontSizePx)}px "Helvetica Neue", "Arial", sans-serif`;
+			const numberType = state.numbers.numberType || 'arabic';
+			const intermediatePoints = state.numbers.intermediatePoints || 'without';
+			
 			for (let i = 1; i <= 12; i++) {
-				const angleDeg = (i % 12) * 30;
+				// Calculer l'angle pour positionner le 12 en haut (comme une vraie horloge)
+				// Avec translateY(-radius) dans le calcul, l'angle 0° place l'élément en haut
+				// Puis on tourne dans le sens horaire: 12h=0°, 3h=90°, 6h=180°, 9h=270°
+				// Formule identique aux slots: angle = (i === 12 ? 0 : i) * 30
+				const angleDeg = (i === 12 ? 0 : i) * 30;
 				const angleRad = (angleDeg * Math.PI) / 180;
 				const numberX = centerX + Math.sin(angleRad) * numbersRadius;
 				const numberY = centerY - Math.cos(angleRad) * numbersRadius;
-				ctx.fillText(`${i}`, numberX, numberY);
+				
+				const displayText = getDialDisplayText(i, numberType, intermediatePoints);
+				ctx.fillText(displayText, numberX, numberY);
 			}
 			ctx.restore();
 		}
 
+		// Dessiner le cercle de fond de l'horloge
+		// Dessiner la bordure du cercle
 		ctx.save();
 		ctx.lineWidth = Math.max(6, outputSize * 0.006);
 		ctx.strokeStyle = '#111111';
@@ -1124,8 +1202,11 @@ let sharedConfigLoaded = false;
 		rangeZoom: '.wc-pc13-slot-fields input[data-zoom]',
 		rangeAxis: '.wc-pc13-slot-fields input[data-axis]',
 		colorInput: '#wc-pc13-color',
+		backgroundColorInput: '#wc-pc13-background-color',
 		slotSizeRange: '#wc-pc13-slot-size',
 		numbersToggle: '#wc-pc13-show-numbers',
+		numberType: '#wc-pc13-number-type',
+		intermediatePoints: '#wc-pc13-intermediate-points',
 		numbersColor: '#wc-pc13-number-color',
 		numbersSize: '#wc-pc13-number-size',
 		numbersDistance: '#wc-pc13-number-distance',
@@ -1309,6 +1390,9 @@ let sharedConfigLoaded = false;
 		if (previewEl) {
 			previewEl.classList.toggle('show-numbers', !!state.showNumbers);
 		}
+
+		// Mettre à jour la couleur de fond
+		updateBackgroundColor();
 
 		// Éviter updateRingDimensions pendant le drag (coûteux)
 		if (!skipExpensiveUpdates) {
@@ -1506,6 +1590,41 @@ let sharedConfigLoaded = false;
 			centerSizeRange.disabled = !state.center.image_url;
 			centerSizeRange.value = state.center.size;
 			
+			// Afficher ou masquer le label du slider selon si une image centrale est présente
+			const centerSizeLabel = configurator.querySelector('.wc-pc13-center-size-label');
+			if (centerSizeLabel) {
+				if (state.center.image_url) {
+					centerSizeLabel.style.display = 'block';
+				} else {
+					centerSizeLabel.style.display = 'none';
+				}
+			}
+			
+			// Afficher ou masquer les contrôles de zoom/position selon si une image centrale est présente
+			const centerControls = configurator.querySelector('.wc-pc13-center-controls');
+			if (centerControls) {
+				if (state.center.image_url) {
+					centerControls.style.display = 'block';
+					
+					// Mettre à jour les valeurs des contrôles
+					const centerZoom = centerControls.querySelector('#wc-pc13-center-zoom');
+					const centerAxisX = centerControls.querySelector('#wc-pc13-center-position-x');
+					const centerAxisY = centerControls.querySelector('#wc-pc13-center-position-y');
+					
+					if (centerZoom) {
+						centerZoom.value = state.center.scale || 1;
+					}
+					if (centerAxisX) {
+						centerAxisX.value = -(state.center.x || 0);
+					}
+					if (centerAxisY) {
+						centerAxisY.value = -(state.center.y || 0);
+					}
+				} else {
+					centerControls.style.display = 'none';
+				}
+			}
+			
 			// Mettre à jour l'affichage du pourcentage
 			const valueDisplay = configurator.querySelector('#wc-pc13-center-size-value');
 			if (valueDisplay && state.centerMax > 0) {
@@ -1519,6 +1638,8 @@ let sharedConfigLoaded = false;
 		const numbersColor = configurator.querySelector(selectors.numbersColor);
 		const numbersSize = configurator.querySelector(selectors.numbersSize);
 		const numbersDistanceInput = configurator.querySelector(selectors.numbersDistance);
+		const numberTypeSelect = configurator.querySelector(selectors.numberType);
+		const intermediatePointsSelect = configurator.querySelector(selectors.intermediatePoints);
 		const centerRemoveBtn = configurator.querySelector(selectors.centerRemoveButton);
 		if (numbersToggle) {
 			numbersToggle.checked = !!state.showNumbers;
@@ -1527,11 +1648,22 @@ let sharedConfigLoaded = false;
 
 		if (numbersFields) {
 			numbersFields.classList.toggle('is-active', numbersEnabled);
+			numbersFields.style.display = numbersEnabled ? 'flex' : 'none';
 		}
 
 		if (numbersColor) {
 			numbersColor.value = state.numbers.color;
 			numbersColor.disabled = !numbersEnabled;
+		}
+
+		if (numberTypeSelect) {
+			numberTypeSelect.value = state.numbers.numberType || 'arabic';
+			numberTypeSelect.disabled = !numbersEnabled;
+		}
+
+		if (intermediatePointsSelect) {
+			intermediatePointsSelect.value = state.numbers.intermediatePoints || 'without';
+			intermediatePointsSelect.disabled = !numbersEnabled;
 		}
 
 		if (numbersSize) {
@@ -1540,7 +1672,7 @@ let sharedConfigLoaded = false;
 		}
 
 		if (numbersDistanceInput) {
-			let maxDistance = 400; // Valeur par défaut
+			let maxDistance = 350; // Valeur par défaut
 			const preview = configurator.querySelector('.wc-pc13-preview');
 			if (preview && state.currentRingRadius) {
 				const previewWidth = preview.offsetWidth || 360;
@@ -1638,14 +1770,22 @@ let sharedConfigLoaded = false;
 		
 		const payload = {
 			color: state.color,
+			background_color: state.backgroundColor,
 			second_hand: state.secondHand,
 			diameter: state.diameter,
+			diameter_price: state.diameterPrice || 59,
 			slots: state.slots,
 			center: state.center,
 			ring_size: state.ringSize,
 			show_slots: state.showSlots,
 			show_numbers: state.showNumbers,
-			numbers: state.numbers,
+			numbers: {
+				color: state.numbers.color,
+				size: state.numbers.size,
+				distance: state.numbers.distance,
+				numberType: state.numbers.numberType || 'arabic',
+				intermediatePoints: state.numbers.intermediatePoints || 'without',
+			},
 			slot_border: state.slotBorder,
 			slot_shadow: state.slotShadow,
 		};
@@ -1810,14 +1950,123 @@ function applyUploadedImage(data, targetSlot = null) {
 	if (slotKey === 'center') {
 		target.image_url = data.full_url || data.url || '';
 		target.image_url_display = data.full_url || data.url || '';
+		// Calculer le scale optimal pour remplir le cercle sans blanc
+		const imageUrl = target.image_url;
+		if (imageUrl) {
+			const img = new Image();
+			img.onload = function() {
+				const configurator = document.querySelector(selectors.configurator);
+				// Récupérer la taille actuelle du centre
+				let centerSize = target.size || 180;
+				if (!target.size) {
+					const centerSizeRange = configurator ? configurator.querySelector(selectors.centerSizeRange) : null;
+					if (centerSizeRange) {
+						centerSize = parseInt(centerSizeRange.value || 180, 10);
+					}
+				}
+				
+				// Le CSS applique un inset de 14px par défaut de chaque côté
+				// La zone visible effective pour l'image est donc : centerSize - 2*inset
+				const effectiveSize = centerSize - (2 * DEFAULT_CENTER_INSET);
+				
+				// Calculer le ratio de l'image
+				const imageAspectRatio = img.width / img.height;
+				
+				// Avec background-size en pourcentage (scale * 100%), le comportement CSS est :
+				// - À scale=1, l'image occupe 100% de la plus grande dimension du conteneur visible
+				// - Pour un conteneur carré de taille effective S:
+				//   * Si image plus large (ratio >= 1): largeur = S, hauteur = S/ratio
+				//   * Si image plus haute (ratio < 1): hauteur = S, largeur = S*ratio
+				// Pour couvrir complètement un cercle de diamètre D=S, il faut que la dimension la plus petite soit >= D
+				
+				let optimalScale;
+				if (imageAspectRatio >= 1) {
+					// Image plus large ou carrée : à scale=1, height = effectiveSize/ratio
+					// Pour couvrir le cercle : height doit être >= effectiveSize
+					// Donc : scale * (effectiveSize/ratio) >= effectiveSize
+					// Donc : scale >= ratio
+					optimalScale = imageAspectRatio;
+				} else {
+					// Image plus haute : à scale=1, width = effectiveSize*ratio
+					// Pour couvrir le cercle : width doit être >= effectiveSize
+					// Donc : scale * (effectiveSize*ratio) >= effectiveSize
+					// Donc : scale >= 1/ratio
+					optimalScale = 1 / imageAspectRatio;
+				}
+				
+				// Ajouter une marge supplémentaire pour garantir qu'il n'y a absolument pas de blanc
+				// On multiplie par 1.2 pour avoir une marge de sécurité importante
+				optimalScale = optimalScale * 1.2;
+				
+				// S'assurer que le scale est au minimum 1.4 pour bien remplir (surtout pour les images carrées)
+				optimalScale = Math.max(optimalScale, 1.4);
+				
+				target.scale = optimalScale;
+				target.x = 0;
+				target.y = 0;
+				
+				// Appliquer les transformations après que le scale soit calculé
+				setTimeout(() => {
+					applyTransforms();
+					updateSelectionUI();
+					savePayload();
+				}, 10);
+			};
+			img.onerror = function() {
+				// En cas d'erreur, utiliser scale par défaut plus élevé pour remplir
+				target.scale = 1.3;
+				target.x = 0;
+				target.y = 0;
+				applyTransforms();
+				updateSelectionUI();
+				savePayload();
+			};
+			img.src = imageUrl;
+			// Initialiser avec des valeurs par défaut, elles seront mises à jour dans onload
+			target.x = 0;
+			target.y = 0;
+			target.scale = 1;
+			
+			// Définir la taille du centre si nécessaire (avant de retourner)
+			const configurator = document.querySelector(selectors.configurator);
+			const centerSizeRange = configurator ? configurator.querySelector(selectors.centerSizeRange) : null;
+			const centerMax = state.centerMax || (centerSizeRange ? parseInt(centerSizeRange.max || `${target.size || 180}`, 10) : (target.size || 180));
+			if (centerMax && !target.size) {
+				// Par défaut, définir la taille à 50% du maximum
+				const defaultSize = Math.round(centerMax * 0.5);
+				target.size = Math.max(CENTER_MIN_SIZE, defaultSize);
+				if (centerSizeRange) {
+					centerSizeRange.value = target.size;
+					
+					// Mettre à jour l'affichage du pourcentage
+					const valueDisplay = configurator.querySelector('#wc-pc13-center-size-value');
+					if (valueDisplay && centerMax > 0) {
+						const percentage = Math.round((target.size / centerMax) * 100);
+						valueDisplay.textContent = `${percentage}%`;
+					}
+				}
+			}
+			
+			// Appliquer immédiatement pour afficher l'image, le scale sera optimisé dans onload
+			applyTransforms();
+			updateSelectionUI();
+			savePayload();
+			// Retourner ici car le scale optimal sera calculé et appliqué dans img.onload
+			return;
+		} else {
+			// Si pas d'URL, initialiser avec valeurs par défaut
+			target.x = 0;
+			target.y = 0;
+			target.scale = 1;
+		}
 	} else {
 		// Slots périphériques : utiliser thumbnail pour l'affichage, full_url pour le PDF
 		target.image_url = data.full_url || data.url || ''; // Pour le PDF/export
 		target.image_url_display = data.url || data.full_url || ''; // Thumbnail pour l'affichage
+		target.x = 0;
+		target.y = 0;
+		target.scale = 1;
 	}
-	target.x = 0;
-	target.y = 0;
-	target.scale = 1;
 	
 	console.log('applyUploadedImage - image_url défini:', target.image_url, 'full_url:', data.full_url, 'url:', data.url);
 	
@@ -2047,21 +2296,34 @@ function handleCenterSizeChange(event) {
 function handleNumbersToggle(event) {
 	state.showNumbers = !!event.target.checked;
 	
-	// Si l'option est activée et que la distance n'est pas encore définie (ou est à 0), définir à 78% par défaut
+	const configurator = document.querySelector(selectors.configurator);
+	const numbersFields = configurator ? configurator.querySelector(selectors.numbersFields) : null;
+	
+	// Afficher ou masquer les champs des options des chiffres
+	if (numbersFields) {
+		if (state.showNumbers) {
+			numbersFields.style.display = 'flex';
+			numbersFields.classList.add('is-active');
+		} else {
+			numbersFields.style.display = 'none';
+			numbersFields.classList.remove('is-active');
+		}
+	}
+	
+	// Si l'option est activée et que la distance n'est pas encore définie (ou est à 0), définir à 77% par défaut
 	if (state.showNumbers && (!state.numbers.distance || state.numbers.distance === 0)) {
-		const configurator = document.querySelector(selectors.configurator);
 		const numbersDistanceInput = configurator ? configurator.querySelector(selectors.numbersDistance) : null;
 		if (numbersDistanceInput) {
 			const maxValue = parseInt(numbersDistanceInput.max, 10);
 			if (maxValue > 0) {
-				const defaultDistance = Math.round(maxValue * 0.78); // 78% du max
+				const defaultDistance = Math.round(maxValue * 0.77); // 77% du max
 				state.numbers.distance = defaultDistance;
 				numbersDistanceInput.value = defaultDistance;
 				
 				// Mettre à jour l'affichage du pourcentage
 				const valueDisplay = configurator.querySelector('#wc-pc13-number-distance-value');
 				if (valueDisplay) {
-					valueDisplay.textContent = '78%';
+					valueDisplay.textContent = '77%';
 				}
 			}
 		}
@@ -2132,7 +2394,7 @@ function handleNumbersDistanceChange(event) {
 	}
 	const maxAttr = parseInt(event.target.getAttribute('max'), 10);
 	// Le slider va de 0 (au centre) à max (collé au bord du cadran)
-	const maxDistance = Number.isNaN(maxAttr) ? 400 : maxAttr; // Fallback à 400 si max non défini
+	const maxDistance = Number.isNaN(maxAttr) ? 350 : maxAttr; // Fallback à 350 si max non défini
 	const clamped = Math.max(0, Math.min(maxDistance, value));
 	state.numbers.distance = clamped;
 	
@@ -2145,6 +2407,18 @@ function handleNumbersDistanceChange(event) {
 	
 	applyTransforms();
 	updateSelectionUI();
+	savePayload();
+}
+
+function handleNumberTypeChange(event) {
+	state.numbers.numberType = event.target.value || 'arabic';
+	applyTransforms();
+	savePayload();
+}
+
+function handleIntermediatePointsChange(event) {
+	state.numbers.intermediatePoints = event.target.value || 'without';
+	applyTransforms();
 	savePayload();
 }
 
@@ -2439,9 +2713,55 @@ function handleNumbersDistanceChange(event) {
 	if (centerSizeRange) {
 		centerSizeRange.addEventListener('input', handleCenterSizeChange);
 	}
+	
+	// Contrôles de zoom et position pour la photo centrale
+	const centerZoom = configurator.querySelector('#wc-pc13-center-zoom');
+	const centerAxisX = configurator.querySelector('#wc-pc13-center-position-x');
+	const centerAxisY = configurator.querySelector('#wc-pc13-center-position-y');
+	
+	if (centerZoom) {
+		centerZoom.addEventListener('input', function(event) {
+			state.center.scale = parseFloat(event.target.value);
+			const clamped = clampTransformValues(state.center);
+			state.center.scale = clamped.scale;
+			applyTransforms();
+			savePayload();
+		});
+	}
+	
+	if (centerAxisX) {
+		centerAxisX.addEventListener('input', function(event) {
+			state.center.x = -parseFloat(event.target.value);
+			const clamped = clampTransformValues(state.center);
+			state.center.x = clamped.x;
+			applyTransforms();
+			savePayload();
+		});
+	}
+	
+	if (centerAxisY) {
+		centerAxisY.addEventListener('input', function(event) {
+			state.center.y = -parseFloat(event.target.value);
+			const clamped = clampTransformValues(state.center);
+			state.center.y = clamped.y;
+			applyTransforms();
+			savePayload();
+		});
+	}
 
 	if (numbersToggle) {
 		numbersToggle.checked = !!state.showNumbers;
+		// Définir l'état initial des champs des chiffres
+		const numbersFields = configurator.querySelector(selectors.numbersFields);
+		if (numbersFields) {
+			if (state.showNumbers) {
+				numbersFields.style.display = 'flex';
+				numbersFields.classList.add('is-active');
+			} else {
+				numbersFields.style.display = 'none';
+				numbersFields.classList.remove('is-active');
+			}
+		}
 		numbersToggle.addEventListener('change', handleNumbersToggle);
 	}
 
@@ -2455,6 +2775,18 @@ function handleNumbersDistanceChange(event) {
 
 	if (numbersDistanceInput) {
 		numbersDistanceInput.addEventListener('input', handleNumbersDistanceChange);
+	}
+
+	const numberTypeSelect = configurator.querySelector(selectors.numberType);
+	if (numberTypeSelect) {
+		numberTypeSelect.value = state.numbers.numberType || 'arabic';
+		numberTypeSelect.addEventListener('change', handleNumberTypeChange);
+	}
+
+	const intermediatePointsSelect = configurator.querySelector(selectors.intermediatePoints);
+	if (intermediatePointsSelect) {
+		intermediatePointsSelect.value = state.numbers.intermediatePoints || 'without';
+		intermediatePointsSelect.addEventListener('change', handleIntermediatePointsChange);
 	}
 
 	const slotBorderEnabled = configurator.querySelector(selectors.slotBorderEnabled);
@@ -2699,7 +3031,8 @@ function handleNumbersDistanceChange(event) {
 		const colorInput = document.querySelector(selectors.colorInput);
 		const handsWrapper = document.querySelector('.wc-pc13-hands');
 
-		startHandsClock();
+		// Animer les aiguilles jusqu'à l'heure actuelle avec une animation sympa
+		animateHandsToCurrentTime();
 
 		if (colorInput) {
 			state.color = colorInput.value;
@@ -2711,14 +3044,38 @@ function handleNumbersDistanceChange(event) {
 			updateHandsColor();
 		}
 
+		// Gérer le changement de couleur de fond
+		const backgroundColorInput = document.querySelector(selectors.backgroundColorInput);
+		if (backgroundColorInput) {
+			state.backgroundColor = backgroundColorInput.value || '#fafafa';
+			backgroundColorInput.addEventListener('change', (event) => {
+				state.backgroundColor = event.target.value;
+				updateBackgroundColor();
+				savePayload();
+			});
+			updateBackgroundColor();
+		}
+
 		// Gérer le changement de diamètre
 		const diameterInput = document.querySelector('#wc-pc13-diameter');
 		if (diameterInput) {
 			// Initialiser le diamètre depuis la valeur sélectionnée
 			state.diameter = parseInt(diameterInput.value, 10) || 40;
+			// Extraire le prix depuis l'attribut data-price de l'option sélectionnée
+			const selectedOption = diameterInput.options[diameterInput.selectedIndex];
+			if (selectedOption && selectedOption.dataset.price) {
+				state.diameterPrice = parseFloat(selectedOption.dataset.price) || 59;
+			}
+			updateTotalPrice();
 			
 			diameterInput.addEventListener('change', (event) => {
 				state.diameter = parseInt(event.target.value, 10) || 40;
+				// Extraire le prix depuis l'attribut data-price de l'option sélectionnée
+				const selectedOption = event.target.options[event.target.selectedIndex];
+				if (selectedOption && selectedOption.dataset.price) {
+					state.diameterPrice = parseFloat(selectedOption.dataset.price) || 59;
+				}
+				updateTotalPrice();
 				savePayload();
 			});
 		}
@@ -2738,6 +3095,14 @@ function handleNumbersDistanceChange(event) {
 		}
 	}
 
+	function updateTotalPrice() {
+		const totalPriceElement = document.querySelector('#wc-pc13-total-price');
+		if (totalPriceElement) {
+			const price = state.diameterPrice || 59;
+			totalPriceElement.textContent = Math.round(price) + '€';
+		}
+	}
+
 	function updateHandsColor() {
 		const color = (state.color || '#111111').toLowerCase();
 		const hands = document.querySelectorAll('.wc-pc13-hand.hour, .wc-pc13-hand.minute');
@@ -2749,6 +3114,14 @@ function handleNumbersDistanceChange(event) {
 		});
 		
 		updateSecondHand();
+	}
+
+	function updateBackgroundColor() {
+		const backgroundColor = state.backgroundColor || '#fafafa';
+		const clockFace = document.querySelector('.wc-pc13-clock-face');
+		if (clockFace) {
+			clockFace.style.background = backgroundColor;
+		}
 	}
 
 	function updateSecondHand() {
@@ -2798,6 +3171,72 @@ function handleNumbersDistanceChange(event) {
 		if (secondHand && state.secondHand !== 'none') {
 			secondHand.style.transform = `rotate(${secondAngle}deg)`;
 		}
+	}
+
+	function animateHandsToCurrentTime() {
+		const handsWrapper = document.querySelector('.wc-pc13-hands');
+		if (!handsWrapper) {
+			return;
+		}
+
+		const hourHand = handsWrapper.querySelector('.wc-pc13-hand.hour');
+		const minuteHand = handsWrapper.querySelector('.wc-pc13-hand.minute');
+		const secondHand = handsWrapper.querySelector('.wc-pc13-hand.second');
+
+		// Positionner les aiguilles à 0° (midi) initialement
+		if (hourHand) {
+			hourHand.style.transition = 'none';
+			hourHand.style.transform = 'rotate(0deg)';
+		}
+		if (minuteHand) {
+			minuteHand.style.transition = 'none';
+			minuteHand.style.transform = 'rotate(0deg)';
+		}
+		if (secondHand) {
+			secondHand.style.transition = 'none';
+			secondHand.style.transform = 'rotate(0deg)';
+		}
+
+		// Forcer un reflow pour que la transition s'applique
+		void handsWrapper.offsetHeight;
+
+		// Calculer l'heure actuelle
+		const now = new Date();
+		const hours = now.getHours() % 12;
+		const minutes = now.getMinutes();
+		const seconds = now.getSeconds();
+
+		const targetHourAngle = (hours * 30) + (minutes * 0.5);
+		const targetMinuteAngle = (minutes * 6) + (seconds * 0.1);
+		const targetSecondAngle = seconds * 6;
+
+		// Appliquer une transition plus longue et sympa pour l'animation initiale
+		if (hourHand) {
+			hourHand.style.transition = 'transform 2s cubic-bezier(0.4, 0, 0.2, 1)';
+			hourHand.style.transform = `rotate(${targetHourAngle}deg)`;
+		}
+		if (minuteHand) {
+			minuteHand.style.transition = 'transform 2s cubic-bezier(0.4, 0, 0.2, 1)';
+			minuteHand.style.transform = `rotate(${targetMinuteAngle}deg)`;
+		}
+		if (secondHand && state.secondHand !== 'none') {
+			secondHand.style.transition = 'transform 2s cubic-bezier(0.4, 0, 0.2, 1)';
+			secondHand.style.transform = `rotate(${targetSecondAngle}deg)`;
+		}
+
+		// Après l'animation, démarrer l'horloge normale
+		setTimeout(() => {
+			if (hourHand) {
+				hourHand.style.transition = 'transform 0.3s ease-out';
+			}
+			if (minuteHand) {
+				minuteHand.style.transition = 'transform 0.3s ease-out';
+			}
+			if (secondHand) {
+				secondHand.style.transition = 'none';
+			}
+			startHandsClock();
+		}, 2000); // 2 secondes pour l'animation initiale
 	}
 
 	function startHandsClock() {
@@ -3373,6 +3812,41 @@ function handleNumbersDistanceChange(event) {
 			state.center.size = Math.max(CENTER_MIN_SIZE, sanitized);
 			centerSizeRange.value = state.center.size;
 			
+			// Afficher ou masquer le label du slider selon si une image centrale est présente
+			const centerSizeLabel = configurator.querySelector('.wc-pc13-center-size-label');
+			if (centerSizeLabel) {
+				if (state.center.image_url) {
+					centerSizeLabel.style.display = 'block';
+				} else {
+					centerSizeLabel.style.display = 'none';
+				}
+			}
+			
+			// Afficher ou masquer les contrôles de zoom/position selon si une image centrale est présente
+			const centerControls = configurator.querySelector('.wc-pc13-center-controls');
+			if (centerControls) {
+				if (state.center.image_url) {
+					centerControls.style.display = 'block';
+					
+					// Mettre à jour les valeurs des contrôles
+					const centerZoom = centerControls.querySelector('#wc-pc13-center-zoom');
+					const centerAxisX = centerControls.querySelector('#wc-pc13-center-position-x');
+					const centerAxisY = centerControls.querySelector('#wc-pc13-center-position-y');
+					
+					if (centerZoom) {
+						centerZoom.value = state.center.scale || 1;
+					}
+					if (centerAxisX) {
+						centerAxisX.value = -(state.center.x || 0);
+					}
+					if (centerAxisY) {
+						centerAxisY.value = -(state.center.y || 0);
+					}
+				} else {
+					centerControls.style.display = 'none';
+				}
+			}
+			
 			// Mettre à jour l'affichage du pourcentage
 			const valueDisplay = configurator.querySelector('#wc-pc13-center-size-value');
 			if (valueDisplay && state.centerMax > 0) {
@@ -3387,6 +3861,17 @@ function handleNumbersDistanceChange(event) {
 		if (numbersToggle && sharedConfigLoaded) {
 			numbersToggle.checked = !!state.showNumbers;
 		}
+		// Définir l'état initial des champs des chiffres
+		const numbersFields = configurator.querySelector(selectors.numbersFields);
+		if (numbersFields) {
+			if (state.showNumbers) {
+				numbersFields.style.display = 'flex';
+				numbersFields.classList.add('is-active');
+			} else {
+				numbersFields.style.display = 'none';
+				numbersFields.classList.remove('is-active');
+			}
+		}
 
 		const showSlotsToggle = configurator.querySelector(selectors.showSlotsToggle);
 		if (showSlotsToggle) {
@@ -3395,6 +3880,33 @@ function handleNumbersDistanceChange(event) {
 
 		if (numbersColor && numbersColor.value && !sharedConfigLoaded) {
 			state.numbers.color = numbersColor.value;
+		}
+
+		// Initialiser le type de chiffres
+		const numberTypeSelect = configurator.querySelector(selectors.numberType);
+		if (numberTypeSelect) {
+			if (sharedConfigLoaded && state.numbers.numberType) {
+				numberTypeSelect.value = state.numbers.numberType;
+			} else {
+				state.numbers.numberType = numberTypeSelect.value || 'arabic';
+			}
+		}
+
+		// Initialiser les points intermédiaires
+		const intermediatePointsSelect = configurator.querySelector(selectors.intermediatePoints);
+		if (intermediatePointsSelect) {
+			if (sharedConfigLoaded && state.numbers.intermediatePoints) {
+				intermediatePointsSelect.value = state.numbers.intermediatePoints;
+			} else {
+				state.numbers.intermediatePoints = intermediatePointsSelect.value || 'without';
+			}
+		}
+
+		// Initialiser la couleur de fond depuis l'input HTML si pas de config partagée
+		const backgroundColorInput = configurator.querySelector(selectors.backgroundColorInput);
+		if (backgroundColorInput && !sharedConfigLoaded) {
+			state.backgroundColor = backgroundColorInput.value || '#fafafa';
+			updateBackgroundColor();
 		}
 
 		if (numbersSize) {
@@ -3423,9 +3935,9 @@ function handleNumbersDistanceChange(event) {
 			
 			// Si initialDistance est null, calculer selon l'état de l'option "Afficher les chiffres"
 			if (initialDistance === null || initialDistance === undefined) {
-				const maxValue = parseInt(numbersDistanceInput.max, 10) || 400;
-				// Si l'option "Afficher les chiffres" est activée, utiliser 78% par défaut, sinon 90%
-				const defaultPercentage = state.showNumbers ? 0.78 : 0.9;
+				const maxValue = parseInt(numbersDistanceInput.max, 10) || 350;
+				// Si l'option "Afficher les chiffres" est activée, utiliser 77% par défaut, sinon 90%
+				const defaultPercentage = state.showNumbers ? 0.77 : 0.9;
 				initialDistance = Math.round(maxValue * defaultPercentage);
 			}
 			
@@ -3485,7 +3997,8 @@ function handleNumbersDistanceChange(event) {
 		applyTransforms();
 		updateSelectionUI();
 		savePayload();
-		startHandsClock();
+		// Animer les aiguilles jusqu'à l'heure actuelle avec une animation sympa au chargement
+		animateHandsToCurrentTime();
 		initCustomAddToCart();
 		scheduleLivePreviewUpdate();
 
@@ -3885,8 +4398,24 @@ async function saveShareAndSendEmail(email, triggerBtn = null) {
 			if (sharedConfig.color) {
 				state.color = sharedConfig.color;
 			}
+			if (sharedConfig.background_color) {
+				state.backgroundColor = sharedConfig.background_color;
+			}
 			if (sharedConfig.diameter) {
 				state.diameter = sharedConfig.diameter;
+				// Si un prix est fourni dans la config, l'utiliser, sinon le calculer depuis l'attribut data-price
+				if (sharedConfig.diameter_price) {
+					state.diameterPrice = sharedConfig.diameter_price;
+				} else {
+					const diameterSelect = configurator.querySelector('#wc-pc13-diameter');
+					if (diameterSelect) {
+						const option = diameterSelect.querySelector(`option[value="${sharedConfig.diameter}"]`);
+						if (option && option.dataset.price) {
+							state.diameterPrice = parseFloat(option.dataset.price) || 59;
+						}
+					}
+				}
+				updateTotalPrice();
 			}
 			if (sharedConfig.secondHand) {
 				state.secondHand = sharedConfig.secondHand;
@@ -3898,7 +4427,12 @@ async function saveShareAndSendEmail(email, triggerBtn = null) {
 				state.showNumbers = sharedConfig.showNumbers;
 			}
 			if (sharedConfig.numbers) {
-				state.numbers = { ...state.numbers, ...sharedConfig.numbers };
+				state.numbers = { 
+					...state.numbers, 
+					...sharedConfig.numbers,
+					numberType: sharedConfig.numbers.numberType || state.numbers.numberType || 'arabic',
+					intermediatePoints: sharedConfig.numbers.intermediatePoints || state.numbers.intermediatePoints || 'without',
+				};
 			}
 			if (sharedConfig.slot_border) {
 				state.slotBorder = { ...state.slotBorder, ...sharedConfig.slot_border };
@@ -3940,6 +4474,13 @@ async function saveShareAndSendEmail(email, triggerBtn = null) {
 			updateHandsColor();
 		}
 
+		// Appliquer la couleur de fond
+		const backgroundColorInput = configurator.querySelector(selectors.backgroundColorInput);
+		if (backgroundColorInput && state.backgroundColor) {
+			backgroundColorInput.value = state.backgroundColor;
+			updateBackgroundColor();
+		}
+
 		// Appliquer le diamètre
 		const diameterSelect = configurator.querySelector('#wc-pc13-diameter');
 		if (diameterSelect && state.diameter) {
@@ -3975,6 +4516,21 @@ async function saveShareAndSendEmail(email, triggerBtn = null) {
 		if (slotShadowEnabled) {
 			slotShadowEnabled.checked = !!state.slotShadow.enabled;
 		}
+
+		// Appliquer le type de chiffres
+		const numberTypeSelect = configurator.querySelector(selectors.numberType);
+		if (numberTypeSelect && state.numbers.numberType) {
+			numberTypeSelect.value = state.numbers.numberType;
+		}
+
+		// Appliquer les points intermédiaires
+		const intermediatePointsSelect = configurator.querySelector(selectors.intermediatePoints);
+		if (intermediatePointsSelect && state.numbers.intermediatePoints) {
+			intermediatePointsSelect.value = state.numbers.intermediatePoints;
+		}
+
+		// Mettre à jour le prix total
+		updateTotalPrice();
 
 		// Appliquer les images
 		updatePreview();

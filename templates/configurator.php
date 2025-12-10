@@ -34,12 +34,20 @@ $button_text = isset( $button_text ) ? $button_text : __( 'Ajouter au panier', '
 
 	<div class="wc-pc13-columns">
 		<div class="wc-pc13-preview-column">
+			<small class="wc-pc13-silent-note" style="display: block; text-align: center; margin-bottom: 16px; font-size: 12px; color: #666; font-style: italic;">
+				🔇 <?php esc_html_e( 'Horloge silencieuse (pas de tic-tac) - Mouvement continu', 'wc-photo-clock-13' ); ?>
+			</small>
 			<div class="wc-pc13-preview" data-initial-slot-size="110">
 				<div class="wc-pc13-clock-face">
 					<div class="wc-pc13-ring">
 						<?php for ( $i = 1; $i <= 12; $i++ ) : ?>
 							<?php
-							$angle = ( $i % 12 ) * 30; // 0deg for 12h, 30deg increments.
+							// Calculer l'angle pour positionner le slot 12 en haut (comme une vraie horloge)
+							// Si le 6 est actuellement en haut (à 180°), il faut décaler de 180° pour avoir le 12 en haut
+							// Le 12 doit être à l'angle qui met actuellement le 6 en haut, donc 180°
+							// Formule: angle = ((i == 12 ? 0 : i) * 30 + 180) % 360
+							$base_angle = ( $i == 12 ? 0 : $i ) * 30;
+							$angle = ($base_angle + 180) % 360;
 							?>
 							<div class="wc-pc13-slot" data-slot="<?php echo esc_attr( $i ); ?>" style="--angle: <?php echo esc_attr( $angle ); ?>deg;">
 								<div class="wc-pc13-slot-inner">
@@ -51,7 +59,11 @@ $button_text = isset( $button_text ) ? $button_text : __( 'Ajouter au panier', '
 					<div class="wc-pc13-numbers-overlay">
 						<?php for ( $i = 1; $i <= 12; $i++ ) : ?>
 							<?php
-							$angle = ( $i % 12 ) * 30; // 0deg for 12h, 30deg increments.
+							// Calculer l'angle pour positionner le 12 en haut (comme une vraie horloge)
+							// Si le 6 est actuellement en haut (à 180°), il faut décaler de 180° pour avoir le 12 en haut
+							// Formule identique aux slots: angle = ((i == 12 ? 0 : i) * 30 + 180) % 360
+							$base_angle = ( $i == 12 ? 0 : $i ) * 30;
+							$angle = ($base_angle + 180) % 360;
 							?>
 							<div class="wc-pc13-number-label" data-number="<?php echo esc_attr( $i ); ?>" style="--angle: <?php echo esc_attr( $angle ); ?>deg;"><?php echo esc_html( $i ); ?></div>
 						<?php endfor; ?>
@@ -209,12 +221,18 @@ $button_text = isset( $button_text ) ? $button_text : __( 'Ajouter au panier', '
 
 		<div class="wc-pc13-controls-column">
 			<div class="wc-pc13-global-settings">
+				<div class="wc-pc13-total-price">
+					<span class="wc-pc13-total-price-label"><?php esc_html_e( 'Prix total', 'wc-photo-clock-13' ); ?></span>
+					<span class="wc-pc13-total-price-value" id="wc-pc13-total-price">59€</span>
+				</div>
 				<label for="wc-pc13-diameter">
 					<span><?php esc_html_e( 'Diamètre de l\'horloge', 'wc-photo-clock-13' ); ?></span>
 					<select id="wc-pc13-diameter" name="wc_pc13_diameter">
 						<option value="30" data-price="49">30 cm - 49€</option>
 						<option value="40" data-price="59" selected>40 cm - 59€</option>
 						<option value="50" data-price="69">50 cm - 69€</option>
+						<option value="60" data-price="89">60 cm - 89€</option>
+						<option value="70" data-price="109">70 cm - 109€</option>
 					</select>
 					<small class="wc-pc13-diameter-note">
 						<?php esc_html_e( 'Impression sur support alu dibond', 'wc-photo-clock-13' ); ?>
@@ -241,48 +259,80 @@ $button_text = isset( $button_text ) ? $button_text : __( 'Ajouter au panier', '
 						</select>
 					</div>
 				</div>
-				<small class="wc-pc13-silent-note" style="display: block; margin-top: 6px; font-size: 12px; color: #666; font-style: italic;">
-					🔇 <?php esc_html_e( 'Horloge silencieuse (pas de tic-tac)', 'wc-photo-clock-13' ); ?>
-				</small>
+				<label for="wc-pc13-background-color">
+					<span><?php esc_html_e( 'Couleur de fond de l\'horloge', 'wc-photo-clock-13' ); ?></span>
+					<input type="color" id="wc-pc13-background-color" name="wc_pc13_background_color" value="#fafafa">
+				</label>
 				<div class="wc-pc13-center-panel">
 					<div class="wc-pc13-center-actions">
 						<button type="button" class="button button-secondary wc-pc13-select-center">
 							<?php esc_html_e( 'Remplacer l’image centrale…', 'wc-photo-clock-13' ); ?>
 						</button>
-						<button type="button" class="button wc-pc13-remove-center" disabled>
-							<?php esc_html_e( 'Retirer l’image centrale', 'wc-photo-clock-13' ); ?>
+						<button type="button" class="button wc-pc13-remove-center" disabled aria-label="<?php echo esc_attr( __( 'Retirer l\'image centrale', 'wc-photo-clock-13' ) ); ?>" data-tooltip="<?php echo esc_attr( __( 'Retirer l\'image centrale', 'wc-photo-clock-13' ) ); ?>">
+							<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+								<path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14zM10 11v6M14 11v6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+							</svg>
 						</button>
 					</div>
-					<h5><?php esc_html_e( 'Visuel central', 'wc-photo-clock-13' ); ?></h5>
-					<label for="wc-pc13-center-size">
+					<label for="wc-pc13-center-size" class="wc-pc13-center-size-label" style="display: none;">
 						<span><?php esc_html_e( 'Diamètre du visuel central', 'wc-photo-clock-13' ); ?></span>
-						<input type="range" id="wc-pc13-center-size" name="wc_pc13_center_size" min="120" max="520" step="1" value="180" data-center-size>
+						<input type="range" id="wc-pc13-center-size" name="wc_pc13_center_size" min="120" max="720" step="1" value="180" data-center-size>
 						<span class="wc-pc13-range-value" id="wc-pc13-center-size-value">0%</span>
 					</label>
+					<div class="wc-pc13-center-controls" style="display: none;">
+						<label for="wc-pc13-center-zoom">
+							<span><?php esc_html_e( 'Zoom', 'wc-photo-clock-13' ); ?></span>
+							<input type="range" id="wc-pc13-center-zoom" name="wc_pc13_center_zoom" min="1" max="5" step="0.01" value="1" data-center-zoom>
+						</label>
+						<label for="wc-pc13-center-position-x">
+							<span><?php esc_html_e( 'Position horizontale', 'wc-photo-clock-13' ); ?></span>
+							<input type="range" id="wc-pc13-center-position-x" name="wc_pc13_center_position_x" min="-100" max="100" step="1" value="0" data-center-axis="x">
+						</label>
+						<label for="wc-pc13-center-position-y">
+							<span><?php esc_html_e( 'Position verticale', 'wc-photo-clock-13' ); ?></span>
+							<input type="range" id="wc-pc13-center-position-y" name="wc_pc13_center_position_y" min="-100" max="100" step="1" value="0" data-center-axis="y">
+						</label>
+					</div>
 				</div>
 				<label class="wc-pc13-toggle">
-					<input type="checkbox" id="wc-pc13-show-numbers" name="wc_pc13_show_numbers" value="1">
+					<input type="checkbox" id="wc-pc13-show-numbers" name="wc_pc13_show_numbers" value="1" checked>
 					<span><?php esc_html_e( 'Afficher les chiffres des heures', 'wc-photo-clock-13' ); ?></span>
+					<div class="wc-pc13-numbers-fields">
+						<div class="wc-pc13-number-style-row">
+							<label for="wc-pc13-number-type">
+								<span><?php esc_html_e( 'Type de chiffres', 'wc-photo-clock-13' ); ?></span>
+								<select id="wc-pc13-number-type" name="wc_pc13_number_type">
+									<option value="arabic"><?php esc_html_e( 'Arabes', 'wc-photo-clock-13' ); ?></option>
+									<option value="roman"><?php esc_html_e( 'Romains', 'wc-photo-clock-13' ); ?></option>
+								</select>
+							</label>
+							<label for="wc-pc13-intermediate-points">
+								<span><?php esc_html_e( 'Points intermédiaires', 'wc-photo-clock-13' ); ?></span>
+								<select id="wc-pc13-intermediate-points" name="wc_pc13_intermediate_points">
+									<option value="with"><?php esc_html_e( 'Avec points intermédiaires', 'wc-photo-clock-13' ); ?></option>
+									<option value="without"><?php esc_html_e( 'Sans points intermédiaires', 'wc-photo-clock-13' ); ?></option>
+								</select>
+							</label>
+						</div>
+						<label for="wc-pc13-number-color">
+							<span><?php esc_html_e( 'Couleur des chiffres', 'wc-photo-clock-13' ); ?></span>
+							<input type="color" id="wc-pc13-number-color" name="wc_pc13_number_color" value="#222222">
+						</label>
+						<label for="wc-pc13-number-size">
+							<span><?php esc_html_e( 'Taille des chiffres', 'wc-photo-clock-13' ); ?></span>
+							<input type="range" id="wc-pc13-number-size" name="wc_pc13_number_size" min="16" max="72" step="1" value="32">
+						</label>
+						<label for="wc-pc13-number-distance">
+							<span><?php esc_html_e( 'Distance des chiffres depuis le centre', 'wc-photo-clock-13' ); ?></span>
+							<input type="range" id="wc-pc13-number-distance" name="wc_pc13_number_distance" min="0" max="350" step="1" value="270">
+							<span class="wc-pc13-range-value" id="wc-pc13-number-distance-value">77%</span>
+						</label>
+					</div>
 				</label>
 				<label class="wc-pc13-toggle">
 					<input type="checkbox" id="wc-pc13-show-slots" name="wc_pc13_show_slots" value="1" checked>
 					<span><?php esc_html_e( 'Afficher les photos périphériques', 'wc-photo-clock-13' ); ?></span>
 				</label>
-				<div class="wc-pc13-numbers-fields">
-					<label for="wc-pc13-number-color">
-						<span><?php esc_html_e( 'Couleur des chiffres', 'wc-photo-clock-13' ); ?></span>
-						<input type="color" id="wc-pc13-number-color" name="wc_pc13_number_color" value="#222222">
-					</label>
-					<label for="wc-pc13-number-size">
-						<span><?php esc_html_e( 'Taille des chiffres', 'wc-photo-clock-13' ); ?></span>
-						<input type="range" id="wc-pc13-number-size" name="wc_pc13_number_size" min="16" max="72" step="1" value="32">
-					</label>
-					<label for="wc-pc13-number-distance">
-						<span><?php esc_html_e( 'Distance des chiffres depuis le centre', 'wc-photo-clock-13' ); ?></span>
-						<input type="range" id="wc-pc13-number-distance" name="wc_pc13_number_distance" min="0" max="400" step="1" value="0">
-						<span class="wc-pc13-range-value" id="wc-pc13-number-distance-value">0%</span>
-					</label>
-				</div>
 					<label for="wc-pc13-slot-size"><?php esc_html_e( 'Taille des photos périphériques', 'wc-photo-clock-13' ); ?></label>
 					<input type="range" id="wc-pc13-slot-size" name="wc_pc13_slot_size" min="50" max="160" step="1" value="110">
 					<div class="wc-pc13-slot-styling">

@@ -362,10 +362,12 @@ class WC_PC13_Frontend {
 			30 => 49,
 			40 => 59,
 			50 => 69,
+			60 => 89,
+			70 => 109,
 		);
 		
 		$diameter = isset( $payload['diameter'] ) ? absint( $payload['diameter'] ) : 40;
-		if ( ! in_array( $diameter, array( 30, 40, 50 ), true ) ) {
+		if ( ! in_array( $diameter, array( 30, 40, 50, 60, 70 ), true ) ) {
 			$diameter = 40; // Valeur par défaut
 		}
 		
@@ -377,6 +379,7 @@ class WC_PC13_Frontend {
 		$clean = array(
 			'hands'  => isset( $payload['hands'] ) ? sanitize_text_field( $payload['hands'] ) : 'classic',
 			'color'  => isset( $payload['color'] ) ? sanitize_hex_color( $payload['color'] ) : '#111111',
+			'background_color' => isset( $payload['background_color'] ) ? sanitize_hex_color( $payload['background_color'] ) : '#fafafa',
 			'second_hand' => $second_hand,
 			'diameter' => $diameter,
 			'diameter_price' => isset( $diameter_prices[ $diameter ] ) ? $diameter_prices[ $diameter ] : 59,
@@ -389,6 +392,8 @@ class WC_PC13_Frontend {
 				'color'    => '#222222',
 				'size'     => 32,
 				'distance' => 0,
+				'number_type' => isset( $payload['numbers']['number_type'] ) ? sanitize_text_field( $payload['numbers']['number_type'] ) : 'arabic',
+				'intermediate_points' => isset( $payload['numbers']['intermediate_points'] ) ? sanitize_text_field( $payload['numbers']['intermediate_points'] ) : 'without',
 			),
 		);
 
@@ -436,6 +441,42 @@ class WC_PC13_Frontend {
 			} elseif ( isset( $payload['numbers']['offset'] ) ) {
 				$distance = absint( $payload['numbers']['offset'] );
 				$clean['numbers']['distance'] = max( 0, min( 2000, $distance ) );
+			}
+
+			// Gérer le type de chiffres
+			if ( isset( $payload['numbers']['number_type'] ) ) {
+				$number_type = sanitize_text_field( $payload['numbers']['number_type'] );
+				if ( in_array( $number_type, array( 'arabic', 'roman' ), true ) ) {
+					$clean['numbers']['number_type'] = $number_type;
+				}
+			}
+
+			// Gérer les points intermédiaires
+			if ( isset( $payload['numbers']['intermediate_points'] ) ) {
+				$intermediate_points = sanitize_text_field( $payload['numbers']['intermediate_points'] );
+				if ( in_array( $intermediate_points, array( 'with', 'without' ), true ) ) {
+					$clean['numbers']['intermediate_points'] = $intermediate_points;
+				}
+			}
+
+			// Compatibilité avec l'ancien format dial_style
+			if ( isset( $payload['numbers']['dial_style'] ) && ! isset( $payload['numbers']['number_type'] ) ) {
+				$dial_style = sanitize_text_field( $payload['numbers']['dial_style'] );
+				// Convertir l'ancien format vers le nouveau
+				if ( strpos( $dial_style, 'roman' ) !== false ) {
+					$clean['numbers']['number_type'] = 'roman';
+				} else {
+					$clean['numbers']['number_type'] = 'arabic';
+				}
+				if ( $dial_style === 'dots' ) {
+					$clean['numbers']['intermediate_points'] = 'with';
+					$clean['numbers']['number_type'] = 'arabic';
+				} elseif ( $dial_style === 'all' || $dial_style === 'roman-all' ) {
+					$clean['numbers']['intermediate_points'] = 'without';
+				} else {
+					// Pour '12-4' et 'roman-12-4', on utilise 'with' (12, 3, 6, 9 avec points)
+					$clean['numbers']['intermediate_points'] = 'with';
+				}
 			}
 		}
 
