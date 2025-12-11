@@ -381,7 +381,7 @@ class WC_PC13_Cart {
 			echo '<ul style="list-style: none; padding: 0;">';
 			echo '<li style="margin-bottom: 8px;"><strong>' . esc_html__( 'Produit :', 'wc-photo-clock-13' ) . '</strong> ' . esc_html( $item->get_name() ) . '</li>';
 			if ( ! empty( $data['hands'] ) ) {
-				echo '<li style="margin-bottom: 8px;"><strong>' . esc_html__( 'Style d'aiguilles :', 'wc-photo-clock-13' ) . '</strong> ' . esc_html( $data['hands'] ) . '</li>';
+				echo '<li style="margin-bottom: 8px;"><strong>' . esc_html__( 'Style d\'aiguilles :', 'wc-photo-clock-13' ) . '</strong> ' . esc_html( $data['hands'] ) . '</li>';
 			}
 			if ( ! empty( $data['color'] ) ) {
 				echo '<li style="margin-bottom: 8px;"><strong>' . esc_html__( 'Couleur :', 'wc-photo-clock-13' ) . '</strong> ' . esc_html( $data['color'] ) . '</li>';
