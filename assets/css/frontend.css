@@ -711,6 +711,18 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	cursor: pointer;
 }
 
+/* Empêcher que les interactions dans numbers-fields déclenchent le toggle parent */
+.wc-pc13-toggle:has(.wc-pc13-numbers-fields) .wc-pc13-numbers-fields,
+.wc-pc13-toggle:has(.wc-pc13-numbers-fields) .wc-pc13-numbers-fields * {
+	pointer-events: auto;
+}
+
+.wc-pc13-toggle:has(.wc-pc13-numbers-fields) input[type="range"],
+.wc-pc13-toggle:has(.wc-pc13-numbers-fields) input[type="color"],
+.wc-pc13-toggle:has(.wc-pc13-numbers-fields) select {
+	pointer-events: auto;
+}
+
 .wc-pc13-toggle:hover {
 	background: #f8f8f8;
 	border-color: #21759b;
@@ -734,6 +746,12 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	background: linear-gradient(135deg, #f8faff 0%, #f0f7ff 100%);
 	margin-top: 12px;
 	width: 100%;
+	pointer-events: auto;
+}
+
+/* Empêcher les interactions dans numbers-fields de déclencher le toggle parent */
+.wc-pc13-numbers-fields * {
+	pointer-events: auto;
 }
 
 .wc-pc13-number-style-row {
@@ -752,6 +770,7 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 
 .wc-pc13-numbers-fields label {
 	display: grid;
+	grid-template-rows: auto 1fr;
 	gap: 8px;
 	font-weight: 500;
 }
@@ -760,16 +779,24 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	font-size: 13px;
 	color: #555;
 	font-weight: 500;
+	order: -1;
+	grid-row: 1;
 }
 
-.wc-pc13-numbers-fields input[type="range"] {
+.wc-pc13-numbers-fields input[type="range"],
+.wc-pc13-numbers-fields input[type="color"],
+.wc-pc13-numbers-fields select {
 	width: 100%;
+	order: 1;
+	grid-row: 2;
 }
 
 .wc-pc13-range-value {
 	display: block;
 	margin-top: 6px;
 	font-size: 13px;
+	order: 2;
+	grid-row: 3;
 	color: #666;
 	font-weight: 500;
 	text-align: center;
@@ -801,6 +828,30 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	margin-top: 10px;
 	padding-left: 20px;
 	border-left: 2px solid #d0e5f5;
+}
+
+.wc-pc13-number-shadow-fields label,
+.wc-pc13-number-glow-fields label {
+	display: grid;
+	grid-template-rows: auto 1fr;
+	gap: 8px;
+	font-weight: 500;
+}
+
+.wc-pc13-number-shadow-fields label span,
+.wc-pc13-number-glow-fields label span {
+	font-size: 13px;
+	color: #555;
+	font-weight: 500;
+	order: -1;
+	grid-row: 1;
+}
+
+.wc-pc13-number-shadow-fields input[type="range"],
+.wc-pc13-number-glow-fields input[type="range"] {
+	width: 100%;
+	order: 1;
+	grid-row: 2;
 }
 
 .wc-pc13-slot-styling {
@@ -1607,7 +1658,54 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 .wc-pc13-unsplash-search {
 	display: flex;
 	gap: 12px;
+	margin-bottom: 16px;
+}
+
+.wc-pc13-unsplash-suggestions {
+	display: flex;
+	align-items: center;
+	gap: 12px;
 	margin-bottom: 24px;
+	flex-wrap: wrap;
+}
+
+.wc-pc13-suggestions-label {
+	font-size: 13px;
+	color: #666;
+	font-weight: 500;
+	flex-shrink: 0;
+}
+
+.wc-pc13-suggestions-tags {
+	display: flex;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+
+.wc-pc13-suggestion-tag {
+	padding: 6px 14px;
+	background: #f5f5f5;
+	border: 1px solid #e0e0e0;
+	border-radius: 20px;
+	font-size: 13px;
+	color: #555;
+	cursor: pointer;
+	transition: all 0.2s ease;
+	font-weight: 500;
+	white-space: nowrap;
+}
+
+.wc-pc13-suggestion-tag:hover {
+	background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+	color: #fff;
+	border-color: transparent;
+	transform: translateY(-1px);
+	box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+.wc-pc13-suggestion-tag:active {
+	transform: translateY(0);
+	box-shadow: 0 1px 4px rgba(102, 126, 234, 0.2);
 }
 
 .wc-pc13-unsplash-search-input {
@@ -2335,6 +2433,22 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	font-size: 11px !important;
 	transition: all 0.2s ease !important;
 	position: relative;
+}
+
+.wc-pc13-select-center.wc-pc13-no-image {
+	background: #28a745 !important;
+	border-color: #28a745 !important;
+	color: #ffffff !important;
+	padding: 12px 24px !important;
+	font-size: 14px !important;
+	font-weight: 600 !important;
+}
+
+.wc-pc13-select-center.wc-pc13-no-image:hover:not(.wc-pc13-loading) {
+	background: #218838 !important;
+	border-color: #218838 !important;
+	transform: translateY(-2px);
+	box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
 }
 
 .wc-pc13-select-center:hover:not(.wc-pc13-loading) {

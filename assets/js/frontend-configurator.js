@@ -1800,11 +1800,17 @@ let sharedConfigLoaded = false;
 		}
 
 		if (numbersSize) {
-			numbersSize.value = state.numbers.size;
+			// Ne pas modifier le slider s'il est en cours d'utilisation
+			if (document.activeElement !== numbersSize) {
+				numbersSize.value = state.numbers.size;
+			}
 			numbersSize.disabled = !numbersEnabled;
 		}
 
 		if (numbersDistanceInput) {
+			// Ne pas modifier le slider s'il est en cours d'utilisation (pour éviter qu'il disparaisse)
+			const isSliderActive = document.activeElement === numbersDistanceInput;
+			
 			let maxDistance = 350; // Valeur par défaut
 			const preview = configurator.querySelector('.wc-pc13-preview');
 			if (preview && state.currentRingRadius) {
@@ -1813,14 +1819,18 @@ let sharedConfigLoaded = false;
 				// Le bord du cadran est à previewWidth / 2 du centre
 				const edgeDistance = (previewWidth / 2) - 10; // -10px de marge pour éviter que les chiffres touchent le bord
 				maxDistance = Math.max(edgeDistance, 50); // Minimum 50px
-				numbersDistanceInput.min = '0';
-				numbersDistanceInput.max = `${Math.round(maxDistance)}`;
+				if (!isSliderActive) {
+					numbersDistanceInput.min = '0';
+					numbersDistanceInput.max = `${Math.round(maxDistance)}`;
+				}
 			} else if (state.currentRingRadius) {
 				// Fallback si preview n'est pas disponible
 				const ringRadius = state.currentRingRadius;
 				maxDistance = Math.max(ringRadius + state.ringSize, state.center.size);
-				numbersDistanceInput.min = '0';
-				numbersDistanceInput.max = `${Math.round(maxDistance)}`;
+				if (!isSliderActive) {
+					numbersDistanceInput.min = '0';
+					numbersDistanceInput.max = `${Math.round(maxDistance)}`;
+				}
 			}
 			// S'assurer que la valeur est au moins 0 (au centre) et ne dépasse pas le max
 			const maxValue = parseInt(numbersDistanceInput.max, 10) || maxDistance;
@@ -1831,19 +1841,35 @@ let sharedConfigLoaded = false;
 				state.numbers.distance = currentValue;
 			}
 			currentValue = Math.max(0, Math.min(maxValue, currentValue));
-			numbersDistanceInput.value = currentValue;
+			// Ne mettre à jour la valeur que si le slider n'est pas actif
+			if (!isSliderActive && parseInt(numbersDistanceInput.value, 10) !== currentValue) {
+				numbersDistanceInput.value = currentValue;
+			}
 			numbersDistanceInput.disabled = !numbersEnabled;
 			
 			// Mettre à jour l'affichage de la valeur en pourcentage
 			const valueDisplay = configurator.querySelector('#wc-pc13-number-distance-value');
 			if (valueDisplay && maxValue > 0) {
-				const percentage = Math.round((currentValue / maxValue) * 100);
+				const currentSliderValue = isSliderActive ? parseInt(numbersDistanceInput.value, 10) : currentValue;
+				const percentage = Math.round((currentSliderValue / maxValue) * 100);
 				valueDisplay.textContent = `${percentage}%`;
 			}
 		}
 
 		if (centerRemoveBtn) {
 			centerRemoveBtn.disabled = !state.center.image_url;
+		}
+
+		// Mettre à jour le bouton de sélection d'image centrale
+		const centerSelectBtn = configurator.querySelector(selectors.centerSelectButton);
+		if (centerSelectBtn) {
+			if (state.center.image_url) {
+				centerSelectBtn.textContent = 'Remplacer l\'image centrale…';
+				centerSelectBtn.classList.remove('wc-pc13-no-image');
+			} else {
+				centerSelectBtn.textContent = 'Envoyer une image centrale';
+				centerSelectBtn.classList.add('wc-pc13-no-image');
+			}
 		}
 
 		// Afficher/masquer le bloc éditeur uniquement pour les slots périphériques (pas le centre)
@@ -2453,6 +2479,11 @@ function handleCenterSizeChange(event) {
 }
 
 function handleNumbersToggle(event) {
+	// S'assurer que l'événement vient bien du checkbox et non d'une propagation
+	if (event.target.type !== 'checkbox' || event.target.id !== 'wc-pc13-show-numbers') {
+		return;
+	}
+	
 	state.showNumbers = !!event.target.checked;
 	
 	const configurator = document.querySelector(selectors.configurator);
@@ -2494,6 +2525,9 @@ function handleNumbersToggle(event) {
 }
 
 function handleNumbersColorChange(event) {
+	// Empêcher la propagation vers le label parent pour éviter de déclencher le toggle
+	event.stopPropagation();
+	
 	const value = event.target.value;
 	state.numbers.color = value || '#222222';
 	applyTransforms();
@@ -2501,11 +2535,14 @@ function handleNumbersColorChange(event) {
 }
 
 function handleNumbersSizeChange(event) {
+	// Empêcher la propagation vers le label parent pour éviter de déclencher le toggle
+	event.stopPropagation();
+	
 	const value = parseInt(event.target.value, 10);
 	if (Number.isNaN(value)) {
 		return;
 	}
-	state.numbers.size = Math.max(12, Math.min(96, value));
+	state.numbers.size = Math.max(12, Math.min(150, value));
 	applyTransforms();
 	savePayload();
 }
@@ -2574,6 +2611,9 @@ function handleNumberShadowEnabledChange(event) {
 }
 
 function handleNumberShadowIntensityChange(event) {
+	// Empêcher la propagation vers le label parent pour éviter de déclencher le toggle
+	event.stopPropagation();
+	
 	if (!event || !event.target) {
 		return;
 	}
@@ -2618,6 +2658,9 @@ function handleNumberGlowEnabledChange(event) {
 }
 
 function handleNumberGlowIntensityChange(event) {
+	// Empêcher la propagation vers le label parent pour éviter de déclencher le toggle
+	event.stopPropagation();
+	
 	if (!event || !event.target) {
 		return;
 	}
@@ -2634,6 +2677,9 @@ function handleNumberGlowIntensityChange(event) {
 }
 
 function handleNumbersDistanceChange(event) {
+	// Empêcher la propagation vers le label parent pour éviter de déclencher le toggle
+	event.stopPropagation();
+	
 	const value = parseInt(event.target.value, 10);
 	if (Number.isNaN(value)) {
 		return;
@@ -2657,12 +2703,18 @@ function handleNumbersDistanceChange(event) {
 }
 
 function handleNumberTypeChange(event) {
+	// Empêcher la propagation vers le label parent pour éviter de déclencher le toggle
+	event.stopPropagation();
+	
 	state.numbers.numberType = event.target.value || 'arabic';
 	applyTransforms();
 	savePayload();
 }
 
 function handleIntermediatePointsChange(event) {
+	// Empêcher la propagation vers le label parent pour éviter de déclencher le toggle
+	event.stopPropagation();
+	
 	state.numbers.intermediatePoints = event.target.value || 'without';
 	applyTransforms();
 	savePayload();
@@ -3009,7 +3061,11 @@ function handleIntermediatePointsChange(event) {
 	const centerAxisY = configurator.querySelector('#wc-pc13-center-position-y');
 	
 	if (centerZoom) {
+		// Empêcher la propagation des événements
+		centerZoom.addEventListener('click', (e) => e.stopPropagation());
+		centerZoom.addEventListener('mousedown', (e) => e.stopPropagation());
 		centerZoom.addEventListener('input', function(event) {
+			event.stopPropagation();
 			state.center.scale = parseFloat(event.target.value);
 			const clamped = clampTransformValues(state.center);
 			state.center.scale = clamped.scale;
@@ -3019,7 +3075,11 @@ function handleIntermediatePointsChange(event) {
 	}
 	
 	if (centerAxisX) {
+		// Empêcher la propagation des événements
+		centerAxisX.addEventListener('click', (e) => e.stopPropagation());
+		centerAxisX.addEventListener('mousedown', (e) => e.stopPropagation());
 		centerAxisX.addEventListener('input', function(event) {
+			event.stopPropagation();
 			state.center.x = -parseFloat(event.target.value);
 			const clamped = clampTransformValues(state.center);
 			state.center.x = clamped.x;
@@ -3029,7 +3089,11 @@ function handleIntermediatePointsChange(event) {
 	}
 	
 	if (centerAxisY) {
+		// Empêcher la propagation des événements
+		centerAxisY.addEventListener('click', (e) => e.stopPropagation());
+		centerAxisY.addEventListener('mousedown', (e) => e.stopPropagation());
 		centerAxisY.addEventListener('input', function(event) {
+			event.stopPropagation();
 			state.center.y = -parseFloat(event.target.value);
 			const clamped = clampTransformValues(state.center);
 			state.center.y = clamped.y;
@@ -3055,26 +3119,41 @@ function handleIntermediatePointsChange(event) {
 	}
 
 	if (numbersColor) {
+		// Empêcher la propagation des événements pour éviter de déclencher le toggle parent
+		numbersColor.addEventListener('click', (e) => e.stopPropagation());
+		numbersColor.addEventListener('mousedown', (e) => e.stopPropagation());
 		numbersColor.addEventListener('change', handleNumbersColorChange);
 	}
 
 	if (numbersSize) {
+		// Empêcher la propagation des événements de clic et mousedown pour éviter de déclencher le toggle parent
+		numbersSize.addEventListener('click', (e) => e.stopPropagation());
+		numbersSize.addEventListener('mousedown', (e) => e.stopPropagation());
 		numbersSize.addEventListener('input', handleNumbersSizeChange);
 	}
 
 	if (numbersDistanceInput) {
+		// Empêcher la propagation des événements de clic et mousedown pour éviter de déclencher le toggle parent
+		numbersDistanceInput.addEventListener('click', (e) => e.stopPropagation());
+		numbersDistanceInput.addEventListener('mousedown', (e) => e.stopPropagation());
 		numbersDistanceInput.addEventListener('input', handleNumbersDistanceChange);
 	}
 
 	const numberTypeSelect = configurator.querySelector(selectors.numberType);
 	if (numberTypeSelect) {
 		numberTypeSelect.value = state.numbers.numberType || 'arabic';
+		// Empêcher la propagation des événements pour éviter de déclencher le toggle parent
+		numberTypeSelect.addEventListener('click', (e) => e.stopPropagation());
+		numberTypeSelect.addEventListener('mousedown', (e) => e.stopPropagation());
 		numberTypeSelect.addEventListener('change', handleNumberTypeChange);
 	}
 
 	const intermediatePointsSelect = configurator.querySelector(selectors.intermediatePoints);
 	if (intermediatePointsSelect) {
 		intermediatePointsSelect.value = state.numbers.intermediatePoints || 'without';
+		// Empêcher la propagation des événements pour éviter de déclencher le toggle parent
+		intermediatePointsSelect.addEventListener('click', (e) => e.stopPropagation());
+		intermediatePointsSelect.addEventListener('mousedown', (e) => e.stopPropagation());
 		intermediatePointsSelect.addEventListener('change', handleIntermediatePointsChange);
 	}
 
@@ -3093,6 +3172,9 @@ function handleIntermediatePointsChange(event) {
 	if (numberShadowIntensity) {
 		numberShadowIntensity.value = (state.numbers.shadow && state.numbers.shadow.intensity) || 5;
 		numberShadowIntensity.disabled = !(state.numbers.shadow && state.numbers.shadow.enabled);
+		// Empêcher la propagation des événements pour éviter de déclencher le toggle parent
+		numberShadowIntensity.addEventListener('click', (e) => e.stopPropagation());
+		numberShadowIntensity.addEventListener('mousedown', (e) => e.stopPropagation());
 		numberShadowIntensity.addEventListener('input', handleNumberShadowIntensityChange);
 	}
 
@@ -3111,6 +3193,9 @@ function handleIntermediatePointsChange(event) {
 	if (numberGlowIntensity) {
 		numberGlowIntensity.value = (state.numbers.glow && state.numbers.glow.intensity) || 10;
 		numberGlowIntensity.disabled = !(state.numbers.glow && state.numbers.glow.enabled);
+		// Empêcher la propagation des événements pour éviter de déclencher le toggle parent
+		numberGlowIntensity.addEventListener('click', (e) => e.stopPropagation());
+		numberGlowIntensity.addEventListener('mousedown', (e) => e.stopPropagation());
 		numberGlowIntensity.addEventListener('input', handleNumberGlowIntensityChange);
 	}
 
@@ -3453,6 +3538,18 @@ function handleIntermediatePointsChange(event) {
 					}
 				});
 			}
+
+			// Gestion des suggestions de recherche
+			const suggestionTags = unsplashModal.querySelectorAll('.wc-pc13-suggestion-tag');
+			suggestionTags.forEach((tag) => {
+				tag.addEventListener('click', () => {
+					const query = tag.dataset.query || tag.textContent.trim();
+					if (query && searchInput) {
+						searchInput.value = query;
+						searchUnsplashImages(query);
+					}
+				});
+			});
 		}
 	}
 
@@ -4271,10 +4368,12 @@ function handleIntermediatePointsChange(event) {
 			const loading = unsplashModal.querySelector(selectors.unsplashLoading);
 			const empty = unsplashModal.querySelector(selectors.unsplashEmpty);
 			const modalBody = unsplashModal.querySelector('.wc-pc13-unsplash-modal-body');
+			const suggestions = unsplashModal.querySelector('#wc-pc13-unsplash-suggestions');
 			
 			if (grid) grid.innerHTML = '';
 			if (loading) loading.style.display = 'none';
 			if (empty) empty.style.display = 'none';
+			if (suggestions) suggestions.style.display = 'flex';
 			
 			// Réinitialiser l'observer de scroll
 			if (unsplashScrollObserver) {
@@ -4326,6 +4425,10 @@ function handleIntermediatePointsChange(event) {
 			if (grid) grid.innerHTML = '';
 			if (empty) empty.style.display = 'none';
 		}
+		
+		// Masquer les suggestions lors d'une recherche (nouvelle ou chargement supplémentaire)
+		const suggestions = unsplashModal.querySelector('#wc-pc13-unsplash-suggestions');
+		if (suggestions) suggestions.style.display = 'none';
 
 		// Éviter les requêtes multiples
 		if (unsplashLoadingMore) {
@@ -4820,7 +4923,7 @@ function handleIntermediatePointsChange(event) {
 		if (numbersSize) {
 			const initialSize = sharedConfigLoaded ? state.numbers.size : parseInt(numbersSize.value || state.numbers.size, 10);
 			if (!Number.isNaN(initialSize)) {
-				state.numbers.size = Math.max(12, Math.min(96, initialSize));
+				state.numbers.size = Math.max(12, Math.min(150, initialSize));
 			}
 			numbersSize.value = state.numbers.size;
 		}

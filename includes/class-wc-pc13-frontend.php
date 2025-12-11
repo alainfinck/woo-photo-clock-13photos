@@ -440,7 +440,7 @@ class WC_PC13_Frontend {
 			if ( isset( $payload['numbers']['size'] ) ) {
 				$size = absint( $payload['numbers']['size'] );
 				if ( $size ) {
-					$clean['numbers']['size'] = max( 12, min( 96, $size ) );
+					$clean['numbers']['size'] = max( 12, min( 150, $size ) );
 				}
 			}
 

@@ -207,6 +207,25 @@ $default_show_slots = isset( $default_show_slots ) ? $default_show_slots : true;
 								<?php esc_html_e( 'Rechercher', 'wc-photo-clock-13' ); ?>
 							</button>
 						</div>
+						<div class="wc-pc13-unsplash-suggestions" id="wc-pc13-unsplash-suggestions">
+							<span class="wc-pc13-suggestions-label"><?php esc_html_e( 'Suggestions:', 'wc-photo-clock-13' ); ?></span>
+							<div class="wc-pc13-suggestions-tags">
+								<button type="button" class="wc-pc13-suggestion-tag" data-query="nature"><?php esc_html_e( 'Nature', 'wc-photo-clock-13' ); ?></button>
+								<button type="button" class="wc-pc13-suggestion-tag" data-query="ville"><?php esc_html_e( 'Ville', 'wc-photo-clock-13' ); ?></button>
+								<button type="button" class="wc-pc13-suggestion-tag" data-query="portrait"><?php esc_html_e( 'Portrait', 'wc-photo-clock-13' ); ?></button>
+								<button type="button" class="wc-pc13-suggestion-tag" data-query="paysage"><?php esc_html_e( 'Paysage', 'wc-photo-clock-13' ); ?></button>
+								<button type="button" class="wc-pc13-suggestion-tag" data-query="animaux"><?php esc_html_e( 'Animaux', 'wc-photo-clock-13' ); ?></button>
+								<button type="button" class="wc-pc13-suggestion-tag" data-query="architecture"><?php esc_html_e( 'Architecture', 'wc-photo-clock-13' ); ?></button>
+								<button type="button" class="wc-pc13-suggestion-tag" data-query="voyage"><?php esc_html_e( 'Voyage', 'wc-photo-clock-13' ); ?></button>
+								<button type="button" class="wc-pc13-suggestion-tag" data-query="art"><?php esc_html_e( 'Art', 'wc-photo-clock-13' ); ?></button>
+								<button type="button" class="wc-pc13-suggestion-tag" data-query="fleurs"><?php esc_html_e( 'Fleurs', 'wc-photo-clock-13' ); ?></button>
+								<button type="button" class="wc-pc13-suggestion-tag" data-query="montagne"><?php esc_html_e( 'Montagne', 'wc-photo-clock-13' ); ?></button>
+								<button type="button" class="wc-pc13-suggestion-tag" data-query="mer"><?php esc_html_e( 'Mer', 'wc-photo-clock-13' ); ?></button>
+								<button type="button" class="wc-pc13-suggestion-tag" data-query="coucher de soleil"><?php esc_html_e( 'Coucher de soleil', 'wc-photo-clock-13' ); ?></button>
+								<button type="button" class="wc-pc13-suggestion-tag" data-query="minimaliste"><?php esc_html_e( 'Minimaliste', 'wc-photo-clock-13' ); ?></button>
+								<button type="button" class="wc-pc13-suggestion-tag" data-query="famille"><?php esc_html_e( 'Famille', 'wc-photo-clock-13' ); ?></button>
+							</div>
+						</div>
 						<div class="wc-pc13-unsplash-results" id="wc-pc13-unsplash-results">
 							<div class="wc-pc13-unsplash-loading" style="display: none;">
 								<div class="wc-pc13-loading-spinner"></div>
@@ -313,7 +332,7 @@ $default_show_slots = isset( $default_show_slots ) ? $default_show_slots : true;
 							</svg>
 						</button>
 					<button type="button" class="button button-secondary wc-pc13-select-center">
-						<?php esc_html_e( 'Remplacer l\'image centrale…', 'wc-photo-clock-13' ); ?>
+						<?php esc_html_e( 'Envoyer une image centrale', 'wc-photo-clock-13' ); ?>
 					</button>
 					</div>
 					<label for="wc-pc13-center-size" class="wc-pc13-center-size-label" style="display: none;">
@@ -362,7 +381,7 @@ $default_show_slots = isset( $default_show_slots ) ? $default_show_slots : true;
 						</label>
 						<label for="wc-pc13-number-size">
 							<span><?php esc_html_e( 'Taille des chiffres', 'wc-photo-clock-13' ); ?></span>
-							<input type="range" id="wc-pc13-number-size" name="wc_pc13_number_size" min="16" max="72" step="1" value="32">
+							<input type="range" id="wc-pc13-number-size" name="wc_pc13_number_size" min="16" max="150" step="1" value="32">
 						</label>
 						<label for="wc-pc13-number-distance">
 							<span><?php esc_html_e( 'Distance des chiffres depuis le centre', 'wc-photo-clock-13' ); ?></span>
