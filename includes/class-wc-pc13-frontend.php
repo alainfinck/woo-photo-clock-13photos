@@ -279,11 +279,13 @@ class WC_PC13_Frontend {
 	 * @param WC_Order              $order Commande.
 	 */
 	public function add_order_item_meta( $item, $cart_item_key, $values, $order ) {
-		unset( $order );
-
 		if ( empty( $values['wc_pc13'] ) || ! is_array( $values['wc_pc13'] ) ) {
 			return;
 		}
+
+		// Marquer la commande comme contenant une horloge personnalisée
+		$order->update_meta_data( '_wc_pc13_has_config', 'yes' );
+		$order->save();
 
 		// Encoder les données de configuration en JSON de manière sécurisée
 		$config_json = wp_json_encode( $values['wc_pc13'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );

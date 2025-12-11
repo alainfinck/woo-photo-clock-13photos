@@ -55,7 +55,7 @@ class WC_PC13_Admin {
 	 * @return array
 	 */
 	public function register_action_link( $links ) {
-		$url     = admin_url( 'admin.php?page=wc-pc13-settings' );
+		$url     = admin_url( 'admin.php?page=wc-pc13-admin' );
 		$links[] = sprintf(
 			'<a href="%1$s">%2$s</a>',
 			esc_url( $url ),
@@ -74,26 +74,8 @@ class WC_PC13_Admin {
 			__( 'Horloge 13 Photos', 'wc-photo-clock-13' ),
 			__( 'Horloge 13 Photos', 'wc-photo-clock-13' ),
 			'manage_woocommerce',
-			'wc-pc13-settings',
-			array( $this, 'render_settings_page' )
-		);
-
-		add_submenu_page(
-			'woocommerce',
-			__( 'Projets Horloge 13', 'wc-photo-clock-13' ),
-			__( 'Projets Horloge 13', 'wc-photo-clock-13' ),
-			'manage_woocommerce',
-			'wc-pc13-projects',
-			array( $this, 'render_projects_page' )
-		);
-
-		add_submenu_page(
-			'woocommerce',
-			__( 'Emails partages Horloge 13', 'wc-photo-clock-13' ),
-			__( 'Emails partages Horloge 13', 'wc-photo-clock-13' ),
-			'manage_woocommerce',
-			'wc-pc13-share-emails',
-			array( $this, 'render_share_emails_page' )
+			'wc-pc13-admin',
+			array( $this, 'render_admin_page' )
 		);
 	}
 
@@ -444,6 +426,388 @@ class WC_PC13_Admin {
 		$value   = absint( $value );
 
 		return in_array( $value, $allowed, true ) ? $value : $fallback;
+	}
+
+	/**
+	 * Rendu de l'onglet Créations.
+	 */
+	private function render_creations_tab() {
+		global $wpdb;
+
+		// Récupérer les créations depuis les commandes
+		$orders_query = new WP_Query( array(
+			'post_type' => 'shop_order',
+			'post_status' => array( 'wc-completed', 'wc-processing', 'wc-on-hold', 'wc-pending' ),
+			'posts_per_page' => -1,
+		) );
+
+		$order_creations = array();
+		if ( $orders_query->have_posts() ) {
+			foreach ( $orders_query->posts as $order_post ) {
+				$order = wc_get_order( $order_post->ID );
+				if ( ! $order ) {
+					continue;
+				}
+
+				foreach ( $order->get_items() as $item_id => $item ) {
+					$config_json = $item->get_meta( 'wc_pc13_config' );
+					if ( ! $config_json ) {
+						continue;
+					}
+
+					$config = json_decode( $config_json, true );
+					if ( ! $config ) {
+						continue;
+					}
+
+					$preview_json = $item->get_meta( 'wc_pc13_preview' );
+					$preview = $preview_json ? json_decode( $preview_json, true ) : null;
+
+					$order_creations[] = array(
+						'type' => 'order',
+						'order_id' => $order->get_id(),
+						'order_number' => $order->get_order_number(),
+						'order_date' => $order->get_date_created()->date_i18n( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ) ),
+						'customer' => $order->get_billing_email(),
+						'product_id' => $item->get_product_id(),
+						'product_name' => $item->get_name(),
+						'config' => $config,
+						'preview' => $preview,
+					);
+				}
+			}
+		}
+
+		// Récupérer les créations depuis les transients (partages)
+		$prefix = '_transient_wc_pc13_share_';
+		$like = $wpdb->esc_like( $prefix ) . '%';
+		$rows = $wpdb->get_col( $wpdb->prepare( "SELECT option_name FROM {$wpdb->options} WHERE option_name LIKE %s", $like ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		
+		$share_creations = array();
+		if ( $rows ) {
+			foreach ( $rows as $option_name ) {
+				$key = str_replace( '_transient_', '', $option_name );
+				$share_id = str_replace( 'wc_pc13_share_', '', $key );
+				$payload = get_transient( $key );
+				if ( false === $payload || empty( $payload['config'] ) ) {
+					continue;
+				}
+				$product_id = isset( $payload['product_id'] ) ? absint( $payload['product_id'] ) : 0;
+				$created_at = isset( $payload['created_at'] ) ? $payload['created_at'] : '';
+				$share_creations[] = array(
+					'type' => 'share',
+					'share_id' => $share_id,
+					'product_id' => $product_id,
+					'created_at' => $created_at,
+					'config' => $payload['config'],
+					'url' => add_query_arg(
+						array( 'share' => $share_id ),
+						get_permalink( $product_id )
+					),
+				);
+			}
+		}
+
+		// Trier toutes les créations par date (plus récentes en premier)
+		$all_creations = array_merge( $order_creations, $share_creations );
+		usort( $all_creations, function( $a, $b ) {
+			$date_a = isset( $a['order_date'] ) ? $a['order_date'] : ( isset( $a['created_at'] ) ? $a['created_at'] : '' );
+			$date_b = isset( $b['order_date'] ) ? $b['order_date'] : ( isset( $b['created_at'] ) ? $b['created_at'] : '' );
+			return strcmp( $date_b, $date_a );
+		});
+
+		?>
+		<div class="wc-pc13-tab-content">
+			<h2><?php esc_html_e( 'Toutes les créations d\'horloge', 'wc-photo-clock-13' ); ?></h2>
+			<p class="description"><?php esc_html_e( 'Liste de toutes les horloges créées, qu\'elles aient été commandées ou simplement partagées.', 'wc-photo-clock-13' ); ?></p>
+			
+			<?php if ( empty( $all_creations ) ) : ?>
+				<p><?php esc_html_e( 'Aucune création trouvée pour le moment.', 'wc-photo-clock-13' ); ?></p>
+			<?php else : ?>
+				<table class="widefat striped">
+					<thead>
+						<tr>
+							<th><?php esc_html_e( 'Type', 'wc-photo-clock-13' ); ?></th>
+							<th><?php esc_html_e( 'Produit', 'wc-photo-clock-13' ); ?></th>
+							<th><?php esc_html_e( 'Client / Email', 'wc-photo-clock-13' ); ?></th>
+							<th><?php esc_html_e( 'Date', 'wc-photo-clock-13' ); ?></th>
+							<th><?php esc_html_e( 'Actions', 'wc-photo-clock-13' ); ?></th>
+						</tr>
+					</thead>
+					<tbody>
+						<?php foreach ( $all_creations as $creation ) : ?>
+							<tr>
+								<td>
+									<?php if ( $creation['type'] === 'order' ) : ?>
+										<span class="dashicons dashicons-cart" title="<?php esc_attr_e( 'Commande', 'wc-photo-clock-13' ); ?>"></span>
+										<?php esc_html_e( 'Commande', 'wc-photo-clock-13' ); ?>
+									<?php else : ?>
+										<span class="dashicons dashicons-share" title="<?php esc_attr_e( 'Partage', 'wc-photo-clock-13' ); ?>"></span>
+										<?php esc_html_e( 'Partage', 'wc-photo-clock-13' ); ?>
+									<?php endif; ?>
+								</td>
+								<td>
+									<?php
+									$product_id = isset( $creation['product_id'] ) ? absint( $creation['product_id'] ) : 0;
+									if ( $product_id ) {
+										$title = isset( $creation['product_name'] ) ? $creation['product_name'] : get_the_title( $product_id );
+										echo '<a href="' . esc_url( get_edit_post_link( $product_id ) ) . '">' . esc_html( $title ? $title : sprintf( __( 'Produit #%d', 'wc-photo-clock-13' ), $product_id ) ) . '</a>';
+									} else {
+										esc_html_e( 'Non renseigné', 'wc-photo-clock-13' );
+									}
+									?>
+								</td>
+								<td>
+									<?php if ( $creation['type'] === 'order' ) : ?>
+										<?php
+										$order_id = isset( $creation['order_id'] ) ? absint( $creation['order_id'] ) : 0;
+										$customer = isset( $creation['customer'] ) ? $creation['customer'] : '';
+										if ( $order_id ) {
+											echo '<a href="' . esc_url( admin_url( 'post.php?post=' . $order_id . '&action=edit' ) ) . '">';
+											echo esc_html( sprintf( __( 'Commande #%s', 'wc-photo-clock-13' ), $creation['order_number'] ) );
+											echo '</a>';
+											if ( $customer ) {
+												echo '<br><small>' . esc_html( $customer ) . '</small>';
+											}
+										}
+										?>
+									<?php else : ?>
+										<?php esc_html_e( 'Non renseigné', 'wc-photo-clock-13' ); ?>
+									<?php endif; ?>
+								</td>
+								<td>
+									<?php
+									$date = isset( $creation['order_date'] ) ? $creation['order_date'] : ( isset( $creation['created_at'] ) ? $creation['created_at'] : '—' );
+									echo esc_html( $date );
+									?>
+								</td>
+								<td>
+									<?php if ( $creation['type'] === 'order' && isset( $creation['order_id'] ) ) : ?>
+										<a href="<?php echo esc_url( admin_url( 'post.php?post=' . $creation['order_id'] . '&action=edit' ) ); ?>" class="button button-small">
+											<?php esc_html_e( 'Voir la commande', 'wc-photo-clock-13' ); ?>
+										</a>
+									<?php elseif ( isset( $creation['url'] ) ) : ?>
+										<a href="<?php echo esc_url( $creation['url'] ); ?>" target="_blank" rel="noopener noreferrer" class="button button-small">
+											<?php esc_html_e( 'Ouvrir', 'wc-photo-clock-13' ); ?>
+										</a>
+									<?php endif; ?>
+									<?php if ( isset( $creation['preview'] ) && ! empty( $creation['preview'] ) ) : ?>
+										<?php
+										$preview_url = '';
+										if ( ! empty( $creation['preview']['url'] ) ) {
+											$preview_url = esc_url( $creation['preview']['url'] );
+										} elseif ( ! empty( $creation['preview']['id'] ) ) {
+											$preview_url = esc_url( wp_get_attachment_url( absint( $creation['preview']['id'] ) ) );
+										}
+										if ( $preview_url ) :
+											?>
+											<a href="<?php echo $preview_url; ?>" target="_blank" rel="noopener noreferrer" class="button button-small">
+												<?php esc_html_e( 'Aperçu', 'wc-photo-clock-13' ); ?>
+											</a>
+										<?php endif; ?>
+									<?php endif; ?>
+								</td>
+							</tr>
+						<?php endforeach; ?>
+					</tbody>
+				</table>
+			<?php endif; ?>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Rendu de l'onglet Emails.
+	 */
+	private function render_emails_tab() {
+		// Emails de partage
+		$share_emails = get_option( 'wc_pc13_share_emails', array() );
+		if ( ! is_array( $share_emails ) ) {
+			$share_emails = array();
+		}
+
+		?>
+		<div class="wc-pc13-tab-content">
+			<h2><?php esc_html_e( 'Emails collectés', 'wc-photo-clock-13' ); ?></h2>
+			<p class="description"><?php esc_html_e( 'Liste de tous les emails collectés via les partages de configuration.', 'wc-photo-clock-13' ); ?></p>
+			
+			<?php if ( empty( $share_emails ) ) : ?>
+				<p><?php esc_html_e( 'Aucun email collecté pour le moment.', 'wc-photo-clock-13' ); ?></p>
+			<?php else : ?>
+				<table class="widefat striped">
+					<thead>
+						<tr>
+							<th><?php esc_html_e( 'Email', 'wc-photo-clock-13' ); ?></th>
+							<th><?php esc_html_e( 'Share ID', 'wc-photo-clock-13' ); ?></th>
+							<th><?php esc_html_e( 'Produit', 'wc-photo-clock-13' ); ?></th>
+							<th><?php esc_html_e( 'Date', 'wc-photo-clock-13' ); ?></th>
+							<th><?php esc_html_e( 'Lien', 'wc-photo-clock-13' ); ?></th>
+						</tr>
+					</thead>
+					<tbody>
+						<?php foreach ( $share_emails as $entry ) : ?>
+							<tr>
+								<td><?php echo esc_html( isset( $entry['email'] ) ? $entry['email'] : '' ); ?></td>
+								<td><code><?php echo esc_html( isset( $entry['share_id'] ) ? $entry['share_id'] : '' ); ?></code></td>
+								<td>
+									<?php
+									$product_id = isset( $entry['product_id'] ) ? absint( $entry['product_id'] ) : 0;
+									if ( $product_id ) {
+										$title = get_the_title( $product_id );
+										echo '<a href="' . esc_url( get_edit_post_link( $product_id ) ) . '">' . esc_html( $title ? $title : sprintf( __( 'Produit #%d', 'wc-photo-clock-13' ), $product_id ) ) . '</a>';
+									} else {
+										esc_html_e( 'Non renseigné', 'wc-photo-clock-13' );
+									}
+									?>
+								</td>
+								<td><?php echo esc_html( isset( $entry['created_at'] ) ? $entry['created_at'] : '—' ); ?></td>
+								<td>
+									<?php if ( ! empty( $entry['share_url'] ) ) : ?>
+										<a href="<?php echo esc_url( $entry['share_url'] ); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Ouvrir', 'wc-photo-clock-13' ); ?></a>
+									<?php else : ?>
+										—
+									<?php endif; ?>
+								</td>
+							</tr>
+						<?php endforeach; ?>
+					</tbody>
+				</table>
+			<?php endif; ?>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Rendu de l'onglet Statistiques.
+	 */
+	private function render_stats_tab() {
+		global $wpdb;
+
+		// Statistiques des commandes
+		$orders_with_config = get_posts( array(
+			'post_type' => 'shop_order',
+			'post_status' => 'any',
+			'posts_per_page' => -1,
+			'fields' => 'ids',
+		) );
+
+		$total_orders = 0;
+		foreach ( $orders_with_config as $order_id ) {
+			$order = wc_get_order( $order_id );
+			if ( ! $order ) {
+				continue;
+			}
+			foreach ( $order->get_items() as $item ) {
+				if ( $item->get_meta( 'wc_pc13_config' ) ) {
+					$total_orders++;
+					break;
+				}
+			}
+		}
+
+		// Statistiques des partages
+		$prefix = '_transient_wc_pc13_share_';
+		$like = $wpdb->esc_like( $prefix ) . '%';
+		$share_count = $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->options} WHERE option_name LIKE %s", $like ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+
+		// Statistiques des emails
+		$share_emails = get_option( 'wc_pc13_share_emails', array() );
+		$total_emails = is_array( $share_emails ) ? count( $share_emails ) : 0;
+
+		// Produits avec configurateur activé
+		$products_with_config = get_posts( array(
+			'post_type' => 'product',
+			'posts_per_page' => -1,
+			'meta_query' => array(
+				array(
+					'key' => '_wc_pc13_enabled',
+					'value' => 'yes',
+					'compare' => '=',
+				),
+			),
+			'fields' => 'ids',
+		) );
+		$total_products = count( $products_with_config );
+
+		?>
+		<div class="wc-pc13-tab-content">
+			<h2><?php esc_html_e( 'Statistiques', 'wc-photo-clock-13' ); ?></h2>
+			
+			<div class="wc-pc13-stats-grid">
+				<div class="wc-pc13-stat-box">
+					<h3><?php esc_html_e( 'Produits activés', 'wc-photo-clock-13' ); ?></h3>
+					<p class="wc-pc13-stat-number"><?php echo esc_html( $total_products ); ?></p>
+					<p class="description"><?php esc_html_e( 'Nombre de produits avec le configurateur activé', 'wc-photo-clock-13' ); ?></p>
+				</div>
+
+				<div class="wc-pc13-stat-box">
+					<h3><?php esc_html_e( 'Commandes avec horloge', 'wc-photo-clock-13' ); ?></h3>
+					<p class="wc-pc13-stat-number"><?php echo esc_html( $total_orders ); ?></p>
+					<p class="description"><?php esc_html_e( 'Nombre de commandes contenant une horloge personnalisée', 'wc-photo-clock-13' ); ?></p>
+				</div>
+
+				<div class="wc-pc13-stat-box">
+					<h3><?php esc_html_e( 'Partages sauvegardés', 'wc-photo-clock-13' ); ?></h3>
+					<p class="wc-pc13-stat-number"><?php echo esc_html( $share_count ); ?></p>
+					<p class="description"><?php esc_html_e( 'Nombre de configurations partagées (transients actifs)', 'wc-photo-clock-13' ); ?></p>
+				</div>
+
+				<div class="wc-pc13-stat-box">
+					<h3><?php esc_html_e( 'Emails collectés', 'wc-photo-clock-13' ); ?></h3>
+					<p class="wc-pc13-stat-number"><?php echo esc_html( $total_emails ); ?></p>
+					<p class="description"><?php esc_html_e( 'Nombre d\'emails collectés via les partages', 'wc-photo-clock-13' ); ?></p>
+				</div>
+			</div>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Affiche les styles CSS pour la page d'administration.
+	 */
+	private function render_admin_styles() {
+		?>
+		<style>
+			.wc-pc13-admin-content {
+				margin-top: 20px;
+			}
+			.wc-pc13-tab-content {
+				background: #fff;
+				padding: 20px;
+				border: 1px solid #ccd0d4;
+				box-shadow: 0 1px 1px rgba(0,0,0,.04);
+			}
+			.wc-pc13-stats-grid {
+				display: grid;
+				grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+				gap: 20px;
+				margin-top: 20px;
+			}
+			.wc-pc13-stat-box {
+				background: #f9f9f9;
+				border: 1px solid #ddd;
+				border-radius: 4px;
+				padding: 20px;
+				text-align: center;
+			}
+			.wc-pc13-stat-box h3 {
+				margin: 0 0 10px 0;
+				font-size: 14px;
+				color: #666;
+			}
+			.wc-pc13-stat-number {
+				font-size: 36px;
+				font-weight: bold;
+				color: #2271b1;
+				margin: 10px 0;
+			}
+			.wc-pc13-stat-box .description {
+				margin: 10px 0 0 0;
+				font-size: 12px;
+				color: #666;
+			}
+		</style>
+		<?php
 	}
 }
 

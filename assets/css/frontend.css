@@ -712,7 +712,11 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 }
 
 /* Empêcher que les interactions dans numbers-fields déclenchent le toggle parent */
-.wc-pc13-toggle:has(.wc-pc13-numbers-fields) .wc-pc13-numbers-fields,
+.wc-pc13-toggle:has(.wc-pc13-numbers-fields) .wc-pc13-numbers-fields {
+	pointer-events: auto;
+	cursor: default;
+}
+
 .wc-pc13-toggle:has(.wc-pc13-numbers-fields) .wc-pc13-numbers-fields * {
 	pointer-events: auto;
 }

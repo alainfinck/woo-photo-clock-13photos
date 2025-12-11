@@ -2480,7 +2480,20 @@ function handleCenterSizeChange(event) {
 
 function handleNumbersToggle(event) {
 	// S'assurer que l'événement vient bien du checkbox et non d'une propagation
-	if (event.target.type !== 'checkbox' || event.target.id !== 'wc-pc13-show-numbers') {
+	// Ne traiter que si c'est un clic direct sur la checkbox ou si c'est un événement change depuis la checkbox
+	if (event.type === 'click' && (event.target.type !== 'checkbox' || event.target.id !== 'wc-pc13-show-numbers')) {
+		// Si c'est un clic sur le span, laisser le comportement par défaut du label
+		if (event.target.tagName === 'SPAN' && event.target.closest('.wc-pc13-toggle')) {
+			// Le label gérera automatiquement le clic sur le checkbox
+			return;
+		}
+		// Pour tout autre élément, empêcher la propagation
+		event.stopPropagation();
+		return;
+	}
+	
+	// Pour l'événement change, s'assurer que c'est bien la bonne checkbox
+	if (event.type === 'change' && (event.target.type !== 'checkbox' || event.target.id !== 'wc-pc13-show-numbers')) {
 		return;
 	}
 	
@@ -2617,11 +2630,18 @@ function handleNumberShadowIntensityChange(event) {
 	if (!event || !event.target) {
 		return;
 	}
+	
+	// S'assurer que c'est bien le slider de l'ombre
+	if (event.target.id !== 'wc-pc13-number-shadow-intensity') {
+		return;
+	}
+	
 	if (!state.numbers.shadow) {
 		state.numbers.shadow = { enabled: true, intensity: 5 };
 	}
 	const value = parseInt(event.target.value, 10);
 	if (!Number.isNaN(value)) {
+		// Mettre à jour l'ombre, pas le glow
 		state.numbers.shadow.intensity = Math.max(0, Math.min(20, value));
 	}
 	const configurator = document.querySelector(selectors.configurator);
@@ -2664,15 +2684,24 @@ function handleNumberGlowIntensityChange(event) {
 	if (!event || !event.target) {
 		return;
 	}
+	
+	// S'assurer que c'est bien le slider du glow
+	if (event.target.id !== 'wc-pc13-number-glow-intensity') {
+		return;
+	}
+	
 	if (!state.numbers.glow) {
 		state.numbers.glow = { enabled: true, intensity: 10 };
 	}
 	const value = parseInt(event.target.value, 10);
 	if (!Number.isNaN(value)) {
+		// Mettre à jour le glow, pas l'ombre
 		state.numbers.glow.intensity = Math.max(0, Math.min(30, value));
 	}
+	
 	const configurator = document.querySelector(selectors.configurator);
 	updateNumbersOverlay(configurator, state.currentRingRadius);
+	applyTransforms();
 	savePayload();
 }
 
@@ -3114,7 +3143,28 @@ function handleIntermediatePointsChange(event) {
 				numbersFields.style.display = 'none';
 				numbersFields.classList.remove('is-active');
 			}
+			
+			// Empêcher les clics sur le div de déclencher la checkbox parente
+			numbersFields.addEventListener('click', function(e) {
+				e.stopPropagation();
+			});
+			numbersFields.addEventListener('mousedown', function(e) {
+				e.stopPropagation();
+			});
 		}
+		// Ajouter un gestionnaire sur le label parent pour empêcher les clics sur numbers-fields de déclencher le toggle
+		const numbersToggleLabel = numbersToggle.closest('.wc-pc13-toggle');
+		if (numbersToggleLabel) {
+			numbersToggleLabel.addEventListener('click', function(e) {
+				// Si le clic est sur numbers-fields ou ses enfants, empêcher
+				if (e.target.closest('.wc-pc13-numbers-fields')) {
+					e.preventDefault();
+					e.stopPropagation();
+					return false;
+				}
+			}, true); // Utiliser capture phase pour intercepter avant le label
+		}
+		
 		numbersToggle.addEventListener('change', handleNumbersToggle);
 	}
 
