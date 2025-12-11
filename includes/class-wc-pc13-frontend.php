@@ -71,15 +71,20 @@ class WC_PC13_Frontend {
 
 		$default_color    = $product->get_meta( '_wc_pc13_default_color' );
 		$mode             = $product->get_meta( '_wc_pc13_mode' );
+		$default_show_slots = $product->get_meta( '_wc_pc13_default_show_slots' );
 
 		$settings = class_exists( 'WC_PC13_Admin' ) ? WC_PC13_Admin::instance()->get_settings() : array(
 			'default_color'    => '#111111',
 		);
 
+		// Par défaut, les photos périphériques sont activées si la meta n'existe pas
+		$show_slots_value = $default_show_slots ? $default_show_slots : 'yes';
+
 		$args = array(
 			'product_id'       => $product->get_id(),
 			'default_color'    => $default_color ? $default_color : $settings['default_color'],
 			'mode'              => $mode ? $mode : 'peripheral',
+			'default_show_slots' => 'yes' === $show_slots_value ? true : false,
 			'button_text'      => $product->single_add_to_cart_text(),
 		);
 

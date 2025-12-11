@@ -67,6 +67,7 @@ class WC_PC13_Product_Settings {
 		$hands          = get_post_meta( $post->ID, '_wc_pc13_default_hands', true );
 		$accent_color   = get_post_meta( $post->ID, '_wc_pc13_default_color', true );
 		$diameter       = get_post_meta( $post->ID, '_wc_pc13_default_diameter', true );
+		$show_slots     = get_post_meta( $post->ID, '_wc_pc13_default_show_slots', true );
 		$settings       = class_exists( 'WC_PC13_Admin' ) ? WC_PC13_Admin::instance()->get_settings() : array(
 			'default_hands'    => 'classic',
 			'default_color'    => '#111111',
@@ -75,6 +76,8 @@ class WC_PC13_Product_Settings {
 		$default_hands  = $hands ? $hands : $settings['default_hands'];
 		$default_color  = $accent_color ? $accent_color : $settings['default_color'];
 		$default_diameter = $diameter ? absint( $diameter ) : ( isset( $settings['default_diameter'] ) ? $settings['default_diameter'] : 30 );
+		// Par défaut, les photos périphériques sont activées si la meta n'existe pas
+		$default_show_slots = $show_slots ? $show_slots : 'yes';
 		$diameter_options = class_exists( 'WC_PC13_Admin' ) ? WC_PC13_Admin::instance()->get_available_diameters() : array( 20, 30, 40, 50, 60, 80, 100 );
 		$hands_options  = array(
 			'classic' => __( 'Classique', 'wc-photo-clock-13' ),
@@ -130,6 +133,14 @@ class WC_PC13_Product_Settings {
 						),
 					)
 				);
+				woocommerce_wp_checkbox(
+					array(
+						'id'          => '_wc_pc13_default_show_slots',
+						'label'       => __( 'Photos périphériques par défaut', 'wc-photo-clock-13' ),
+						'description' => __( 'Afficher les photos périphériques par défaut pour les clients.', 'wc-photo-clock-13' ),
+						'value'       => 'yes' === $default_show_slots ? 'yes' : 'no',
+					)
+				);
 				?>
 			</div>
 		</div>
@@ -147,10 +158,12 @@ class WC_PC13_Product_Settings {
 		$hands        = isset( $_POST['_wc_pc13_default_hands'] ) ? sanitize_text_field( wp_unslash( $_POST['_wc_pc13_default_hands'] ) ) : 'classic';
 		$accent_color = isset( $_POST['_wc_pc13_default_color'] ) ? sanitize_hex_color( wp_unslash( $_POST['_wc_pc13_default_color'] ) ) : '#111111';
 		$diameter     = isset( $_POST['_wc_pc13_default_diameter'] ) ? absint( wp_unslash( $_POST['_wc_pc13_default_diameter'] ) ) : 30;
+		$show_slots   = isset( $_POST['_wc_pc13_default_show_slots'] ) ? 'yes' : 'no';
 
 		$product->update_meta_data( '_wc_pc13_enabled', $enabled );
 		$product->update_meta_data( '_wc_pc13_mode', $mode );
 		$product->update_meta_data( '_wc_pc13_default_hands', $hands );
+		$product->update_meta_data( '_wc_pc13_default_show_slots', $show_slots );
 
 		if ( $accent_color ) {
 			$product->update_meta_data( '_wc_pc13_default_color', $accent_color );

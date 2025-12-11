@@ -253,7 +253,9 @@ const CENTER_COVER_THRESHOLD = 3;
 		slotShadow: {
 			enabled: false,
 		},
-		showSlots: true,
+		showSlots: (typeof WCPC13 !== 'undefined' && WCPC13.settings && typeof WCPC13.settings.default_show_slots !== 'undefined') 
+			? WCPC13.settings.default_show_slots 
+			: true,
 	};
 
 	function clampTransformValues(target) {

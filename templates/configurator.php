@@ -29,6 +29,7 @@ if ( $default_color && ! array_key_exists( $default_color_key, $normalized_color
 
 $button_text = isset( $button_text ) ? $button_text : __( 'Ajouter au panier', 'wc-photo-clock-13' );
 $mode = isset( $mode ) ? $mode : 'peripheral';
+$default_show_slots = isset( $default_show_slots ) ? $default_show_slots : true;
 ?>
 <div class="wc-pc13-configurator" data-product="<?php echo esc_attr( $product_id ); ?>" data-mode="<?php echo esc_attr( $mode ); ?>">
 	<h3><?php esc_html_e( 'Créez votre horloge photo personnalisée', 'wc-photo-clock-13' ); ?></h3>
@@ -354,7 +355,7 @@ $mode = isset( $mode ) ? $mode : 'peripheral';
 					</div>
 				</label>
 				<label class="wc-pc13-toggle">
-					<input type="checkbox" id="wc-pc13-show-slots" name="wc_pc13_show_slots" value="1" checked>
+					<input type="checkbox" id="wc-pc13-show-slots" name="wc_pc13_show_slots" value="1" <?php echo ( isset( $default_show_slots ) && $default_show_slots ) ? 'checked' : ''; ?>>
 					<span><?php esc_html_e( 'Afficher les photos périphériques', 'wc-photo-clock-13' ); ?></span>
 				</label>
 					<label for="wc-pc13-slot-size"><?php esc_html_e( 'Taille des photos périphériques', 'wc-photo-clock-13' ); ?></label>

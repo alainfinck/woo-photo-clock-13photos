@@ -99,6 +99,10 @@ class WC_PC13_Assets {
 			return;
 		}
 
+		$default_show_slots = get_post_meta( $post->ID, '_wc_pc13_default_show_slots', true );
+		// Par défaut, les photos périphériques sont activées si la meta n'existe pas
+		$show_slots_value = $default_show_slots ? $default_show_slots : 'yes';
+
 		$settings = class_exists( 'WC_PC13_Admin' ) ? WC_PC13_Admin::instance()->get_settings() : array(
 			'default_hands'   => 'classic',
 			'default_color'   => '#111111',
@@ -166,6 +170,7 @@ class WC_PC13_Assets {
 				),
 				'settings' => array(
 					'max_upload_bytes' => $max_upload_bytes,
+					'default_show_slots' => 'yes' === $show_slots_value ? true : false,
 				),
 			)
 		);
