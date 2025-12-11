@@ -108,7 +108,9 @@ $default_show_slots = isset( $default_show_slots ) ? $default_show_slots : true;
 					</div>
 				</div>
 			</div>
-			<p class="wc-pc13-preview-hint"><?php esc_html_e( 'Cliquez sur une zone pour l’éditer.', 'wc-photo-clock-13' ); ?></p>
+			<p class="wc-pc13-preview-hint" style="display: none;">
+				<span class="wc-pc13-preview-hint-text"><?php esc_html_e( 'Cliquez sur une image périphérique pour l\'éditer.', 'wc-photo-clock-13' ); ?></span>
+			</p>
 			<div class="wc-pc13-download-actions">
 				<button type="button" class="button button-secondary wc-pc13-download-jpeg">
 					<?php esc_html_e( 'Télécharger JPEG', 'wc-photo-clock-13' ); ?>
@@ -183,6 +185,40 @@ $default_show_slots = isset( $default_show_slots ) ? $default_show_slots : true;
 					<span class="wc-pc13-fill-unsplash-icon">🎲</span>
 					<?php esc_html_e( 'Charger des photos aléatoires', 'wc-photo-clock-13' ); ?>
 				</button>
+				<button type="button" class="button wc-pc13-search-unsplash-btn">
+					<span class="wc-pc13-search-icon">🔍</span>
+					<?php esc_html_e( 'Rechercher une photo', 'wc-photo-clock-13' ); ?>
+				</button>
+			</div>
+			
+			<!-- Modal de recherche Unsplash -->
+			<div id="wc-pc13-unsplash-modal" class="wc-pc13-unsplash-modal" style="display: none;">
+				<div class="wc-pc13-unsplash-modal-overlay"></div>
+				<div class="wc-pc13-unsplash-modal-content">
+					<div class="wc-pc13-unsplash-modal-header">
+						<h3><?php esc_html_e( 'Rechercher une photo', 'wc-photo-clock-13' ); ?></h3>
+						<button type="button" class="wc-pc13-unsplash-modal-close" aria-label="<?php esc_attr_e( 'Fermer', 'wc-photo-clock-13' ); ?>">×</button>
+					</div>
+					<div class="wc-pc13-unsplash-modal-body">
+						<div class="wc-pc13-unsplash-search">
+							<input type="text" id="wc-pc13-unsplash-search-input" class="wc-pc13-unsplash-search-input" placeholder="<?php esc_attr_e( 'Tapez un mot-clé (ex: nature, ville, portrait...)', 'wc-photo-clock-13' ); ?>" />
+							<button type="button" class="wc-pc13-unsplash-search-submit">
+								<span class="wc-pc13-search-icon">🔍</span>
+								<?php esc_html_e( 'Rechercher', 'wc-photo-clock-13' ); ?>
+							</button>
+						</div>
+						<div class="wc-pc13-unsplash-results" id="wc-pc13-unsplash-results">
+							<div class="wc-pc13-unsplash-loading" style="display: none;">
+								<div class="wc-pc13-loading-spinner"></div>
+								<p><?php esc_html_e( 'Recherche en cours...', 'wc-photo-clock-13' ); ?></p>
+							</div>
+							<div class="wc-pc13-unsplash-grid"></div>
+							<div class="wc-pc13-unsplash-empty" style="display: none;">
+								<p><?php esc_html_e( 'Aucune photo trouvée. Essayez un autre mot-clé.', 'wc-photo-clock-13' ); ?></p>
+							</div>
+						</div>
+					</div>
+				</div>
 			</div>
 			<div class="wc-pc13-add-to-cart">
 				<button type="button" class="button button-primary wc-pc13-add-to-cart-btn">

@@ -1320,6 +1320,16 @@ let sharedConfigLoaded = false;
 		livePreviewImage: '.wc-pc13-live-preview-image',
 		livePreviewPlaceholder: '.wc-pc13-live-preview-placeholder',
 		fillUnsplash: '.wc-pc13-fill-unsplash',
+		searchUnsplashBtn: '.wc-pc13-search-unsplash-btn',
+		unsplashModal: '#wc-pc13-unsplash-modal',
+		unsplashModalClose: '.wc-pc13-unsplash-modal-close',
+		unsplashModalOverlay: '.wc-pc13-unsplash-modal-overlay',
+		unsplashSearchInput: '#wc-pc13-unsplash-search-input',
+		unsplashSearchSubmit: '.wc-pc13-unsplash-search-submit',
+		unsplashResults: '#wc-pc13-unsplash-results',
+		unsplashGrid: '.wc-pc13-unsplash-grid',
+		unsplashLoading: '.wc-pc13-unsplash-loading',
+		unsplashEmpty: '.wc-pc13-unsplash-empty',
 		slotBorderEnabled: '#wc-pc13-slot-border-enabled',
 		slotBorderColor: '#wc-pc13-slot-border-color',
 		slotBorderWidth: '#wc-pc13-slot-border-width',
@@ -1350,6 +1360,7 @@ let sharedConfigLoaded = false;
 		const slotSizeLabel = configurator.querySelector('label[for="wc-pc13-slot-size"]');
 		const slotSizeInput = configurator.querySelector('#wc-pc13-slot-size');
 		const slotStyling = configurator.querySelector(selectors.slotStyling);
+		const previewHint = configurator.querySelector('.wc-pc13-preview-hint');
 		const displayValue = state.showSlots ? '' : 'none';
 		if (slotSizeLabel) {
 			slotSizeLabel.style.display = displayValue;
@@ -1359,6 +1370,10 @@ let sharedConfigLoaded = false;
 		}
 		if (slotStyling) {
 			slotStyling.style.display = displayValue;
+		}
+		// Afficher/masquer le message d'aide selon l'état des photos périphériques
+		if (previewHint) {
+			previewHint.style.display = state.showSlots ? 'block' : 'none';
 		}
 
 		state.currentRingRadius = radius;
@@ -3282,6 +3297,7 @@ function handleIntermediatePointsChange(event) {
 				}
 				applyTransforms();
 				updateSelectionUI();
+				updateRingDimensions(); // Mettre à jour l'affichage du message d'aide
 				savePayload();
 			});
 		}
@@ -3383,6 +3399,60 @@ function handleIntermediatePointsChange(event) {
 				event.preventDefault();
 				fillUnsplashImages();
 			});
+		}
+
+		// Bouton de recherche Unsplash
+		const searchUnsplashBtn = configurator.querySelector(selectors.searchUnsplashBtn);
+		if (searchUnsplashBtn) {
+			searchUnsplashBtn.addEventListener('click', (event) => {
+				event.preventDefault();
+				openUnsplashModal();
+			});
+		}
+
+		// Modal de recherche Unsplash
+		const unsplashModal = document.querySelector(selectors.unsplashModal);
+		if (unsplashModal) {
+			const modalClose = unsplashModal.querySelector(selectors.unsplashModalClose);
+			const modalOverlay = unsplashModal.querySelector(selectors.unsplashModalOverlay);
+			const searchInput = unsplashModal.querySelector(selectors.unsplashSearchInput);
+			const searchSubmit = unsplashModal.querySelector(selectors.unsplashSearchSubmit);
+
+			// Fermer le modal
+			const closeModal = () => {
+				unsplashModal.style.display = 'none';
+				document.body.style.overflow = '';
+			};
+
+			if (modalClose) {
+				modalClose.addEventListener('click', closeModal);
+			}
+			if (modalOverlay) {
+				modalOverlay.addEventListener('click', closeModal);
+			}
+
+			// Recherche au clic sur le bouton
+			if (searchSubmit) {
+				searchSubmit.addEventListener('click', () => {
+					const query = searchInput ? searchInput.value.trim() : '';
+					if (query) {
+						searchUnsplashImages(query);
+					}
+				});
+			}
+
+			// Recherche avec Enter
+			if (searchInput) {
+				searchInput.addEventListener('keypress', (e) => {
+					if (e.key === 'Enter') {
+						e.preventDefault();
+						const query = searchInput.value.trim();
+						if (query) {
+							searchSubmit.click();
+						}
+					}
+				});
+			}
 		}
 	}
 
@@ -4178,6 +4248,334 @@ function handleIntermediatePointsChange(event) {
 		}
 	}
 
+	/**
+	 * Ouvre le modal de recherche Unsplash
+	 */
+	function openUnsplashModal() {
+		const unsplashModal = document.querySelector(selectors.unsplashModal);
+		const searchInput = unsplashModal ? unsplashModal.querySelector(selectors.unsplashSearchInput) : null;
+		
+		if (unsplashModal) {
+			unsplashModal.style.display = 'flex';
+			document.body.style.overflow = 'hidden';
+			
+			// Focus sur l'input de recherche
+			if (searchInput) {
+				setTimeout(() => {
+					searchInput.focus();
+				}, 100);
+			}
+			
+			// Réinitialiser l'affichage
+			const grid = unsplashModal.querySelector(selectors.unsplashGrid);
+			const loading = unsplashModal.querySelector(selectors.unsplashLoading);
+			const empty = unsplashModal.querySelector(selectors.unsplashEmpty);
+			const modalBody = unsplashModal.querySelector('.wc-pc13-unsplash-modal-body');
+			
+			if (grid) grid.innerHTML = '';
+			if (loading) loading.style.display = 'none';
+			if (empty) empty.style.display = 'none';
+			
+			// Réinitialiser l'observer de scroll
+			if (unsplashScrollObserver) {
+				unsplashScrollObserver.disconnect();
+				unsplashScrollObserver = null;
+			}
+			
+			// Supprimer la sentinelle et le loader
+			if (modalBody) {
+				const sentinel = modalBody.querySelector('#wc-pc13-unsplash-sentinel');
+				if (sentinel) sentinel.remove();
+				const loadMore = modalBody.querySelector('.wc-pc13-unsplash-load-more');
+				if (loadMore) loadMore.remove();
+			}
+			
+			// Réinitialiser les variables
+			unsplashCurrentQuery = '';
+			unsplashCurrentPage = 1;
+			unsplashLoadingMore = false;
+			unsplashHasMore = true;
+		}
+	}
+
+	// Variables pour le chargement infini
+	let unsplashCurrentQuery = '';
+	let unsplashCurrentPage = 1;
+	let unsplashLoadingMore = false;
+	let unsplashHasMore = true;
+	let unsplashScrollObserver = null;
+
+	/**
+	 * Recherche des images Unsplash par mot-clé
+	 */
+	async function searchUnsplashImages(query, page = 1, append = false) {
+		const unsplashModal = document.querySelector(selectors.unsplashModal);
+		if (!unsplashModal) return;
+
+		const grid = unsplashModal.querySelector(selectors.unsplashGrid);
+		const loading = unsplashModal.querySelector(selectors.unsplashLoading);
+		const empty = unsplashModal.querySelector(selectors.unsplashEmpty);
+		const searchSubmit = unsplashModal.querySelector(selectors.unsplashSearchSubmit);
+		const modalBody = unsplashModal.querySelector('.wc-pc13-unsplash-modal-body');
+
+		// Si c'est une nouvelle recherche, réinitialiser
+		if (!append) {
+			unsplashCurrentQuery = query;
+			unsplashCurrentPage = 1;
+			unsplashHasMore = true;
+			if (grid) grid.innerHTML = '';
+			if (empty) empty.style.display = 'none';
+		}
+
+		// Éviter les requêtes multiples
+		if (unsplashLoadingMore) {
+			return;
+		}
+
+		unsplashLoadingMore = true;
+
+		// Afficher le chargement
+		if (!append) {
+			if (loading) loading.style.display = 'flex';
+			if (searchSubmit) searchSubmit.disabled = true;
+		} else {
+			// Afficher un indicateur de chargement en bas
+			showUnsplashLoadingMore(modalBody);
+		}
+
+		try {
+			const formData = new FormData();
+			formData.append('action', 'wc_pc13_fetch_unsplash');
+			formData.append('nonce', WCPC13.nonce);
+			formData.append('count', '20'); // 20 images par page
+			formData.append('query', query);
+			formData.append('page', page);
+
+			const response = await fetch(WCPC13.ajax_url, {
+				method: 'POST',
+				credentials: 'same-origin',
+				body: formData,
+			});
+
+			if (!response.ok) {
+				throw new Error(WCPC13?.labels?.unsplash_error || 'Erreur lors de la recherche');
+			}
+
+			const data = await response.json();
+			if (!data || !data.success || !data.data || !data.data.images || !Array.isArray(data.data.images)) {
+				throw new Error(data?.data?.message || WCPC13?.labels?.unsplash_error || 'Aucune image trouvée');
+			}
+
+			const images = data.data.images;
+			
+			// Masquer le chargement initial
+			if (!append && loading) loading.style.display = 'none';
+			if (append) hideUnsplashLoadingMore(modalBody);
+
+			// Vérifier s'il y a plus de résultats
+			unsplashHasMore = images.length === 20; // Si on a 20 images, il y a probablement plus
+
+			if (images.length === 0 && !append) {
+				// Aucun résultat (seulement pour la première page)
+				if (empty) empty.style.display = 'block';
+			} else {
+				// Afficher les résultats
+				if (empty) empty.style.display = 'none';
+				if (grid) {
+					const startIndex = append ? grid.children.length : 0;
+					images.forEach((image, index) => {
+						const item = document.createElement('div');
+						item.className = 'wc-pc13-unsplash-item';
+						item.dataset.index = startIndex + index;
+						
+						const img = document.createElement('img');
+						img.src = image.thumb || image.url;
+						img.alt = `Photo ${startIndex + index + 1}`;
+						img.loading = 'lazy';
+						
+						// Animation d'apparition
+						item.style.opacity = '0';
+						item.style.transform = 'scale(0.9)';
+						
+						item.appendChild(img);
+						grid.appendChild(item);
+						
+						// Animation avec délai
+						setTimeout(() => {
+							item.style.transition = 'all 0.3s ease';
+							item.style.opacity = '1';
+							item.style.transform = 'scale(1)';
+						}, (startIndex + index) * 20);
+						
+						// Sélection de l'image
+						item.addEventListener('click', () => {
+							selectUnsplashImage(image);
+						});
+					});
+
+					// Configurer l'observer de scroll pour charger plus
+					if (unsplashHasMore && !unsplashScrollObserver) {
+						setupUnsplashInfiniteScroll(modalBody, grid);
+					}
+				}
+			}
+		} catch (error) {
+			console.error('Erreur recherche Unsplash:', error);
+			if (!append && loading) loading.style.display = 'none';
+			if (append) hideUnsplashLoadingMore(modalBody);
+			if (empty && !append) {
+				empty.style.display = 'block';
+				empty.innerHTML = `<p>${error?.message || WCPC13?.labels?.unsplash_error || 'Erreur lors de la recherche'}</p>`;
+			}
+			unsplashHasMore = false;
+		} finally {
+			unsplashLoadingMore = false;
+			if (searchSubmit) searchSubmit.disabled = false;
+		}
+	}
+
+	/**
+	 * Configure le scroll infini pour charger plus de résultats
+	 */
+	function setupUnsplashInfiniteScroll(modalBody, grid) {
+		if (!modalBody || !grid) return;
+
+		// Créer un élément sentinelle en bas de la grille
+		let sentinel = document.getElementById('wc-pc13-unsplash-sentinel');
+		if (!sentinel) {
+			sentinel = document.createElement('div');
+			sentinel.id = 'wc-pc13-unsplash-sentinel';
+			sentinel.style.height = '20px';
+			grid.parentNode.appendChild(sentinel);
+		}
+
+		// Observer pour détecter quand la sentinelle devient visible
+		if (unsplashScrollObserver) {
+			unsplashScrollObserver.disconnect();
+		}
+
+		unsplashScrollObserver = new IntersectionObserver((entries) => {
+			entries.forEach((entry) => {
+				if (entry.isIntersecting && unsplashHasMore && !unsplashLoadingMore) {
+					unsplashCurrentPage++;
+					searchUnsplashImages(unsplashCurrentQuery, unsplashCurrentPage, true);
+				}
+			});
+		}, {
+			root: modalBody,
+			rootMargin: '100px',
+			threshold: 0.1
+		});
+
+		unsplashScrollObserver.observe(sentinel);
+	}
+
+	/**
+	 * Affiche l'indicateur de chargement en bas
+	 */
+	function showUnsplashLoadingMore(container) {
+		if (!container) return;
+		let loader = container.querySelector('.wc-pc13-unsplash-load-more');
+		if (!loader) {
+			loader = document.createElement('div');
+			loader.className = 'wc-pc13-unsplash-load-more';
+			loader.innerHTML = `
+				<div class="wc-pc13-loading-spinner"></div>
+				<p>Chargement de plus de résultats...</p>
+			`;
+			container.appendChild(loader);
+		}
+		loader.style.display = 'flex';
+	}
+
+	/**
+	 * Masque l'indicateur de chargement en bas
+	 */
+	function hideUnsplashLoadingMore(container) {
+		if (!container) return;
+		const loader = container.querySelector('.wc-pc13-unsplash-load-more');
+		if (loader) {
+			loader.style.display = 'none';
+		}
+	}
+
+	/**
+	 * Sélectionne une image Unsplash et l'applique au centre
+	 */
+	function selectUnsplashImage(image) {
+		if (!image || !image.url) {
+			return;
+		}
+
+		// Fermer le modal
+		const unsplashModal = document.querySelector(selectors.unsplashModal);
+		if (unsplashModal) {
+			unsplashModal.style.display = 'none';
+			document.body.style.overflow = '';
+		}
+
+		// Appliquer l'image au centre
+		const target = state.center;
+		target.image_url = image.url;
+		target.image_url_display = image.url;
+		target.attachment_id = 0;
+		target.x = 0;
+		target.y = 0;
+
+		// Calculer le zoom optimal
+		const configurator = document.querySelector(selectors.configurator);
+		const centerSizeRange = configurator ? configurator.querySelector(selectors.centerSizeRange) : null;
+		let centerSize = target.size || 180;
+		if (centerSizeRange) {
+			centerSize = parseInt(centerSizeRange.value || centerSize, 10);
+		}
+
+		// Charger l'image pour obtenir ses dimensions et calculer le zoom optimal
+		const img = new Image();
+		img.onload = function() {
+			target.scale = calculateOptimalZoomForCircle(img.width, img.height, centerSize, DEFAULT_CENTER_INSET);
+			applyTransforms();
+			updateSelectionUI();
+			savePayload();
+			scheduleLivePreviewUpdate();
+			
+			// Déplacer la page vers l'aperçu de l'horloge
+			scrollToPreview();
+		};
+		img.onerror = function() {
+			// En cas d'erreur, utiliser un scale par défaut
+			target.scale = 1.3;
+			applyTransforms();
+			updateSelectionUI();
+			savePayload();
+			scheduleLivePreviewUpdate();
+			
+			// Déplacer la page vers l'aperçu de l'horloge
+			scrollToPreview();
+		};
+		img.src = image.url;
+	}
+
+	/**
+	 * Fait défiler la page vers l'aperçu de l'horloge
+	 */
+	function scrollToPreview() {
+		const configurator = document.querySelector(selectors.configurator);
+		if (!configurator) return;
+
+		const preview = configurator.querySelector(selectors.preview);
+		if (preview) {
+			// Attendre un peu pour que l'image soit appliquée
+			setTimeout(() => {
+				preview.scrollIntoView({
+					behavior: 'smooth',
+					block: 'center',
+					inline: 'nearest'
+				});
+			}, 100);
+		}
+	}
+
 	async function init() {
 		const configurator = document.querySelector(selectors.configurator);
 		if (!configurator) {
@@ -4333,6 +4731,9 @@ function handleIntermediatePointsChange(event) {
 					}
 				}
 			}
+			
+			// Mettre à jour l'affichage du message d'aide
+			updateRingDimensions();
 		}
 
 		if (numbersColor && numbersColor.value && !sharedConfigLoaded) {

@@ -183,10 +183,19 @@ class WC_PC13_Ajax {
 		check_ajax_referer( 'wc_pc13_nonce', 'nonce' );
 
 		$count = isset( $_POST['count'] ) ? absint( $_POST['count'] ) : 13;
-		$count = min( $count, 13 ); // Maximum 13 images
+		$count = min( $count, 30 ); // Maximum 30 images pour la recherche
+		$query = isset( $_POST['query'] ) ? sanitize_text_field( wp_unslash( $_POST['query'] ) ) : '';
+		$page = isset( $_POST['page'] ) ? absint( $_POST['page'] ) : 1;
 
 		$access_key = 'p9RniMVfR7MiCI-YC8pDpM9zob_a4fOyMQzmcDAIPVY';
-		$url        = sprintf( 'https://api.unsplash.com/photos/random?count=%d&client_id=%s', $count, $access_key );
+		
+		// Si un mot-clé est fourni, utiliser l'endpoint de recherche, sinon utiliser random
+		if ( ! empty( $query ) ) {
+			$query_encoded = urlencode( $query );
+			$url = sprintf( 'https://api.unsplash.com/search/photos?query=%s&per_page=%d&page=%d&client_id=%s', $query_encoded, $count, $page, $access_key );
+		} else {
+			$url = sprintf( 'https://api.unsplash.com/photos/random?count=%d&client_id=%s', $count, $access_key );
+		}
 
 		$response = wp_remote_get(
 			$url,
@@ -229,17 +238,33 @@ class WC_PC13_Ajax {
 		$body = wp_remote_retrieve_body( $response );
 		$data = json_decode( $body, true );
 
-		if ( ! is_array( $data ) || empty( $data ) ) {
+		// L'API de recherche retourne un objet avec une propriété 'results', l'API random retourne directement un tableau
+		$photos = array();
+		if ( ! empty( $query ) ) {
+			// Format de recherche : { results: [...] }
+			if ( isset( $data['results'] ) && is_array( $data['results'] ) ) {
+				$photos = $data['results'];
+			}
+		} else {
+			// Format random : tableau direct
+			if ( is_array( $data ) ) {
+				$photos = $data;
+			}
+		}
+
+		if ( empty( $photos ) ) {
 			wp_send_json_error( 
 				array( 
-					'message' => __( 'Aucune image récupérée depuis Unsplash.', 'wc-photo-clock-13' ),
+					'message' => ! empty( $query ) 
+						? __( 'Aucune image trouvée pour ce mot-clé.', 'wc-photo-clock-13' )
+						: __( 'Aucune image récupérée depuis Unsplash.', 'wc-photo-clock-13' ),
 					'debug' => $body
 				) 
 			);
 		}
 
 		$images = array();
-		foreach ( $data as $index => $photo ) {
+		foreach ( $photos as $index => $photo ) {
 			// Pour la première image (centrale), utiliser 'regular' ou 'full' pour une résolution plus élevée
 			// Pour les autres images (périphériques), utiliser 'small' pour des images moins lourdes
 			if ( $index === 0 ) {
