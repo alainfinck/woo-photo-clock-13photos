@@ -2071,6 +2071,28 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	font-weight: 700 !important;
 }
 
+.wc-pc13-cart-button {
+	display: inline-block;
+	margin-top: 10px;
+	padding: 8px 16px;
+	background: #21759b;
+	color: #fff;
+	text-decoration: none;
+	border-radius: 6px;
+	font-size: 13px;
+	font-weight: 500;
+	transition: all 0.2s ease;
+	text-align: center;
+}
+
+.wc-pc13-cart-button:hover {
+	background: #1a5f7f;
+	color: #fff;
+	text-decoration: none;
+	transform: translateY(-1px);
+	box-shadow: 0 2px 8px rgba(33, 117, 155, 0.3);
+}
+
 .wc-pc13-notification-close {
 	position: absolute;
 	top: 8px;
@@ -2627,5 +2649,13 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	max-width: 100%;
 	display: block;
 	margin-top: 8px;
+}
+
+/* Styles pour le bouton de suppression dans le mini panier */
+.woocommerce-mini-cart-item a.remove.remove_from_cart_button {
+	left: 262px !important;
+	top: 2px !important;
+	width: 30px !important;
+	height: 30px !important;
 }
 

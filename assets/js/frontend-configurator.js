@@ -2768,6 +2768,9 @@ function handleIntermediatePointsChange(event) {
 
 					// Déclencher aussi l'événement wc_fragment_refresh pour forcer la mise à jour
 					jQuery(document.body).trigger('wc_fragment_refresh');
+					
+					// Réorganiser les éléments du mini-cart
+					setTimeout(reorganizeMiniCart, 100);
 				}
 
 				// Mettre à jour le compteur du panier si présent
@@ -2783,6 +2786,46 @@ function handleIntermediatePointsChange(event) {
 				window.alert(error?.message || WCPC13.labels.preview_error || 'Erreur lors de l\'ajout au panier');
 				customBtn.disabled = false;
 				customBtn.classList.remove('is-loading');
+			}
+		});
+	}
+
+	function reorganizeMiniCart() {
+		// Trouver tous les éléments li du mini-cart
+		const miniCartItems = document.querySelectorAll('.woocommerce-mini-cart-item');
+		
+		miniCartItems.forEach((item, index) => {
+			// Chercher le div.ux-mini-cart-qty dans cet item
+			const qtyDiv = item.querySelector('.ux-mini-cart-qty');
+			if (qtyDiv) {
+				// Chercher le span.quantity dans ce div
+				const quantitySpan = qtyDiv.querySelector('span.quantity');
+				if (quantitySpan) {
+					// Chercher le lien produit dans .product-name a ou directement dans le li
+					const productLink = item.querySelector('.product-name a') || item.querySelector('a');
+					if (productLink) {
+						// Insérer le span.quantity dans le lien à l'index 1 (après le premier enfant)
+						if (productLink.children.length > 0) {
+							// Insérer après le premier enfant pour qu'il soit à l'index 1
+							productLink.insertBefore(quantitySpan, productLink.children[1] || null);
+						} else {
+							// Si le lien n'a pas d'enfants, utiliser appendChild
+							productLink.appendChild(quantitySpan);
+						}
+					} else {
+						// Fallback: déplacer dans l'ul, juste après le li correspondant
+						const ul = item.closest('ul.woocommerce-mini-cart');
+						if (ul) {
+							ul.insertBefore(quantitySpan, item.nextSibling);
+						} else {
+							item.parentNode.insertBefore(quantitySpan, item.nextSibling);
+						}
+					}
+					// Supprimer le div.ux-mini-cart-qty s'il est vide
+					if (qtyDiv.children.length === 0) {
+						qtyDiv.remove();
+					}
+				}
 			}
 		});
 	}
@@ -4402,6 +4445,7 @@ function handleIntermediatePointsChange(event) {
 		notification.className = 'wc-pc13-cart-notification';
 		const price = data.price || state.diameterPrice || 59;
 		const priceDisplay = Math.round(price) + '€';
+		const cartUrl = (typeof WCPC13 !== 'undefined' && WCPC13.cart_url) ? WCPC13.cart_url : '/cart/';
 		notification.innerHTML = `
 			<div class="wc-pc13-notification-content">
 				${data.preview_url ? `<img src="${data.preview_url}" alt="Horloge" class="wc-pc13-notification-image">` : ''}
@@ -4410,6 +4454,7 @@ function handleIntermediatePointsChange(event) {
 					${data.product_name ? `<p>${data.product_name}</p>` : ''}
 					${data.cart_count ? `<p class="wc-pc13-cart-count">${data.cart_count} article${data.cart_count > 1 ? 's' : ''} dans le panier</p>` : ''}
 					<p class="wc-pc13-notification-price"><strong>${priceDisplay}</strong></p>
+					<a href="${cartUrl}" class="wc-pc13-cart-button">Voir le panier</a>
 				</div>
 				<button class="wc-pc13-notification-close" aria-label="Fermer">&times;</button>
 			</div>
@@ -5033,6 +5078,22 @@ async function saveShareAndSendEmail(email, triggerBtn = null) {
 
 		// Appliquer les images
 		updatePreview();
+		
+		// Réorganiser le mini-cart au chargement
+		setTimeout(reorganizeMiniCart, 500);
+		
+		// Écouter les événements de mise à jour du panier
+		if (typeof jQuery !== 'undefined') {
+			jQuery(document.body).on('added_to_cart', function() {
+				setTimeout(reorganizeMiniCart, 100);
+			});
+			jQuery(document.body).on('wc_fragment_refresh', function() {
+				setTimeout(reorganizeMiniCart, 100);
+			});
+			jQuery(document.body).on('updated_cart_totals', function() {
+				setTimeout(reorganizeMiniCart, 100);
+			});
+		}
 	}
 
 	$(init);

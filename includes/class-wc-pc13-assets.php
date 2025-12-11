@@ -144,6 +144,7 @@ class WC_PC13_Assets {
 				'ajax_url' => admin_url( 'admin-ajax.php' ),
 				'nonce'    => wp_create_nonce( 'wc_pc13_nonce' ),
 				'plugin_url' => trailingslashit( WC_PC13_PLUGIN_URL ),
+				'cart_url' => wc_get_cart_url(),
 				'labels'   => array(
 					'upload_error' => __( 'Erreur lors de l\'envoi du fichier.', 'wc-photo-clock-13' ),
 					'empty'        => __( 'Photo', 'wc-photo-clock-13' ),
