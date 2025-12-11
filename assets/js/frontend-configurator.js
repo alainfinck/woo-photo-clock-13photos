@@ -1419,7 +1419,11 @@ let sharedConfigLoaded = false;
 		centerSizeRange.max = state.centerMax;
 
 		const previous = state.center.size;
-		if (state.center.size > state.centerMax) {
+		
+		// Si les photos périphériques sont désactivées, mettre la taille au maximum
+		if (!state.showSlots) {
+			state.center.size = state.centerMax;
+		} else if (state.center.size > state.centerMax) {
 			state.center.size = state.centerMax;
 		}
 
@@ -2045,6 +2049,65 @@ let sharedConfigLoaded = false;
 		});
 	}
 
+	/**
+	 * Calcule le zoom optimal pour qu'une image remplisse complètement un cercle
+	 * @param {number} imageWidth - Largeur de l'image
+	 * @param {number} imageHeight - Hauteur de l'image
+	 * @param {number} circleSize - Taille du cercle (diamètre)
+	 * @param {number} inset - Inset CSS appliqué (par défaut 14px)
+	 * @returns {number} - Scale optimal
+	 */
+	function calculateOptimalZoomForCircle(imageWidth, imageHeight, circleSize, inset = DEFAULT_CENTER_INSET) {
+		if (!imageWidth || !imageHeight || !circleSize) {
+			return 1.2; // Valeur par défaut sécurisée
+		}
+
+		const imageAspectRatio = imageWidth / imageHeight;
+		const effectiveSize = circleSize - (2 * inset);
+
+		// Calculer le scale nécessaire pour que la dimension la plus petite remplisse le cercle
+		let optimalScale;
+		if (imageAspectRatio >= 1) {
+			// Image plus large ou carrée : à scale=1, height = effectiveSize/ratio
+			// Pour couvrir le cercle : height doit être >= effectiveSize
+			// Donc : scale >= ratio
+			optimalScale = imageAspectRatio;
+		} else {
+			// Image plus haute : à scale=1, width = effectiveSize*ratio
+			// Pour couvrir le cercle : width doit être >= effectiveSize
+			// Donc : scale >= 1/ratio
+			optimalScale = 1 / imageAspectRatio;
+		}
+
+		// Calculer aussi le scale basé sur la diagonale pour garantir le remplissage du cercle
+		let diagonalScale;
+		if (imageAspectRatio >= 1) {
+			// À scale=1 : largeur = effectiveSize, hauteur = effectiveSize/ratio
+			// Diagonale = effectiveSize * sqrt(1 + 1/ratio²)
+			// Pour que scale * diagonale >= effectiveSize :
+			// scale >= 1 / sqrt(1 + 1/ratio²)
+			diagonalScale = 1 / Math.sqrt(1 + 1 / (imageAspectRatio * imageAspectRatio));
+		} else {
+			// À scale=1 : hauteur = effectiveSize, largeur = effectiveSize*ratio
+			// Diagonale = effectiveSize * sqrt(ratio² + 1)
+			// Pour que scale * diagonale >= effectiveSize :
+			// scale >= 1 / sqrt(ratio² + 1)
+			diagonalScale = 1 / Math.sqrt(imageAspectRatio * imageAspectRatio + 1);
+		}
+
+		// Prendre le maximum des deux calculs pour garantir le remplissage complet
+		optimalScale = Math.max(optimalScale, diagonalScale);
+
+		// Ajouter une marge supplémentaire pour garantir qu'il n'y a absolument pas de blanc
+		// On multiplie par 1.1 pour avoir une marge de sécurité sans trop zoomer
+		optimalScale = optimalScale * 1.1;
+
+		// S'assurer que le scale est au minimum 1.2 pour bien remplir
+		optimalScale = Math.max(optimalScale, 1.2);
+
+		return optimalScale;
+	}
+
 function applyUploadedImage(data, targetSlot = null) {
 		if (!data) {
 			return;
@@ -2081,43 +2144,8 @@ function applyUploadedImage(data, targetSlot = null) {
 					}
 				}
 				
-				// Le CSS applique un inset de 14px par défaut de chaque côté
-				// La zone visible effective pour l'image est donc : centerSize - 2*inset
-				const effectiveSize = centerSize - (2 * DEFAULT_CENTER_INSET);
-				
-				// Calculer le ratio de l'image
-				const imageAspectRatio = img.width / img.height;
-				
-				// Avec background-size en pourcentage (scale * 100%), le comportement CSS est :
-				// - À scale=1, l'image occupe 100% de la plus grande dimension du conteneur visible
-				// - Pour un conteneur carré de taille effective S:
-				//   * Si image plus large (ratio >= 1): largeur = S, hauteur = S/ratio
-				//   * Si image plus haute (ratio < 1): hauteur = S, largeur = S*ratio
-				// Pour couvrir complètement un cercle de diamètre D=S, il faut que la dimension la plus petite soit >= D
-				
-				let optimalScale;
-				if (imageAspectRatio >= 1) {
-					// Image plus large ou carrée : à scale=1, height = effectiveSize/ratio
-					// Pour couvrir le cercle : height doit être >= effectiveSize
-					// Donc : scale * (effectiveSize/ratio) >= effectiveSize
-					// Donc : scale >= ratio
-					optimalScale = imageAspectRatio;
-				} else {
-					// Image plus haute : à scale=1, width = effectiveSize*ratio
-					// Pour couvrir le cercle : width doit être >= effectiveSize
-					// Donc : scale * (effectiveSize*ratio) >= effectiveSize
-					// Donc : scale >= 1/ratio
-					optimalScale = 1 / imageAspectRatio;
-				}
-				
-				// Ajouter une marge supplémentaire pour garantir qu'il n'y a absolument pas de blanc
-				// On multiplie par 1.2 pour avoir une marge de sécurité importante
-				optimalScale = optimalScale * 1.2;
-				
-				// S'assurer que le scale est au minimum 1.4 pour bien remplir (surtout pour les images carrées)
-				optimalScale = Math.max(optimalScale, 1.4);
-				
-				target.scale = optimalScale;
+				// Calculer le zoom optimal pour remplir le cercle
+				target.scale = calculateOptimalZoomForCircle(img.width, img.height, centerSize, DEFAULT_CENTER_INSET);
 				target.x = 0;
 				target.y = 0;
 				
@@ -3236,9 +3264,21 @@ function handleIntermediatePointsChange(event) {
 			showSlotsToggle.checked = !!state.showSlots;
 			showSlotsToggle.addEventListener('change', (e) => {
 				state.showSlots = !!e.target.checked;
-				// Si on masque les slots, forcer la sélection sur le centre
+				// Si on masque les slots, forcer la sélection sur le centre et mettre la taille au maximum
 				if (!state.showSlots) {
 					selectSlot('center');
+					// Mettre la taille centrale au maximum
+					const centerSizeRange = configurator.querySelector(selectors.centerSizeRange);
+					if (centerSizeRange && state.centerMax) {
+						state.center.size = state.centerMax;
+						centerSizeRange.value = state.centerMax;
+						
+						// Mettre à jour l'affichage du pourcentage
+						const valueDisplay = configurator.querySelector('#wc-pc13-center-size-value');
+						if (valueDisplay && state.centerMax > 0) {
+							valueDisplay.textContent = '100%';
+						}
+					}
 				}
 				applyTransforms();
 				updateSelectionUI();
@@ -4054,9 +4094,9 @@ function handleIntermediatePointsChange(event) {
 				state.center.image_url = images[0].url; // URL haute résolution (regular/full)
 				state.center.image_url_display = images[0].url; // Utiliser la même URL haute résolution pour l'affichage
 				state.center.attachment_id = 0;
-				state.center.scale = 1;
 				state.center.x = 0;
 				state.center.y = 0;
+				
 				const configurator = document.querySelector(selectors.configurator);
 				const centerSizeRange = configurator ? configurator.querySelector(selectors.centerSizeRange) : null;
 				const centerMax = state.centerMax || (centerSizeRange ? parseInt(centerSizeRange.max || `${state.center.size}`, 10) : state.center.size);
@@ -4068,6 +4108,29 @@ function handleIntermediatePointsChange(event) {
 						centerSizeRange.value = state.center.size;
 					}
 				}
+				
+				// Calculer le zoom optimal pour remplir le cercle
+				let centerSize = state.center.size || 180;
+				if (centerSizeRange) {
+					centerSize = parseInt(centerSizeRange.value || centerSize, 10);
+				}
+				
+				// Charger l'image pour obtenir ses dimensions et calculer le zoom optimal
+				const img = new Image();
+				img.onload = function() {
+					state.center.scale = calculateOptimalZoomForCircle(img.width, img.height, centerSize, DEFAULT_CENTER_INSET);
+					applyTransforms();
+					updateSelectionUI();
+					savePayload();
+				};
+				img.onerror = function() {
+					// En cas d'erreur, utiliser un scale par défaut
+					state.center.scale = 1.3;
+					applyTransforms();
+					updateSelectionUI();
+					savePayload();
+				};
+				img.src = images[0].url;
 			}
 
 			// Remplir les 12 slots périphériques
@@ -4254,6 +4317,21 @@ function handleIntermediatePointsChange(event) {
 					showSlotsToggle.checked = !!state.showSlots;
 				}
 				showSlotsToggle.disabled = false;
+			}
+			
+			// Si les photos périphériques sont désactivées, mettre la taille centrale au maximum
+			if (!state.showSlots && state.centerMax) {
+				const centerSizeRange = configurator.querySelector(selectors.centerSizeRange);
+				if (centerSizeRange) {
+					state.center.size = state.centerMax;
+					centerSizeRange.value = state.centerMax;
+					
+					// Mettre à jour l'affichage du pourcentage
+					const valueDisplay = configurator.querySelector('#wc-pc13-center-size-value');
+					if (valueDisplay && state.centerMax > 0) {
+						valueDisplay.textContent = '100%';
+					}
+				}
 			}
 		}
 
