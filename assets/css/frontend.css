@@ -1832,6 +1832,44 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	border-radius: 50px !important;
 	border: none !important;
 	box-shadow: 0 6px 16px rgba(39, 174, 96, 0.25);
+	display: inline-flex !important;
+	align-items: center !important;
+	justify-content: center !important;
+	gap: 10px !important;
+	position: relative !important;
+	overflow: hidden !important;
+}
+
+.wc-pc13-cart-icon {
+	flex-shrink: 0;
+	width: 20px;
+	height: 20px;
+	stroke-width: 2.5;
+	transition: transform 0.3s ease;
+}
+
+.wc-pc13-add-to-cart-btn:hover .wc-pc13-cart-icon {
+	transform: scale(1.1) rotate(-5deg);
+}
+
+.wc-pc13-add-to-cart-text {
+	display: inline-block;
+}
+
+.wc-pc13-add-to-cart-btn::before {
+	content: '';
+	position: absolute;
+	top: 0;
+	left: -100%;
+	width: 100%;
+	height: 100%;
+	background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+	transition: left 0.5s ease;
+}
+
+.wc-pc13-add-to-cart-btn:hover::before {
+	left: 100%;
+}
 	transition: all 0.2s ease;
 	width: 100%;
 	display: inline-flex;

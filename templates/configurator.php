@@ -222,7 +222,10 @@ $default_show_slots = isset( $default_show_slots ) ? $default_show_slots : true;
 			</div>
 			<div class="wc-pc13-add-to-cart">
 				<button type="button" class="button button-primary wc-pc13-add-to-cart-btn">
-					<?php echo esc_html( $button_text ?? __( 'Ajouter au panier', 'wc-photo-clock-13' ) ); ?>
+					<svg class="wc-pc13-cart-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+						<path d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm-8 2a2 2 0 1 1-4 0 2 2 0 0 1 4 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+					</svg>
+					<span class="wc-pc13-add-to-cart-text"><?php echo esc_html( $button_text ?? __( 'Ajouter au panier', 'wc-photo-clock-13' ) ); ?></span>
 					<span class="wc-pc13-add-to-cart-price" id="wc-pc13-add-to-cart-price">59€</span>
 				</button>
 				<p class="wc-pc13-add-to-cart-note"><?php esc_html_e( 'Vos réglages seront ajoutés au panier avec ce produit.', 'wc-photo-clock-13' ); ?></p>
