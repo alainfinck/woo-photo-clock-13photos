@@ -286,7 +286,79 @@ class WC_PC13_Admin {
 	}
 
 	/**
-	 * Rendu de la page de réglages.
+	 * Rendu de la page principale d'administration avec onglets.
+	 */
+	public function render_admin_page() {
+		$current_tab = isset( $_GET['tab'] ) ? sanitize_text_field( wp_unslash( $_GET['tab'] ) ) : 'settings';
+		$tabs = array(
+			'settings' => __( 'Réglages', 'wc-photo-clock-13' ),
+			'creations' => __( 'Créations', 'wc-photo-clock-13' ),
+			'emails' => __( 'Emails collectés', 'wc-photo-clock-13' ),
+			'stats' => __( 'Statistiques', 'wc-photo-clock-13' ),
+		);
+		?>
+		<div class="wrap">
+			<h1><?php esc_html_e( 'Horloge Photo 13 - Administration', 'wc-photo-clock-13' ); ?></h1>
+			
+			<nav class="nav-tab-wrapper">
+				<?php foreach ( $tabs as $tab_key => $tab_label ) : ?>
+					<a href="<?php echo esc_url( admin_url( 'admin.php?page=wc-pc13-admin&tab=' . $tab_key ) ); ?>" 
+					   class="nav-tab <?php echo $current_tab === $tab_key ? 'nav-tab-active' : ''; ?>">
+						<?php echo esc_html( $tab_label ); ?>
+					</a>
+				<?php endforeach; ?>
+			</nav>
+
+			<div class="wc-pc13-admin-content">
+				<?php
+				switch ( $current_tab ) {
+					case 'settings':
+						$this->render_settings_tab();
+						break;
+					case 'creations':
+						$this->render_creations_tab();
+						break;
+					case 'emails':
+						$this->render_emails_tab();
+						break;
+					case 'stats':
+						$this->render_stats_tab();
+						break;
+					default:
+						$this->render_settings_tab();
+				}
+				?>
+			</div>
+		</div>
+		<?php
+		$this->render_admin_styles();
+	}
+
+	/**
+	 * Rendu de l'onglet Réglages.
+	 */
+	private function render_settings_tab() {
+		?>
+		<div class="wc-pc13-tab-content">
+			<h2><?php esc_html_e( 'Configuration', 'wc-photo-clock-13' ); ?></h2>
+			<div class="wc-pc13-help">
+				<p><?php esc_html_e( 'Activez l\'option sur les produits WooCommerce concernés pour afficher le configurateur 13 photos côté boutique.', 'wc-photo-clock-13' ); ?></p>
+				<p><?php esc_html_e( 'Par défaut, les réglages ci-dessous définissent le style d\'aiguilles, la couleur d\'accent et la taille maximale des images téléversées. Chaque produit peut ensuite surcharger ces valeurs dans son onglet « Horloge 13 Photos ».', 'wc-photo-clock-13' ); ?></p>
+				<p><?php esc_html_e( 'Sur la fiche produit, vos clients peuvent importer jusqu\'à 13 photos, les déplacer, zoomer, choisir leurs aiguilles et visualiser instantanément l\'aperçu avant de passer commande.', 'wc-photo-clock-13' ); ?></p>
+			</div>
+			<form method="post" action="options.php">
+				<?php
+				settings_fields( 'wc_pc13_settings_group' );
+				do_settings_sections( 'wc_pc13_settings' );
+				submit_button();
+				?>
+			</form>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Rendu de la page de réglages (ancienne méthode, conservée pour compatibilité).
 	 */
 	public function render_settings_page() {
 		?>

@@ -326,7 +326,8 @@ class WC_PC13_Cart {
 	public function render_email_summary( $order, $sent_to_admin, $plain_text, $email ) {
 		unset( $email );
 
-		if ( 'yes' !== $sent_to_admin || $plain_text ) {
+		// Ne pas afficher pour les emails en texte brut
+		if ( $plain_text ) {
 			return;
 		}
 
@@ -341,24 +342,59 @@ class WC_PC13_Cart {
 				continue;
 			}
 
-			echo '<h3>' . esc_html__( 'Horloge Photo personnalisée', 'wc-photo-clock-13' ) . '</h3>';
-			echo '<ul>';
-			echo '<li>' . esc_html__( 'Produit :', 'wc-photo-clock-13' ) . ' ' . esc_html( $item->get_name() ) . '</li>';
+			// Récupérer l'aperçu
+			$preview_meta = $item->get_meta( 'wc_pc13_preview', true );
+			$preview_url = '';
+			$preview_id = 0;
+			if ( $preview_meta ) {
+				$preview_data = json_decode( $preview_meta, true );
+				if ( ! empty( $preview_data['url'] ) ) {
+					$preview_url = esc_url( $preview_data['url'] );
+				} elseif ( ! empty( $preview_data['id'] ) ) {
+					$preview_id = absint( $preview_data['id'] );
+					$preview_url = esc_url( wp_get_attachment_url( $preview_id ) );
+				}
+			}
+
+			echo '<div style="margin: 20px 0; padding: 20px; background: #f9f9f9; border: 1px solid #ddd; border-radius: 8px;">';
+			echo '<h3 style="margin-top: 0;">' . esc_html__( 'Horloge Photo personnalisée', 'wc-photo-clock-13' ) . '</h3>';
+			
+			// Afficher l'aperçu si disponible
+			if ( $preview_url ) {
+				$preview_image_url = $preview_url;
+				if ( $preview_id ) {
+					$preview_image_url = wp_get_attachment_image_url( $preview_id, 'medium' );
+					if ( ! $preview_image_url ) {
+						$preview_image_url = $preview_url;
+					}
+				}
+				echo '<div style="margin-bottom: 15px; text-align: center;">';
+				echo '<a href="' . esc_url( $preview_url ) . '" target="_blank" rel="noopener noreferrer" style="display: inline-block;">';
+				echo '<img src="' . esc_url( $preview_image_url ) . '" alt="' . esc_attr__( 'Aperçu de l\'horloge', 'wc-photo-clock-13' ) . '" style="max-width: 100%; max-width: 500px; height: auto; border: 2px solid #ddd; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" />';
+				echo '</a>';
+				echo '<p style="margin-top: 10px; font-size: 12px; color: #666;">';
+				echo '<a href="' . esc_url( $preview_url ) . '" target="_blank" rel="noopener noreferrer" style="color: #2271b1; text-decoration: none;">' . esc_html__( 'Télécharger l\'aperçu en haute résolution', 'wc-photo-clock-13' ) . '</a>';
+				echo '</p>';
+				echo '</div>';
+			}
+
+			echo '<ul style="list-style: none; padding: 0;">';
+			echo '<li style="margin-bottom: 8px;"><strong>' . esc_html__( 'Produit :', 'wc-photo-clock-13' ) . '</strong> ' . esc_html( $item->get_name() ) . '</li>';
 			if ( ! empty( $data['hands'] ) ) {
-				echo '<li>' . esc_html__( 'Style d’aiguilles :', 'wc-photo-clock-13' ) . ' ' . esc_html( $data['hands'] ) . '</li>';
+				echo '<li style="margin-bottom: 8px;"><strong>' . esc_html__( 'Style d'aiguilles :', 'wc-photo-clock-13' ) . '</strong> ' . esc_html( $data['hands'] ) . '</li>';
 			}
 			if ( ! empty( $data['color'] ) ) {
-				echo '<li>' . esc_html__( 'Couleur :', 'wc-photo-clock-13' ) . ' ' . esc_html( $data['color'] ) . '</li>';
+				echo '<li style="margin-bottom: 8px;"><strong>' . esc_html__( 'Couleur :', 'wc-photo-clock-13' ) . '</strong> ' . esc_html( $data['color'] ) . '</li>';
 			}
 			if ( array_key_exists( 'show_numbers', $data ) ) {
 				$has_numbers = wc_string_to_bool( $data['show_numbers'] );
-				echo '<li>' . esc_html__( 'Chiffres des heures :', 'wc-photo-clock-13' ) . ' ' . esc_html( $has_numbers ? __( 'Oui', 'wc-photo-clock-13' ) : __( 'Non', 'wc-photo-clock-13' ) ) . '</li>';
+				echo '<li style="margin-bottom: 8px;"><strong>' . esc_html__( 'Chiffres des heures :', 'wc-photo-clock-13' ) . '</strong> ' . esc_html( $has_numbers ? __( 'Oui', 'wc-photo-clock-13' ) : __( 'Non', 'wc-photo-clock-13' ) ) . '</li>';
 				if ( $has_numbers && ! empty( $data['numbers'] ) && is_array( $data['numbers'] ) ) {
 					if ( ! empty( $data['numbers']['color'] ) ) {
-						echo '<li>' . esc_html__( 'Couleur des chiffres :', 'wc-photo-clock-13' ) . ' ' . esc_html( sanitize_hex_color( $data['numbers']['color'] ) ) . '</li>';
+						echo '<li style="margin-bottom: 8px;"><strong>' . esc_html__( 'Couleur des chiffres :', 'wc-photo-clock-13' ) . '</strong> ' . esc_html( sanitize_hex_color( $data['numbers']['color'] ) ) . '</li>';
 					}
 					if ( isset( $data['numbers']['size'] ) ) {
-						echo '<li>' . esc_html__( 'Taille des chiffres :', 'wc-photo-clock-13' ) . ' ' . esc_html( absint( $data['numbers']['size'] ) ) . ' px</li>';
+						echo '<li style="margin-bottom: 8px;"><strong>' . esc_html__( 'Taille des chiffres :', 'wc-photo-clock-13' ) . '</strong> ' . esc_html( absint( $data['numbers']['size'] ) ) . ' px</li>';
 					}
 					$distance_value = null;
 					if ( isset( $data['numbers']['distance'] ) ) {
@@ -368,11 +404,12 @@ class WC_PC13_Cart {
 					}
 
 					if ( null !== $distance_value ) {
-						echo '<li>' . esc_html__( 'Distance depuis le centre :', 'wc-photo-clock-13' ) . ' ' . esc_html( $distance_value ) . ' px</li>';
+						echo '<li style="margin-bottom: 8px;"><strong>' . esc_html__( 'Distance depuis le centre :', 'wc-photo-clock-13' ) . '</strong> ' . esc_html( $distance_value ) . ' px</li>';
 					}
 				}
 			}
 			echo '</ul>';
+			echo '</div>';
 			break;
 		}
 	}
