@@ -46,6 +46,8 @@ class WC_PC13_Frontend {
 		add_filter( 'woocommerce_cart_item_thumbnail', array( $this, 'filter_cart_item_thumbnail' ), 10, 3 );
 		add_filter( 'woocommerce_checkout_cart_item_thumbnail', array( $this, 'filter_cart_item_thumbnail' ), 10, 3 );
 		add_filter( 'woocommerce_order_item_thumbnail', array( $this, 'filter_order_item_thumbnail' ), 10, 3 );
+		add_action( 'woocommerce_before_calculate_totals', array( $this, 'apply_diameter_price' ), 20, 1 );
+		add_filter( 'woocommerce_cart_item_price', array( $this, 'filter_cart_item_price' ), 10, 3 );
 		add_action( 'woocommerce_before_add_to_cart_quantity', array( $this, 'hide_quantity_selector' ), 5 );
 		add_action( 'woocommerce_after_add_to_cart_quantity', array( $this, 'hide_quantity_selector_end' ), 5 );
 		add_action( 'wp_ajax_wc_pc13_send_help', array( $this, 'handle_help_request' ) );
@@ -170,7 +172,7 @@ class WC_PC13_Frontend {
 			$diameter = absint( $config['diameter'] );
 			$price = isset( $config['diameter_price'] ) ? floatval( $config['diameter_price'] ) : 59;
 			$badges[] = '<span class="wc-pc13-cart-badge wc-pc13-cart-badge-diameter">' . 
-				sprintf( esc_html__( '%d cm - %s€', 'wc-photo-clock-13' ), $diameter, number_format_i18n( $price, 0 ) ) . 
+				sprintf( esc_html__( '%dcm %s€', 'wc-photo-clock-13' ), $diameter, number_format_i18n( $price, 0 ) ) . 
 				'</span>';
 		}
 		
@@ -179,15 +181,15 @@ class WC_PC13_Frontend {
 			$hands_label = ucfirst( sanitize_text_field( $config['hands'] ) );
 			$badges[] = '<span class="wc-pc13-cart-badge wc-pc13-cart-badge-hands">' . 
 				'<span class="wc-pc13-cart-color-indicator" style="background-color: ' . esc_attr( $color_display ) . ';"></span>' .
-				esc_html__( 'Aiguilles', 'wc-photo-clock-13' ) . ': ' . esc_html( $hands_label ) . ' ' . esc_html( $color_display ) . 
+				esc_html( $hands_label ) . ' ' . esc_html( $color_display ) . 
 				'</span>';
 		} elseif ( ! empty( $config['hands'] ) ) {
-			$badges[] = '<span class="wc-pc13-cart-badge">' . esc_html__( 'Aiguilles', 'wc-photo-clock-13' ) . ': ' . esc_html( ucfirst( $config['hands'] ) ) . '</span>';
+			$badges[] = '<span class="wc-pc13-cart-badge wc-pc13-cart-badge-hands">' . esc_html( ucfirst( $config['hands'] ) ) . '</span>';
 		} elseif ( ! empty( $config['color'] ) ) {
 			$color_display = sanitize_hex_color( $config['color'] );
 			$badges[] = '<span class="wc-pc13-cart-badge wc-pc13-cart-badge-hands">' . 
 				'<span class="wc-pc13-cart-color-indicator" style="background-color: ' . esc_attr( $color_display ) . ';"></span>' .
-				esc_html__( 'Aiguilles', 'wc-photo-clock-13' ) . ': ' . esc_html( $color_display ) . 
+				esc_html( $color_display ) . 
 				'</span>';
 		}
 		if ( array_key_exists( 'show_numbers', $config ) && wc_string_to_bool( $config['show_numbers'] ) ) {
@@ -232,18 +234,8 @@ class WC_PC13_Frontend {
 
 		$value_html = '<div class="wc-pc13-cart-summary">';
 		if ( ! empty( $badges ) ) {
-			$value_html .= '<div class="wc-pc13-cart-badges">' . implode( ' ', $badges ) . '</div>';
+			$value_html .= '<div class="wc-pc13-cart-badges">' . implode( '', $badges ) . '</div>';
 		}
-		$value_html .= '<div class="wc-pc13-cart-info">';
-		$value_html .= '<div class="wc-pc13-cart-photos">';
-		if ( $center_has_photo ) {
-			$value_html .= '<span class="wc-pc13-cart-photo-item"><span class="wc-pc13-cart-icon">🖼️</span> ' . esc_html__( '1 photo centrale', 'wc-photo-clock-13' ) . '</span>';
-		}
-		if ( $slots_with_photo > 0 ) {
-			$value_html .= '<span class="wc-pc13-cart-photo-item"><span class="wc-pc13-cart-icon">📸</span> ' . sprintf( esc_html__( '%d photos périphériques', 'wc-photo-clock-13' ), $slots_with_photo ) . '</span>';
-		}
-		$value_html .= '</div>';
-		$value_html .= '</div>';
 		if ( $download_buttons ) {
 			$value_html .= $download_buttons;
 		}
@@ -691,6 +683,98 @@ class WC_PC13_Frontend {
 
 		return $html ? $html : $thumbnail;
 	}
+
+	/**
+	 * Ajuste le prix dans le panier en fonction du diamètre choisi.
+	 *
+	 * @param WC_Cart $cart Panier courant.
+	 */
+	public function apply_diameter_price( $cart ) {
+		if ( is_admin() && ! defined( 'DOING_AJAX' ) ) {
+			return;
+		}
+
+		if ( ! $cart instanceof WC_Cart ) {
+			return;
+		}
+
+		$diameter_prices = array(
+			30 => 49,
+			40 => 59,
+			50 => 69,
+			60 => 89,
+			70 => 109,
+		);
+
+		foreach ( $cart->get_cart() as $cart_item_key => $cart_item ) {
+			if ( empty( $cart_item['wc_pc13'] ) || ! is_array( $cart_item['wc_pc13'] ) ) {
+				continue;
+			}
+
+			if ( empty( $cart_item['data'] ) || ! $cart_item['data'] instanceof WC_Product ) {
+				continue;
+			}
+
+			$config   = $cart_item['wc_pc13'];
+			$diameter = isset( $config['diameter'] ) ? absint( $config['diameter'] ) : 0;
+
+			$price = isset( $config['diameter_price'] ) ? floatval( $config['diameter_price'] ) : null;
+			if ( null === $price && $diameter && isset( $diameter_prices[ $diameter ] ) ) {
+				$price = $diameter_prices[ $diameter ];
+				// Mémoriser pour l'affichage des badges/récapitulatif.
+				$cart->cart_contents[ $cart_item_key ]['wc_pc13']['diameter_price'] = $price;
+			}
+
+			if ( null === $price ) {
+				continue;
+			}
+
+			$cart_item['data']->set_price( $price );
+			$cart->cart_contents[ $cart_item_key ] = $cart_item;
+		}
+	}
+
+	/**
+	 * Filtre le prix affiché dans le panier pour utiliser le prix du diamètre.
+	 *
+	 * @param string $price_html Prix HTML.
+	 * @param array  $cart_item Item du panier.
+	 * @param string $cart_item_key Clé de l'item.
+	 * @return string
+	 */
+	public function filter_cart_item_price( $price_html, $cart_item, $cart_item_key ) {
+		if ( empty( $cart_item['wc_pc13'] ) || ! is_array( $cart_item['wc_pc13'] ) ) {
+			return $price_html;
+		}
+
+		$config = $cart_item['wc_pc13'];
+		$price  = null;
+
+		// Essayer de récupérer le prix depuis diameter_price
+		if ( isset( $config['diameter_price'] ) ) {
+			$price = floatval( $config['diameter_price'] );
+		}
+
+		// Si pas de prix, calculer depuis le diamètre
+		if ( null === $price || $price <= 0 ) {
+			$diameter_prices = array(
+				30 => 49,
+				40 => 59,
+				50 => 69,
+				60 => 89,
+				70 => 109,
+			);
+			$diameter = isset( $config['diameter'] ) ? absint( $config['diameter'] ) : 0;
+			if ( $diameter && isset( $diameter_prices[ $diameter ] ) ) {
+				$price = $diameter_prices[ $diameter ];
+			} else {
+				return $price_html;
+			}
+		}
+
+		return wc_price( $price );
+	}
+
 
 	/**
 	 * Génère le HTML de vignette d’aperçu.

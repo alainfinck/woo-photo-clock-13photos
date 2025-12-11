@@ -186,6 +186,7 @@ $mode = isset( $mode ) ? $mode : 'peripheral';
 			<div class="wc-pc13-add-to-cart">
 				<button type="button" class="button button-primary wc-pc13-add-to-cart-btn">
 					<?php echo esc_html( $button_text ?? __( 'Ajouter au panier', 'wc-photo-clock-13' ) ); ?>
+					<span class="wc-pc13-add-to-cart-price" id="wc-pc13-add-to-cart-price">59€</span>
 				</button>
 				<p class="wc-pc13-add-to-cart-note"><?php esc_html_e( 'Vos réglages seront ajoutés au panier avec ce produit.', 'wc-photo-clock-13' ); ?></p>
 			</div>

@@ -384,12 +384,19 @@ class WC_PC13_Ajax {
 		// Ajouter le hash du panier
 		$cart_hash = WC()->cart->get_cart_hash();
 
+		// Récupérer le prix depuis la configuration
+		$price = 0;
+		if ( ! empty( $cart_item_data['wc_pc13']['diameter_price'] ) ) {
+			$price = floatval( $cart_item_data['wc_pc13']['diameter_price'] );
+		}
+
 		wp_send_json_success(
 			array(
 				'message'      => __( 'Produit ajouté au panier avec succès.', 'wc-photo-clock-13' ),
 				'cart_count'   => $cart_count,
 				'preview_url'  => $preview_image_url,
 				'product_name' => $product->get_name(),
+				'price'        => $price,
 				'fragments'    => $fragments,
 				'cart_hash'    => $cart_hash,
 			)

@@ -3371,9 +3371,15 @@ function handleIntermediatePointsChange(event) {
 
 	function updateTotalPrice() {
 		const totalPriceElement = document.querySelector('#wc-pc13-total-price');
+		const addToCartPriceElement = document.querySelector('#wc-pc13-add-to-cart-price');
+		const price = state.diameterPrice || 59;
+
 		if (totalPriceElement) {
-			const price = state.diameterPrice || 59;
 			totalPriceElement.textContent = Math.round(price) + '€';
+		}
+
+		if (addToCartPriceElement) {
+			addToCartPriceElement.textContent = Math.round(price) + '€';
 		}
 	}
 
@@ -4394,6 +4400,8 @@ function handleIntermediatePointsChange(event) {
 		// Créer la notification
 		const notification = document.createElement('div');
 		notification.className = 'wc-pc13-cart-notification';
+		const price = data.price || state.diameterPrice || 59;
+		const priceDisplay = Math.round(price) + '€';
 		notification.innerHTML = `
 			<div class="wc-pc13-notification-content">
 				${data.preview_url ? `<img src="${data.preview_url}" alt="Horloge" class="wc-pc13-notification-image">` : ''}
@@ -4401,6 +4409,7 @@ function handleIntermediatePointsChange(event) {
 					<strong>${data.message || 'Produit ajouté au panier'}</strong>
 					${data.product_name ? `<p>${data.product_name}</p>` : ''}
 					${data.cart_count ? `<p class="wc-pc13-cart-count">${data.cart_count} article${data.cart_count > 1 ? 's' : ''} dans le panier</p>` : ''}
+					<p class="wc-pc13-notification-price"><strong>${priceDisplay}</strong></p>
 				</div>
 				<button class="wc-pc13-notification-close" aria-label="Fermer">&times;</button>
 			</div>
