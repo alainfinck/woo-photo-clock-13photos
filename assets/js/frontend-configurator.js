@@ -2144,6 +2144,78 @@ let sharedConfigLoaded = false;
 		}
 	}
 
+	/**
+	 * Redimensionne une image à 2000px max côté client pour les photos périphériques.
+	 * @param {File} file - Fichier image à redimensionner
+	 * @param {number} maxSize - Taille maximale en pixels (défaut: 2000)
+	 * @param {number} quality - Qualité JPEG (0-1, défaut: 0.9)
+	 * @returns {Promise<Blob>} - Blob de l'image redimensionnée
+	 */
+	function resizeImageForPeripheral(file, maxSize = 2000, quality = 0.9) {
+		return new Promise((resolve, reject) => {
+			// Vérifier que c'est une image
+			if (!file.type.match(/^image\/(jpeg|jpg|png|gif|webp)$/i)) {
+				reject(new Error('Format d\'image non supporté'));
+				return;
+			}
+
+			const img = new Image();
+			const reader = new FileReader();
+
+			reader.onload = function(e) {
+				img.onload = function() {
+					// Calculer les nouvelles dimensions en conservant le ratio
+					let width = img.width;
+					let height = img.height;
+
+					// Si l'image est déjà plus petite que maxSize, retourner l'original
+					if (width <= maxSize && height <= maxSize) {
+						// Convertir le fichier en blob
+						file.arrayBuffer().then(buffer => {
+							resolve(new Blob([buffer], { type: file.type }));
+						}).catch(reject);
+						return;
+					}
+
+					// Calculer le ratio de redimensionnement
+					const ratio = Math.min(maxSize / width, maxSize / height);
+					const newWidth = Math.round(width * ratio);
+					const newHeight = Math.round(height * ratio);
+
+					// Créer un canvas pour redimensionner
+					const canvas = document.createElement('canvas');
+					canvas.width = newWidth;
+					canvas.height = newHeight;
+					const ctx = canvas.getContext('2d');
+
+					// Dessiner l'image redimensionnée
+					ctx.drawImage(img, 0, 0, newWidth, newHeight);
+
+					// Convertir en blob JPEG (toujours en JPEG pour optimiser)
+					canvas.toBlob((blob) => {
+						if (blob) {
+							resolve(blob);
+						} else {
+							reject(new Error('Erreur lors de la création de la vignette'));
+						}
+					}, 'image/jpeg', quality);
+				};
+
+				img.onerror = function() {
+					reject(new Error('Erreur lors du chargement de l\'image'));
+				};
+
+				img.src = e.target.result;
+			};
+
+			reader.onerror = function() {
+				reject(new Error('Erreur lors de la lecture du fichier'));
+			};
+
+			reader.readAsDataURL(file);
+		});
+	}
+
 	function uploadFile(slot, file) {
 		return new Promise((resolve, reject) => {
 			const formData = new FormData();
@@ -2595,7 +2667,32 @@ function processFile(file, inputEl) {
 		console.log('processFile - Avant uploadFile, savedSlotKey:', savedSlotKey, 'file:', file.name);
 	}
 
-	uploadFile(savedSlotKey, file)
+	// Pour les slots périphériques, redimensionner l'image côté client avant l'upload
+	const isPeripheral = savedSlotKey !== 'center' && savedSlotKey !== 'Centre' && 
+		typeof savedSlotKey === 'number' && savedSlotKey >= 1 && savedSlotKey <= 12;
+
+	let uploadPromise;
+	if (isPeripheral) {
+		// Redimensionner l'image côté client à 2000px max pour alléger le serveur
+		uploadPromise = resizeImageForPeripheral(file, 2000, 0.9)
+			.then((resizedBlob) => {
+				// Créer un nouveau File à partir du blob pour l'upload
+				const resizedFile = new File([resizedBlob], file.name, { type: 'image/jpeg' });
+				if (window.WCPC13_DEBUG) {
+					console.log('processFile - Image redimensionnée côté client:', {
+						originalSize: file.size,
+						resizedSize: resizedBlob.size,
+						reduction: Math.round((1 - resizedBlob.size / file.size) * 100) + '%'
+					});
+				}
+				return uploadFile(savedSlotKey, resizedFile);
+			});
+	} else {
+		// Pour le centre, uploader l'image originale
+		uploadPromise = uploadFile(savedSlotKey, file);
+	}
+
+	uploadPromise
 		.then((response) => {
 			// Debug avant applyUploadedImage
 			if (window.WCPC13_DEBUG) {
