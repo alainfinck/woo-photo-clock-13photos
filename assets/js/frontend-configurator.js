@@ -2360,10 +2360,59 @@ function applyUploadedImage(data, targetSlot = null) {
 		target.image_url_display = fullUrl; // Utiliser full_url pour l'affichage aussi
 		target.x = 0;
 		target.y = 0;
-		target.scale = 1;
+		
+		// Calculer le scale optimal pour remplir le rond périphérique
+		const imageUrl = target.image_url;
+		if (imageUrl) {
+			const img = new Image();
+			img.onload = function() {
+				const configurator = document.querySelector(selectors.configurator);
+				// Récupérer la taille actuelle du slot périphérique (ringSize)
+				const ringSize = state.ringSize || 80; // Taille par défaut si non définie
+				
+				// Calculer le zoom optimal pour remplir le cercle périphérique
+				// Utiliser le même inset que pour le centre (DEFAULT_CENTER_INSET = 14px)
+				target.scale = calculateOptimalZoomForCircle(img.width, img.height, ringSize, DEFAULT_CENTER_INSET);
+				target.x = 0;
+				target.y = 0;
+				
+				// Appliquer les transformations après que le scale soit calculé
+				setTimeout(() => {
+					applyTransforms();
+					updateSelectionUI();
+					savePayload();
+				}, 10);
+			};
+			img.onerror = function() {
+				// En cas d'erreur, utiliser scale par défaut pour remplir
+				target.scale = 1.3;
+				target.x = 0;
+				target.y = 0;
+				applyTransforms();
+				updateSelectionUI();
+				savePayload();
+			};
+			img.src = imageUrl;
+			// Initialiser avec des valeurs par défaut, elles seront mises à jour dans onload
+			target.x = 0;
+			target.y = 0;
+			target.scale = 1;
+		} else {
+			// Si pas d'URL, initialiser avec valeurs par défaut
+			target.x = 0;
+			target.y = 0;
+			target.scale = 1;
+		}
 		
 		console.log('applyUploadedImage - Slot périphérique mis à jour:', slotKey, 'image_url:', target.image_url, 'image_url_display:', target.image_url_display, 'full_url:', data.full_url, 'url:', data.url);
 		console.log('applyUploadedImage - state.slots après mise à jour:', JSON.parse(JSON.stringify(state.slots[slotKey])));
+		
+		// Appliquer immédiatement pour afficher l'image, le scale sera optimisé dans img.onload
+		applyTransforms();
+		updateSelectionUI();
+		savePayload();
+		// Retourner ici car le scale optimal sera calculé et appliqué dans img.onload
+		return;
 	}
 	
 	console.log('applyUploadedImage - image_url défini:', target.image_url, 'full_url:', data.full_url, 'url:', data.url);
@@ -3016,12 +3065,15 @@ function handleIntermediatePointsChange(event) {
 				const pdfIdInput = document.querySelector(selectors.pdfIdInput);
 				const pdfUrlInput = document.querySelector(selectors.pdfUrlInput);
 
-				// Générer et uploader le PDF HD de façon bloquante pour garantir la présence des métadonnées
-				const pdfData = await uploadPdfForCart();
-				if (!pdfData || (!pdfData.url && !pdfData.attachment_id)) {
-					throw new Error(WCPC13.labels.preview_error || 'PDF non généré');
-				}
+				// Générer et uploader le PDF HD en arrière-plan (non bloquant)
+				// Le PDF sera généré après l'ajout au panier pour améliorer les performances
+				const pdfPromise = uploadPdfForCart().catch((error) => {
+					console.warn('Génération PDF en arrière-plan échouée:', error);
+					// Ne pas bloquer l'ajout au panier si le PDF échoue
+					return null;
+				});
 
+				// Ajouter au panier immédiatement sans attendre le PDF
 				const formData = new FormData();
 				formData.append('action', 'wc_pc13_add_to_cart');
 				formData.append('nonce', WCPC13.nonce);
@@ -3039,14 +3091,7 @@ function handleIntermediatePointsChange(event) {
 					formData.append('wc_pc13_preview_url', previewUrlInput.value);
 					formData.append('preview_url', previewUrlInput.value); // compat handler ajax
 				}
-				if (pdfIdInput && pdfIdInput.value) {
-					formData.append('wc_pc13_pdf_id', pdfIdInput.value);
-					formData.append('pdf_id', pdfIdInput.value); // compat handler ajax
-				}
-				if (pdfUrlInput && pdfUrlInput.value) {
-					formData.append('wc_pc13_pdf_url', pdfUrlInput.value);
-					formData.append('pdf_url', pdfUrlInput.value); // compat handler ajax
-				}
+				// Le PDF sera ajouté en arrière-plan une fois généré
 
 				const response = await fetch(WCPC13.ajax_url, {
 					method: 'POST',
@@ -3062,6 +3107,20 @@ function handleIntermediatePointsChange(event) {
 				if (!data || !data.success) {
 					throw new Error(data?.data?.message || WCPC13.labels.preview_error || 'Erreur lors de l\'ajout au panier');
 				}
+
+				// Mettre à jour le PDF en arrière-plan une fois généré
+				pdfPromise.then((pdfData) => {
+					if (pdfData && (pdfData.url || pdfData.attachment_id)) {
+						if (pdfIdInput) {
+							pdfIdInput.value = pdfData.attachment_id || '';
+						}
+						if (pdfUrlInput) {
+							pdfUrlInput.value = pdfData.url || '';
+						}
+						// Mettre à jour le panier avec le PDF (optionnel, peut être fait plus tard)
+						// On peut aussi laisser le PDF être généré lors de la commande
+					}
+				});
 
 				// Utiliser la vignette générée ou l'URL de prévisualisation
 				const notificationData = {

@@ -618,20 +618,27 @@ class WC_PC13_Ajax {
 		// Calculer le nombre d'articles dans le panier
 		$cart_count = WC()->cart->get_cart_contents_count();
 
-		// Obtenir les fragments WooCommerce pour mettre à jour le panier
-		ob_start();
-		woocommerce_mini_cart();
-		$mini_cart = ob_get_clean();
+		// Obtenir les fragments WooCommerce pour mettre à jour le panier (optionnel pour performance)
+		$fragments = array();
+		$cart_hash = '';
+		
+		// Générer les fragments seulement si nécessaire (peut être désactivé pour améliorer les performances)
+		$generate_fragments = apply_filters( 'wc_pc13_generate_cart_fragments', true );
+		if ( $generate_fragments ) {
+			ob_start();
+			woocommerce_mini_cart();
+			$mini_cart = ob_get_clean();
 
-		$fragments = apply_filters(
-			'woocommerce_add_to_cart_fragments',
-			array(
-				'div.widget_shopping_cart_content' => '<div class="widget_shopping_cart_content">' . $mini_cart . '</div>',
-			)
-		);
+			$fragments = apply_filters(
+				'woocommerce_add_to_cart_fragments',
+				array(
+					'div.widget_shopping_cart_content' => '<div class="widget_shopping_cart_content">' . $mini_cart . '</div>',
+				)
+			);
 
-		// Ajouter le hash du panier
-		$cart_hash = WC()->cart->get_cart_hash();
+			// Ajouter le hash du panier
+			$cart_hash = WC()->cart->get_cart_hash();
+		}
 
 		// Récupérer le prix depuis la configuration
 		$price = 0;

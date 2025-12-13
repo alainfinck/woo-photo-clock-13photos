@@ -46,6 +46,10 @@ class WC_PC13_Frontend {
 		add_filter( 'woocommerce_cart_item_thumbnail', array( $this, 'filter_cart_item_thumbnail' ), 10, 3 );
 		add_filter( 'woocommerce_checkout_cart_item_thumbnail', array( $this, 'filter_cart_item_thumbnail' ), 10, 3 );
 		add_filter( 'woocommerce_order_item_thumbnail', array( $this, 'filter_order_item_thumbnail' ), 10, 3 );
+		// Hook spécifique pour le mini panier (widget)
+		add_filter( 'woocommerce_widget_cart_item_thumbnail', array( $this, 'filter_cart_item_thumbnail' ), 10, 3 );
+		// Filtrer le HTML du mini panier après génération pour s'assurer que la vignette est présente
+		add_filter( 'woocommerce_add_to_cart_fragments', array( $this, 'filter_mini_cart_fragments' ), 20, 1 );
 		add_action( 'woocommerce_before_calculate_totals', array( $this, 'apply_diameter_price' ), 20, 1 );
 		add_filter( 'woocommerce_cart_item_price', array( $this, 'filter_cart_item_price' ), 10, 3 );
 		add_action( 'woocommerce_before_add_to_cart_quantity', array( $this, 'hide_quantity_selector' ), 5 );
@@ -733,15 +737,85 @@ class WC_PC13_Frontend {
 	 * @return string
 	 */
 	public function filter_cart_item_thumbnail( $thumbnail, $cart_item, $cart_item_key = null ) {
-		if ( empty( $cart_item['wc_pc13_preview'] ) || ! is_array( $cart_item['wc_pc13_preview'] ) ) {
+		// Vérifier si c'est un item avec configurateur
+		if ( empty( $cart_item['wc_pc13_preview'] ) ) {
+			return $thumbnail;
+		}
+
+		// Gérer différents formats de données
+		$preview = $cart_item['wc_pc13_preview'];
+		
+		// Si c'est une chaîne JSON, la décoder
+		if ( is_string( $preview ) ) {
+			$preview = json_decode( $preview, true );
+		}
+		
+		// Vérifier que c'est un tableau valide
+		if ( ! is_array( $preview ) || ( empty( $preview['id'] ) && empty( $preview['url'] ) ) ) {
 			return $thumbnail;
 		}
 
 		// Retourner notre vignette personnalisée pour le panier ET le mini panier
-		$html = $this->get_preview_thumbnail_html( $cart_item['wc_pc13_preview'], 'woocommerce_thumbnail' );
+		$html = $this->get_preview_thumbnail_html( $preview, 'woocommerce_thumbnail' );
 
 		// Retourner notre vignette uniquement, remplacer complètement la vignette par défaut
 		return $html ? $html : $thumbnail;
+	}
+
+	/**
+	 * Filtre les fragments du mini panier pour s'assurer que les vignettes sont présentes.
+	 * Utilise une approche simple avec regex pour remplacer les vignettes manquantes.
+	 *
+	 * @param array $fragments Fragments du panier.
+	 * @return array
+	 */
+	public function filter_mini_cart_fragments( $fragments ) {
+		if ( empty( $fragments ) || ! is_array( $fragments ) ) {
+			return $fragments;
+		}
+
+		// Récupérer le panier
+		$cart = WC()->cart;
+		if ( ! $cart ) {
+			return $fragments;
+		}
+
+		$cart_items = $cart->get_cart();
+		if ( empty( $cart_items ) ) {
+			return $fragments;
+		}
+
+		// Parcourir tous les fragments pour trouver le mini panier
+		foreach ( $fragments as $key => $html ) {
+			if ( strpos( $key, 'widget_shopping_cart_content' ) !== false || strpos( $key, 'mini-cart' ) !== false ) {
+				// Pour chaque item du panier, vérifier si la vignette est présente
+				foreach ( $cart_items as $cart_item_key => $cart_item ) {
+					if ( ! empty( $cart_item['wc_pc13_preview'] ) ) {
+						$preview_html = $this->get_preview_thumbnail_html( $cart_item['wc_pc13_preview'], 'woocommerce_thumbnail' );
+						
+						if ( $preview_html ) {
+							// Chercher le product-thumbnail pour cet item et le remplacer
+							// Pattern pour trouver le thumbnail dans le HTML
+							$pattern = '/(<div[^>]*class="[^"]*product-thumbnail[^"]*"[^>]*>)(.*?)(<\/div>)/is';
+							
+							// Si on trouve un product-thumbnail sans notre classe, le remplacer
+							if ( preg_match( $pattern, $html, $matches ) ) {
+								$thumbnail_content = $matches[2];
+								// Vérifier si notre vignette n'est pas déjà présente
+								if ( strpos( $thumbnail_content, 'wc-pc13-cart-clock-wrapper' ) === false ) {
+									$new_thumbnail = $matches[1] . $preview_html . $matches[3];
+									$html = str_replace( $matches[0], $new_thumbnail, $html );
+								}
+							}
+						}
+					}
+				}
+				
+				$fragments[ $key ] = $html;
+			}
+		}
+
+		return $fragments;
 	}
 
 	/**
