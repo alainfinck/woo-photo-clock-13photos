@@ -176,17 +176,30 @@ class WC_PC13_Ajax {
 			}
 		}
 
-		// Créer une vignette redimensionnée (max côté = $thumb_max_size)
-		// Utiliser l'URL de l'attachment WordPress avec une taille spécifique si disponible
+		// Récupérer le slot pour déterminer si c'est une photo périphérique
+		$slot = isset( $_POST['slot'] ) ? sanitize_text_field( wp_unslash( $_POST['slot'] ) ) : '';
+		$is_peripheral = false;
+		if ( $slot && $slot !== 'center' && $slot !== 'Centre' ) {
+			$slot_num = absint( $slot );
+			if ( $slot_num >= 1 && $slot_num <= 12 ) {
+				$is_peripheral = true;
+			}
+		}
+
+		// Créer une vignette redimensionnée pour les photos périphériques (max 2000px)
 		$thumb_url = $full_url;
-		if ( $attachment_id > 0 ) {
-			// Essayer d'utiliser une taille WordPress standard d'abord (medium ou thumbnail)
+		if ( $attachment_id > 0 && $is_peripheral ) {
+			// Créer une vignette de 2000px max pour les photos périphériques
+			$thumb_url = $this->create_peripheral_thumbnail( $attachment_id, $uploaded['file'], $thumb_max_size );
+			if ( ! $thumb_url ) {
+				$thumb_url = $full_url;
+			}
+		} elseif ( $attachment_id > 0 ) {
+			// Pour les autres images (centre), utiliser les tailles WordPress standard
 			$thumb_url = wp_get_attachment_image_url( $attachment_id, 'medium' );
 			if ( ! $thumb_url ) {
 				$thumb_url = wp_get_attachment_image_url( $attachment_id, 'thumbnail' );
 			}
-			// Si aucune taille standard n'est disponible, utiliser l'URL complète
-			// (WordPress générera automatiquement les thumbnails lors de la génération des métadonnées)
 			if ( ! $thumb_url ) {
 				$thumb_url = $full_url;
 			}
@@ -204,6 +217,140 @@ class WC_PC13_Ajax {
 				'attachment_id' => $attachment_id,
 			)
 		);
+	}
+
+	/**
+	 * Crée une vignette optimisée pour les photos périphériques (max 2000px).
+	 *
+	 * @param int    $attachment_id ID de l'attachment.
+	 * @param string $file_path     Chemin du fichier original.
+	 * @param int    $max_size      Taille maximale en pixels (défaut: 2000).
+	 * @return string|false URL de la vignette ou false en cas d'erreur.
+	 */
+	private function create_peripheral_thumbnail( $attachment_id, $file_path, $max_size = 2000 ) {
+		if ( ! $attachment_id || ! file_exists( $file_path ) ) {
+			return false;
+		}
+
+		// Obtenir les dimensions de l'image originale
+		$image_meta = wp_get_attachment_metadata( $attachment_id );
+		if ( ! $image_meta || ! isset( $image_meta['width'] ) || ! isset( $image_meta['height'] ) ) {
+			// Si les métadonnées ne sont pas disponibles, les lire depuis le fichier
+			$image_info = wp_getimagesize( $file_path );
+			if ( ! $image_info ) {
+				return false;
+			}
+			$original_width  = $image_info[0];
+			$original_height = $image_info[1];
+		} else {
+			$original_width  = $image_meta['width'];
+			$original_height = $image_meta['height'];
+		}
+
+		// Si l'image est déjà plus petite que max_size, retourner l'URL originale
+		if ( $original_width <= $max_size && $original_height <= $max_size ) {
+			return wp_get_attachment_url( $attachment_id );
+		}
+
+		// Calculer les nouvelles dimensions en conservant le ratio
+		$ratio = min( $max_size / $original_width, $max_size / $original_height );
+		$new_width  = (int) round( $original_width * $ratio );
+		$new_height = (int) round( $original_height * $ratio );
+
+		// Vérifier si une vignette de cette taille existe déjà
+		$upload_dir = wp_upload_dir();
+		$file_info  = pathinfo( $file_path );
+		$thumb_filename = $file_info['filename'] . '-pc13-' . $max_size . '.' . $file_info['extension'];
+		$thumb_path = $file_info['dirname'] . '/' . $thumb_filename;
+		
+		// Construire l'URL relative depuis le répertoire d'upload
+		$relative_path = str_replace( $upload_dir['basedir'], '', $thumb_path );
+		$thumb_url = $upload_dir['baseurl'] . $relative_path;
+
+		// Si la vignette existe déjà, retourner son URL
+		if ( file_exists( $thumb_path ) ) {
+			return $thumb_url;
+		}
+
+		// Charger l'image selon son type
+		$image = false;
+		$mime_type = get_post_mime_type( $attachment_id );
+		
+		switch ( $mime_type ) {
+			case 'image/jpeg':
+				$image = imagecreatefromjpeg( $file_path );
+				break;
+			case 'image/png':
+				$image = imagecreatefrompng( $file_path );
+				break;
+			case 'image/gif':
+				$image = imagecreatefromgif( $file_path );
+				break;
+			case 'image/webp':
+				if ( function_exists( 'imagecreatefromwebp' ) ) {
+					$image = imagecreatefromwebp( $file_path );
+				}
+				break;
+		}
+
+		if ( ! $image ) {
+			return false;
+		}
+
+		// Créer la nouvelle image redimensionnée
+		$thumb = imagecreatetruecolor( $new_width, $new_height );
+		if ( ! $thumb ) {
+			imagedestroy( $image );
+			return false;
+		}
+
+		// Préserver la transparence pour PNG et GIF
+		if ( in_array( $mime_type, array( 'image/png', 'image/gif' ), true ) ) {
+			imagealphablending( $thumb, false );
+			imagesavealpha( $thumb, true );
+			$transparent = imagecolorallocatealpha( $thumb, 255, 255, 255, 127 );
+			imagefill( $thumb, 0, 0, $transparent );
+		}
+
+		// Redimensionner l'image avec une qualité élevée
+		imagecopyresampled(
+			$thumb,
+			$image,
+			0, 0, 0, 0,
+			$new_width,
+			$new_height,
+			$original_width,
+			$original_height
+		);
+
+		// Sauvegarder la vignette
+		$saved = false;
+		switch ( $mime_type ) {
+			case 'image/jpeg':
+				$saved = imagejpeg( $thumb, $thumb_path, 90 ); // Qualité 90%
+				break;
+			case 'image/png':
+				$saved = imagepng( $thumb, $thumb_path, 9 ); // Compression 9
+				break;
+			case 'image/gif':
+				$saved = imagegif( $thumb, $thumb_path );
+				break;
+			case 'image/webp':
+				if ( function_exists( 'imagewebp' ) ) {
+					$saved = imagewebp( $thumb, $thumb_path, 90 );
+				}
+				break;
+		}
+
+		// Nettoyer la mémoire
+		imagedestroy( $image );
+		imagedestroy( $thumb );
+
+		if ( ! $saved ) {
+			return false;
+		}
+
+		return $thumb_url;
 	}
 
 	/**
