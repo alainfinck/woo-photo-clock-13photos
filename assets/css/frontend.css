@@ -2987,6 +2987,69 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	margin-bottom: 8px;
 }
 
+/* Style pour la liste des options du configurateur dans le panier */
+.wc-pc13-cart-summary {
+	margin-top: 8px;
+}
+
+.wc-pc13-cart-options-list {
+	list-style: none;
+	padding: 0;
+	margin: 0;
+}
+
+.wc-pc13-cart-options-list .wc-pc13-cart-option {
+	margin-bottom: 6px;
+	font-size: 13px;
+	line-height: 1.5;
+	color: #555;
+}
+
+.wc-pc13-cart-options-list .wc-pc13-cart-option:last-child {
+	margin-bottom: 0;
+}
+
+.wc-pc13-cart-options-list .wc-pc13-cart-option strong {
+	font-weight: 600;
+	color: #333;
+	margin-right: 4px;
+}
+
+.wc-pc13-cart-color-indicator {
+	display: inline-block;
+	width: 12px;
+	height: 12px;
+	border-radius: 50%;
+	margin-left: 4px;
+	vertical-align: middle;
+	border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.wc-pc13-cart-download-buttons {
+	margin-top: 10px;
+	display: flex;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+
+.wc-pc13-cart-download-btn {
+	display: inline-block;
+	padding: 6px 12px;
+	background-color: #f5f5f5;
+	border: 1px solid #ddd;
+	border-radius: 4px;
+	color: #333;
+	text-decoration: none;
+	font-size: 12px;
+	transition: background-color 0.2s;
+}
+
+.wc-pc13-cart-download-btn:hover {
+	background-color: #e8e8e8;
+	color: #333;
+	text-decoration: none;
+}
+
 /* Améliorer la mise en page du panier latéral */
 .widget_shopping_cart .cart_list li {
 	padding: 16px 0;

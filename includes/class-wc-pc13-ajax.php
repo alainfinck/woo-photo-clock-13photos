@@ -98,45 +98,73 @@ class WC_PC13_Ajax {
 		require_once ABSPATH . 'wp-admin/includes/file.php';
 		require_once ABSPATH . 'wp-admin/includes/image.php';
 
-		$uploaded = wp_handle_upload(
-			$file,
-			array(
-				'test_form' => false,
-			)
-		);
-
-		if ( isset( $uploaded['error'] ) ) {
-			wp_send_json_error( array( 'message' => $uploaded['error'] ) );
+		// Vérifier les limites PHP avant l'upload
+		$upload_max_filesize = wp_max_upload_size();
+		
+		// Vérifier que le fichier ne dépasse pas les limites PHP
+		if ( $file['size'] > $upload_max_filesize ) {
+			wp_send_json_error( array( 
+				'message' => sprintf(
+					/* translators: %s: taille maximale */
+					__( 'Le fichier dépasse la limite PHP (upload_max_filesize: %s).', 'wc-photo-clock-13' ),
+					size_format( $upload_max_filesize )
+				)
+			) );
 		}
 
-		$attachment = array(
-			'post_mime_type' => $uploaded['type'],
-			'post_title'     => sanitize_file_name( basename( $uploaded['file'] ) ),
-			'post_content'   => '',
-			'post_status'    => 'inherit',
-		);
-
-		$attachment_id = wp_insert_attachment( $attachment, $uploaded['file'] );
-
-		if ( ! is_wp_error( $attachment_id ) ) {
-			$metadata = wp_generate_attachment_metadata( $attachment_id, $uploaded['file'] );
-			wp_update_attachment_metadata( $attachment_id, $metadata );
+		// Augmenter temporairement la limite de mémoire si nécessaire
+		$current_memory_limit = $this->parse_size( ini_get( 'memory_limit' ) );
+		if ( $current_memory_limit > 0 ) {
+			$estimated_memory_needed = $file['size'] * 3; // Estimation: 3x la taille du fichier pour le traitement
+			if ( $estimated_memory_needed > $current_memory_limit ) {
+				$new_memory_limit = max( 256, ceil( $estimated_memory_needed / 1024 / 1024 ) * 1.5 ); // 50% de marge, minimum 256M
+				@ini_set( 'memory_limit', $new_memory_limit . 'M' );
+			}
 		}
 
-		// Créer une vignette redimensionnée (max côté = $thumb_max_size)
-		$thumb_url = $uploaded['url'];
-		if ( ! is_wp_error( $attachment_id ) ) {
-			$image_editor = wp_get_image_editor( $uploaded['file'] );
-			if ( ! is_wp_error( $image_editor ) ) {
-				$image_editor->resize( $thumb_max_size, $thumb_max_size, false );
-				$saved = $image_editor->save();
-				if ( ! is_wp_error( $saved ) && ! empty( $saved['path'] ) ) {
-					$upload_dir = wp_upload_dir();
-					if ( ! empty( $saved['file'] ) ) {
-						$thumb_url = trailingslashit( $upload_dir['baseurl'] ) . $saved['file'];
-					}
+		try {
+			$uploaded = wp_handle_upload(
+				$file,
+				array(
+					'test_form' => false,
+				)
+			);
+
+			if ( isset( $uploaded['error'] ) ) {
+				wp_send_json_error( array( 'message' => $uploaded['error'] ) );
+			}
+
+			$attachment = array(
+				'post_mime_type' => $uploaded['type'],
+				'post_title'     => sanitize_file_name( basename( $uploaded['file'] ) ),
+				'post_content'   => '',
+				'post_status'    => 'inherit',
+			);
+
+			$attachment_id = wp_insert_attachment( $attachment, $uploaded['file'] );
+
+			if ( is_wp_error( $attachment_id ) ) {
+				wp_send_json_error( array( 'message' => $attachment_id->get_error_message() ) );
+			}
+
+			if ( $attachment_id > 0 ) {
+				// Générer les métadonnées avec gestion d'erreur
+				$metadata = wp_generate_attachment_metadata( $attachment_id, $uploaded['file'] );
+				if ( is_wp_error( $metadata ) ) {
+					// Si la génération des métadonnées échoue, continuer quand même
+					error_log( 'WC_PC13: Erreur génération métadonnées: ' . $metadata->get_error_message() );
+				} else {
+					wp_update_attachment_metadata( $attachment_id, $metadata );
 				}
 			}
+		} catch ( Exception $e ) {
+			wp_send_json_error( array( 
+				'message' => sprintf(
+					/* translators: %s: message d'erreur */
+					__( 'Erreur lors du traitement du fichier: %s', 'wc-photo-clock-13' ),
+					$e->getMessage()
+				)
+			) );
 		}
 
 		// Utiliser wp_get_attachment_url pour obtenir l'URL correcte de l'image originale
@@ -148,6 +176,27 @@ class WC_PC13_Ajax {
 			}
 		}
 
+		// Créer une vignette redimensionnée (max côté = $thumb_max_size)
+		// Utiliser l'URL de l'attachment WordPress avec une taille spécifique si disponible
+		$thumb_url = $full_url;
+		if ( $attachment_id > 0 ) {
+			// Essayer d'utiliser une taille WordPress standard d'abord (medium ou thumbnail)
+			$thumb_url = wp_get_attachment_image_url( $attachment_id, 'medium' );
+			if ( ! $thumb_url ) {
+				$thumb_url = wp_get_attachment_image_url( $attachment_id, 'thumbnail' );
+			}
+			// Si aucune taille standard n'est disponible, utiliser l'URL complète
+			// (WordPress générera automatiquement les thumbnails lors de la génération des métadonnées)
+			if ( ! $thumb_url ) {
+				$thumb_url = $full_url;
+			}
+		}
+
+		// S'assurer que thumb_url est valide, sinon utiliser full_url
+		if ( empty( $thumb_url ) ) {
+			$thumb_url = $full_url;
+		}
+
 		wp_send_json_success(
 			array(
 				'url'           => $thumb_url,
@@ -155,6 +204,34 @@ class WC_PC13_Ajax {
 				'attachment_id' => $attachment_id,
 			)
 		);
+	}
+
+	/**
+	 * Suppression éventuelle des images.
+	 */
+	/**
+	 * Parse une valeur de taille PHP (ex: "128M", "2G") en bytes.
+	 *
+	 * @param string $size Valeur de taille.
+	 * @return int Taille en bytes.
+	 */
+	private function parse_size( $size ) {
+		$size = trim( $size );
+		$last = strtolower( $size[ strlen( $size ) - 1 ] );
+		$size = (int) $size;
+		
+		switch ( $last ) {
+			case 'g':
+				$size *= 1024;
+				// Pas de break, continuer avec M
+			case 'm':
+				$size *= 1024;
+				// Pas de break, continuer avec K
+			case 'k':
+				$size *= 1024;
+		}
+		
+		return $size;
 	}
 
 	/**

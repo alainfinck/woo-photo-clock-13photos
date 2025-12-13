@@ -39,6 +39,186 @@ class WC_PC13_Cart {
 		add_action( 'woocommerce_email_after_order_table', array( $this, 'render_email_summary' ), 10, 4 );
 		add_filter( 'woocommerce_hidden_order_itemmeta', array( $this, 'hide_config_meta' ), 10, 1 );
 		add_filter( 'woocommerce_order_item_display_meta_key', array( $this, 'hide_config_meta_key' ), 10, 1 );
+		add_action( 'wp_ajax_wc_pc13_generate_order_pdf', array( $this, 'generate_order_pdf' ) );
+	}
+
+	/**
+	 * Convertit un code couleur hexadécimal en nom lisible.
+	 *
+	 * @param string $color_code Code couleur hexadécimal.
+	 * @return string Nom de la couleur ou code si non trouvé.
+	 */
+	private function get_color_name( $color_code ) {
+		$color_code = strtolower( trim( $color_code ) );
+
+		$color_map = array(
+			'#111111' => __( 'Noir', 'wc-photo-clock-13' ),
+			'#ffffff' => __( 'Blanc', 'wc-photo-clock-13' ),
+			'#777777' => __( 'Gris', 'wc-photo-clock-13' ),
+			'#cc1f1a' => __( 'Rouge', 'wc-photo-clock-13' ),
+		);
+
+		if ( substr( $color_code, 0, 1 ) !== '#' ) {
+			$color_code = '#' . $color_code;
+		}
+
+		return isset( $color_map[ $color_code ] ) ? $color_map[ $color_code ] : $color_code;
+	}
+
+	/**
+	 * Génère un PDF directement depuis un canvas GD sans fichier intermédiaire.
+	 *
+	 * @param resource $canvas Ressource GD du canvas.
+	 * @param string   $pdf_path Chemin de sortie du PDF.
+	 * @param int      $width_pt Largeur en points (1/72 inch).
+	 * @param int      $height_pt Hauteur en points.
+	 * @return bool
+	 */
+	private function generate_pdf_from_canvas( $canvas, $pdf_path, $width_pt, $height_pt ) {
+		if ( ! $canvas ) {
+			return false;
+		}
+		
+		// Vérifier que c'est une ressource GD valide (PHP < 8) ou un objet GdImage (PHP >= 8)
+		if ( ! is_resource( $canvas ) && ! ( is_object( $canvas ) && $canvas instanceof \GdImage ) ) {
+			return false;
+		}
+
+		$img_w = imagesx( $canvas );
+		$img_h = imagesy( $canvas );
+
+		if ( $img_w <= 0 || $img_h <= 0 ) {
+			return false;
+		}
+
+		// Capturer le JPEG en mémoire depuis le canvas
+		ob_start();
+		imagejpeg( $canvas, null, 98 );
+		$jpeg_data = ob_get_clean();
+
+		if ( false === $jpeg_data || empty( $jpeg_data ) ) {
+			return false;
+		}
+
+		// Ajuster les dimensions cible si non fournies
+		if ( $width_pt <= 0 || $height_pt <= 0 ) {
+			$width_pt  = max( $img_w, 1 );
+			$height_pt = max( $img_h, 1 );
+		}
+
+		$objects   = array();
+		$offsets   = array();
+		$buffer    = "%PDF-1.4\n";
+
+		// 1. Catalog
+		$offsets[] = strlen( $buffer );
+		$buffer   .= "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n";
+
+		// 2. Pages
+		$offsets[] = strlen( $buffer );
+		$buffer   .= "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n";
+
+		// 3. Page
+		$offsets[] = strlen( $buffer );
+		$buffer   .= "3 0 obj\n<< /Type /Page /Parent 2 0 R /Resources << /XObject << /Im0 4 0 R >> >> /MediaBox [0 0 {$width_pt} {$height_pt}] /Contents 5 0 R >>\nendobj\n";
+
+		// 4. Image XObject
+		$length_img = strlen( $jpeg_data );
+		$offsets[]  = strlen( $buffer );
+		$buffer    .= "4 0 obj\n<< /Type /XObject /Subtype /Image /Width {$img_w} /Height {$img_h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length {$length_img} >>\nstream\n";
+		$buffer    .= $jpeg_data . "\nendstream\nendobj\n";
+
+		// 5. Page content stream
+		$content = "q {$width_pt} 0 0 {$height_pt} 0 0 cm /Im0 Do Q";
+		$len_ct  = strlen( $content );
+		$offsets[] = strlen( $buffer );
+		$buffer   .= "5 0 obj\n<< /Length {$len_ct} >>\nstream\n{$content}\nendstream\nendobj\n";
+
+		// xref
+		$xref_pos = strlen( $buffer );
+		$buffer  .= "xref\n0 6\n0000000000 65535 f \n";
+		foreach ( $offsets as $off ) {
+			$buffer .= sprintf( "%010d 00000 n \n", $off );
+		}
+
+		// trailer
+		$buffer .= "trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n{$xref_pos}\n%%EOF";
+
+		return false !== file_put_contents( $pdf_path, $buffer );
+	}
+
+	/**
+	 * Génère un PDF minimal avec une seule image JPEG sans dépendre d'Imagick.
+	 *
+	 * @param string $jpeg_path Chemin du JPEG source.
+	 * @param string $pdf_path  Chemin de sortie du PDF.
+	 * @param int    $width_pt  Largeur en points (1/72 inch).
+	 * @param int    $height_pt Hauteur en points.
+	 * @return bool
+	 */
+	private function generate_pdf_from_jpeg( $jpeg_path, $pdf_path, $width_pt, $height_pt ) {
+		if ( ! file_exists( $jpeg_path ) ) {
+			return false;
+		}
+
+		$jpeg_data = file_get_contents( $jpeg_path );
+		if ( false === $jpeg_data ) {
+			return false;
+		}
+
+		// Récupérer dimensions du JPEG pour ajuster l'échelle
+		$image_info = getimagesize( $jpeg_path );
+		if ( empty( $image_info[0] ) || empty( $image_info[1] ) ) {
+			return false;
+		}
+		$img_w = (int) $image_info[0];
+		$img_h = (int) $image_info[1];
+
+		// Ajuster les dimensions cible si non fournies
+		if ( $width_pt <= 0 || $height_pt <= 0 ) {
+			$width_pt  = max( $img_w, 1 );
+			$height_pt = max( $img_h, 1 );
+		}
+
+		$objects   = array();
+		$offsets   = array();
+		$buffer    = "%PDF-1.4\n";
+
+		// 1. Catalog
+		$offsets[] = strlen( $buffer );
+		$buffer   .= "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n";
+
+		// 2. Pages
+		$offsets[] = strlen( $buffer );
+		$buffer   .= "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n";
+
+		// 3. Page
+		$offsets[] = strlen( $buffer );
+		$buffer   .= "3 0 obj\n<< /Type /Page /Parent 2 0 R /Resources << /XObject << /Im0 4 0 R >> >> /MediaBox [0 0 {$width_pt} {$height_pt}] /Contents 5 0 R >>\nendobj\n";
+
+		// 4. Image XObject
+		$length_img = strlen( $jpeg_data );
+		$offsets[]  = strlen( $buffer );
+		$buffer    .= "4 0 obj\n<< /Type /XObject /Subtype /Image /Width {$img_w} /Height {$img_h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length {$length_img} >>\nstream\n";
+		$buffer    .= $jpeg_data . "\nendstream\nendobj\n";
+
+		// 5. Page content stream
+		$content = "q {$width_pt} 0 0 {$height_pt} 0 0 cm /Im0 Do Q";
+		$len_ct  = strlen( $content );
+		$offsets[] = strlen( $buffer );
+		$buffer   .= "5 0 obj\n<< /Length {$len_ct} >>\nstream\n{$content}\nendstream\nendobj\n";
+
+		// xref
+		$xref_pos = strlen( $buffer );
+		$buffer  .= "xref\n0 6\n0000000000 65535 f \n";
+		foreach ( $offsets as $off ) {
+			$buffer .= sprintf( "%010d 00000 n \n", $off );
+		}
+
+		// trailer
+		$buffer .= "trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n{$xref_pos}\n%%EOF";
+
+		return false !== file_put_contents( $pdf_path, $buffer );
 	}
 
 	/**
@@ -83,8 +263,9 @@ class WC_PC13_Cart {
 			echo '<div style="padding:8px;background:#fff;border-radius:4px;border:1px solid #e0e0e0;"><strong>' . esc_html__( 'Style d\'aiguilles', 'wc-photo-clock-13' ) . ':</strong><br><span style="color:#666;">' . esc_html( $hands_label ) . '</span></div>';
 		}
 		if ( ! empty( $data['color'] ) ) {
-			$color_display = sanitize_hex_color( $data['color'] );
-			echo '<div style="padding:8px;background:#fff;border-radius:4px;border:1px solid #e0e0e0;"><strong>' . esc_html__( 'Couleur', 'wc-photo-clock-13' ) . ':</strong><br><span style="display:inline-block;width:20px;height:20px;background:' . esc_attr( $color_display ) . ';border:1px solid #ccc;border-radius:3px;vertical-align:middle;margin-right:5px;"></span><span style="color:#666;">' . esc_html( $color_display ) . '</span></div>';
+			$color_code = sanitize_hex_color( $data['color'] );
+			$color_name = $this->get_color_name( $color_code );
+			echo '<div style="padding:8px;background:#fff;border-radius:4px;border:1px solid #e0e0e0;"><strong>' . esc_html__( 'Couleur des aiguilles', 'wc-photo-clock-13' ) . ':</strong><br><span style="display:inline-block;width:20px;height:20px;background:' . esc_attr( $color_code ) . ';border:1px solid #ccc;border-radius:3px;vertical-align:middle;margin-right:5px;"></span><span style="color:#666;">' . esc_html( $color_name ) . '</span></div>';
 		}
 		if ( isset( $data['ring_size'] ) ) {
 			echo '<div style="padding:8px;background:#fff;border-radius:4px;border:1px solid #e0e0e0;"><strong>' . esc_html__( 'Taille photos périphériques', 'wc-photo-clock-13' ) . ':</strong><br><span style="color:#666;">' . esc_html( absint( $data['ring_size'] ) ) . ' px</span></div>';
@@ -114,33 +295,50 @@ class WC_PC13_Cart {
 		}
 		echo '</div>'; // Fin de la grille
 
+		// Boutons de téléchargement
+		echo '<div style="display:flex;gap:10px;margin-bottom:15px;flex-wrap:wrap;">';
+		
 		$preview_meta = $item->get_meta( 'wc_pc13_preview', true );
+		$preview_url = '';
 		if ( $preview_meta ) {
 			$preview_data = json_decode( $preview_meta, true );
-			$preview_url  = '';
 			if ( ! empty( $preview_data['url'] ) ) {
 				$preview_url = esc_url( $preview_data['url'] );
 			} elseif ( ! empty( $preview_data['id'] ) ) {
 				$preview_url = esc_url( wp_get_attachment_url( absint( $preview_data['id'] ) ) );
 			}
 			if ( $preview_url ) {
-				echo '<p><a class="button" href="' . esc_url( $preview_url ) . '" target="_blank" rel="noopener noreferrer">' . esc_html__( 'Télécharger l’aperçu JPEG', 'wc-photo-clock-13' ) . '</a></p>';
+				echo '<a class="button" href="' . esc_url( $preview_url ) . '" target="_blank" rel="noopener noreferrer">' . esc_html__( 'Télécharger l’aperçu JPEG', 'wc-photo-clock-13' ) . '</a>';
 			}
 		}
 
+		// Toujours afficher le bouton PDF - utiliser le PDF sauvegardé ou générer à la volée
+		$pdf_url = '';
 		$pdf_meta = $item->get_meta( 'wc_pc13_pdf', true );
 		if ( $pdf_meta ) {
 			$pdf_data = json_decode( $pdf_meta, true );
-			$pdf_url  = '';
 			if ( ! empty( $pdf_data['url'] ) ) {
 				$pdf_url = esc_url( $pdf_data['url'] );
 			} elseif ( ! empty( $pdf_data['id'] ) ) {
 				$pdf_url = esc_url( wp_get_attachment_url( absint( $pdf_data['id'] ) ) );
 			}
-			if ( $pdf_url ) {
-				echo '<p><a class="button" href="' . esc_url( $pdf_url ) . '" target="_blank" rel="noopener noreferrer">' . esc_html__( 'Télécharger le PDF HD', 'wc-photo-clock-13' ) . '</a></p>';
-			}
 		}
+		
+		// Afficher le bouton PDF - générer à la volée si nécessaire
+		if ( $pdf_url && $pdf_meta ) {
+			// PDF déjà sauvegardé
+			echo '<a class="button button-primary" href="' . esc_url( $pdf_url ) . '" target="_blank" rel="noopener noreferrer">' . esc_html__( 'Télécharger le visuel HD PDF', 'wc-photo-clock-13' ) . '</a>';
+		} elseif ( $preview_url ) {
+			// Générer le PDF à partir du preview - toujours utiliser la fonction de génération
+			$generate_pdf_url = wp_nonce_url(
+				admin_url( 'admin-ajax.php?action=wc_pc13_generate_order_pdf&item_id=' . absint( $item_id ) ),
+				'wc_pc13_generate_pdf_' . absint( $item_id ),
+				'nonce'
+			);
+			echo '<a class="button button-primary wc-pc13-generate-pdf-btn" href="' . esc_url( $generate_pdf_url ) . '" data-item-id="' . absint( $item_id ) . '" target="_blank" rel="noopener noreferrer">' . esc_html__( 'Télécharger le visuel HD PDF', 'wc-photo-clock-13' ) . '</a>';
+		}
+		
+		echo '</div>';
 
 		$center = isset( $data['center'] ) && is_array( $data['center'] ) ? $data['center'] : array();
 		$slots  = isset( $data['slots'] ) && is_array( $data['slots'] ) ? $data['slots'] : array();
@@ -287,6 +485,723 @@ class WC_PC13_Cart {
 		<?php
 
 		echo '</div>';
+	}
+
+	/**
+	 * Construit un canvas haute résolution à partir de la configuration et des images sources.
+	 *
+	 * @param array $config Configuration complète.
+	 * @param int   $base_size Taille de base en pixels.
+	 * @return resource|false Ressource GD ou false en cas d'erreur.
+	 */
+	private function build_high_res_canvas( $config, $base_size = 360 ) {
+		// Calculer la taille de sortie (comme côté frontend: Math.max(4096, Math.ceil(baseSize * 4)))
+		$output_size = max( 4096, (int) ceil( $base_size * 4 ) );
+		$scale_factor = $output_size / $base_size;
+		
+		// Créer le canvas GD
+		if ( ! function_exists( 'imagecreatetruecolor' ) ) {
+			return false;
+		}
+		
+		$canvas = imagecreatetruecolor( $output_size, $output_size );
+		if ( ! $canvas ) {
+			return false;
+		}
+		
+		// Activer la transparence pour le canvas
+		imagealphablending( $canvas, false );
+		imagesavealpha( $canvas, true );
+		
+		// Fond blanc
+		$white = imagecolorallocate( $canvas, 255, 255, 255 );
+		imagefill( $canvas, 0, 0, $white );
+		
+		// Réactiver le blending pour les dessins suivants
+		imagealphablending( $canvas, true );
+		
+		$center_x = $output_size / 2;
+		$center_y = $output_size / 2;
+		
+		// Couleur de fond de l'horloge
+		$bg_color = isset( $config['background_color'] ) ? $config['background_color'] : '#fafafa';
+		$bg_rgb = $this->hex_to_rgb( $bg_color );
+		$bg_gd = imagecolorallocate( $canvas, $bg_rgb['r'], $bg_rgb['g'], $bg_rgb['b'] );
+		
+		// Dessiner le cercle de fond
+		imagefilledellipse( $canvas, $center_x, $center_y, $output_size, $output_size, $bg_gd );
+		
+		// Récupérer les paramètres
+		$ring_size = isset( $config['ring_size'] ) ? absint( $config['ring_size'] ) : 110;
+		$slot_size = $ring_size * $scale_factor;
+		$ring_radius_screen = max( ( $base_size / 2 ) - ( $ring_size / 2 ) - 35, 50 );
+		$ring_radius = $ring_radius_screen * $scale_factor;
+		
+		$center_size_state = isset( $config['center']['size'] ) && $config['center']['size'] > 0 
+			? absint( $config['center']['size'] ) 
+			: 120; // CENTER_MIN_SIZE
+		$center_size = $center_size_state * $scale_factor;
+		
+		$numbers_distance = isset( $config['numbers']['distance'] ) && $config['numbers']['distance'] >= 0
+			? absint( $config['numbers']['distance'] )
+			: 0;
+		$numbers_radius = $numbers_distance * $scale_factor;
+		
+		// Charger et dessiner les slots périphériques (seulement si activés)
+		$show_slots = isset( $config['show_slots'] ) ? wc_string_to_bool( $config['show_slots'] ) : true;
+		$slots = isset( $config['slots'] ) && is_array( $config['slots'] ) ? $config['slots'] : array();
+		
+		if ( $show_slots ) {
+			for ( $i = 1; $i <= 12; $i++ ) {
+			$slot = isset( $slots[ $i ] ) ? $slots[ $i ] : array();
+			
+			// Récupérer l'URL de l'image source (priorité à image_url pour HD, pas image_url_display qui est le thumbnail)
+			$image_url = '';
+			if ( ! empty( $slot['image_url'] ) ) {
+				$image_url = $slot['image_url'];
+			} elseif ( ! empty( $slot['attachment_id'] ) ) {
+				// Utiliser l'image originale en haute résolution, pas le thumbnail
+				$attachment_id = absint( $slot['attachment_id'] );
+				$image_url = wp_get_attachment_image_url( $attachment_id, 'full' );
+				if ( ! $image_url ) {
+					$image_url = wp_get_attachment_url( $attachment_id );
+				}
+			}
+			
+			if ( empty( $image_url ) ) {
+				continue;
+			}
+			
+			// Charger l'image
+			$slot_image = $this->load_image_resource( $image_url );
+			if ( ! $slot_image ) {
+				continue;
+			}
+			
+			// Calculer l'angle pour positionner le slot 12 en haut
+			$base_angle = ( $i == 12 ? 0 : $i ) * 30;
+			$angle_deg = ( $base_angle + 180 ) % 360;
+			$angle_rad = deg2rad( $angle_deg );
+			$slot_center_x = $center_x + sin( $angle_rad ) * $ring_radius;
+			$slot_center_y = $center_y - cos( $angle_rad ) * $ring_radius;
+			
+			// Récupérer les transformations
+			$scale = isset( $slot['scale'] ) ? floatval( $slot['scale'] ) : 1.0;
+			$x_offset = isset( $slot['x'] ) ? floatval( $slot['x'] ) : 0.0;
+			$y_offset = isset( $slot['y'] ) ? floatval( $slot['y'] ) : 0.0;
+			
+			// Dessiner l'ombre portée si activée
+			if ( isset( $config['slot_shadow']['enabled'] ) && $config['slot_shadow']['enabled'] ) {
+				$shadow_radius = $slot_size / 2;
+				$shadow_x = $slot_center_x + 4 * $scale_factor;
+				$shadow_y = $slot_center_y + 4 * $scale_factor;
+				$shadow_color = imagecolorallocatealpha( $canvas, 0, 0, 0, 64 ); // rgba(0,0,0,0.25)
+				imagefilledellipse( $canvas, $shadow_x, $shadow_y, $slot_size, $slot_size, $shadow_color );
+			}
+			
+			// Dessiner l'image circulaire
+			$this->draw_circular_image_gd( $canvas, $slot_center_x, $slot_center_y, $slot_size, $slot_image, array(
+				'scale' => $scale,
+				'x'     => $x_offset,
+				'y'     => $y_offset,
+			), $scale_factor );
+			
+			// Dessiner la bordure si activée
+			if ( isset( $config['slot_border']['enabled'] ) && $config['slot_border']['enabled'] ) {
+				$border_width = isset( $config['slot_border']['width'] ) ? absint( $config['slot_border']['width'] ) : 2;
+				$border_color_hex = isset( $config['slot_border']['color'] ) ? $config['slot_border']['color'] : '#000000';
+				$border_rgb = $this->hex_to_rgb( $border_color_hex );
+				$border_gd = imagecolorallocate( $canvas, $border_rgb['r'], $border_rgb['g'], $border_rgb['b'] );
+				imagesetthickness( $canvas, $border_width * $scale_factor );
+				imageellipse( $canvas, $slot_center_x, $slot_center_y, $slot_size, $slot_size, $border_gd );
+			}
+			
+			imagedestroy( $slot_image );
+			}
+		}
+		
+		// Charger et dessiner l'image centrale
+		$center = isset( $config['center'] ) && is_array( $config['center'] ) ? $config['center'] : array();
+		if ( ! empty( $center['image_url'] ) || ! empty( $center['attachment_id'] ) ) {
+			$center_image_url = '';
+			if ( ! empty( $center['image_url'] ) ) {
+				$center_image_url = $center['image_url'];
+			} elseif ( ! empty( $center['attachment_id'] ) ) {
+				// Utiliser l'image originale en haute résolution
+				$attachment_id = absint( $center['attachment_id'] );
+				$center_image_url = wp_get_attachment_image_url( $attachment_id, 'full' );
+				if ( ! $center_image_url ) {
+					$center_image_url = wp_get_attachment_url( $attachment_id );
+				}
+			}
+			
+			if ( $center_image_url ) {
+				$center_image = $this->load_image_resource( $center_image_url );
+				if ( $center_image ) {
+					$center_scale = isset( $center['scale'] ) ? floatval( $center['scale'] ) : 1.0;
+					$center_x_offset = isset( $center['x'] ) ? floatval( $center['x'] ) : 0.0;
+					$center_y_offset = isset( $center['y'] ) ? floatval( $center['y'] ) : 0.0;
+					
+					$this->draw_circular_image_gd( $canvas, $center_x, $center_y, $center_size, $center_image, array(
+						'scale' => $center_scale,
+						'x'     => $center_x_offset,
+						'y'     => $center_y_offset,
+					), $scale_factor );
+					
+					imagedestroy( $center_image );
+				}
+			}
+		}
+		
+		// Dessiner les chiffres si activés
+		if ( isset( $config['show_numbers'] ) && wc_string_to_bool( $config['show_numbers'] ) ) {
+			$number_type = isset( $config['numbers']['number_type'] ) ? $config['numbers']['number_type'] : ( isset( $config['number_type'] ) ? $config['number_type'] : 'arabic' );
+			$intermediate_points = isset( $config['numbers']['intermediate_points'] ) ? $config['numbers']['intermediate_points'] : ( isset( $config['intermediate_points'] ) ? $config['intermediate_points'] : 'without' );
+			$number_size = isset( $config['numbers']['size'] ) ? max( 12, absint( $config['numbers']['size'] ) ) : 32;
+			$font_size = $number_size * $scale_factor;
+			$number_color_hex = isset( $config['numbers']['color'] ) ? $config['numbers']['color'] : '#222222';
+			$number_rgb = $this->hex_to_rgb( $number_color_hex );
+			$number_color_gd = imagecolorallocate( $canvas, $number_rgb['r'], $number_rgb['g'], $number_rgb['b'] );
+			
+			$shadow_enabled = isset( $config['numbers']['shadow']['enabled'] ) && $config['numbers']['shadow']['enabled'];
+			$shadow_intensity = $shadow_enabled ? ( isset( $config['numbers']['shadow']['intensity'] ) ? absint( $config['numbers']['shadow']['intensity'] ) : 5 ) : 0;
+			$glow_enabled = isset( $config['numbers']['glow']['enabled'] ) && $config['numbers']['glow']['enabled'];
+			$glow_intensity = $glow_enabled ? ( isset( $config['numbers']['glow']['intensity'] ) ? absint( $config['numbers']['glow']['intensity'] ) : 10 ) : 0;
+			
+			// Utiliser imagettftext si disponible, sinon imagestring
+			$use_ttf = function_exists( 'imagettftext' );
+			$font_path = '';
+			if ( $use_ttf ) {
+				// Chercher une police système
+				$system_fonts = array(
+					'/System/Library/Fonts/Helvetica.ttc',
+					'/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+					'/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
+					'/Windows/Fonts/arial.ttf',
+				);
+				foreach ( $system_fonts as $font ) {
+					if ( file_exists( $font ) ) {
+						$font_path = $font;
+						break;
+					}
+				}
+				// Si aucune police système trouvée, utiliser imagestring
+				if ( empty( $font_path ) ) {
+					$use_ttf = false;
+				}
+			}
+			
+			for ( $i = 1; $i <= 12; $i++ ) {
+				$angle_deg = ( $i === 12 ? 0 : $i ) * 30;
+				$angle_rad = deg2rad( $angle_deg );
+				$number_x = $center_x + sin( $angle_rad ) * $numbers_radius;
+				$number_y = $center_y - cos( $angle_rad ) * $numbers_radius;
+				
+				$display_text = $this->get_dial_display_text( $i, $number_type, $intermediate_points );
+				
+				// Calculer la taille du texte pour le centrer correctement
+				$text_box = $use_ttf && $font_path 
+					? imagettfbbox( $font_size, 0, $font_path, $display_text )
+					: array( 0, 0, strlen( $display_text ) * imagefontwidth( 5 ), imagefontheight( 5 ) );
+				$text_width = $use_ttf && $font_path 
+					? abs( $text_box[4] - $text_box[0] )
+					: strlen( $display_text ) * imagefontwidth( 5 );
+				$text_height = $use_ttf && $font_path
+					? abs( $text_box[5] - $text_box[1] )
+					: imagefontheight( 5 );
+				$text_x = $number_x - ( $text_width / 2 );
+				$text_y = $number_y + ( $text_height / 2 );
+				
+				// Dessiner le halo lumineux d'abord (derrière)
+				if ( $glow_enabled && $glow_intensity > 0 ) {
+					// Simuler le glow avec plusieurs passes
+					for ( $j = 0; $j < 3; $j++ ) {
+						$glow_alpha = 30 - ( $j * 10 );
+						$glow_color = imagecolorallocatealpha( $canvas, $number_rgb['r'], $number_rgb['g'], $number_rgb['b'], $glow_alpha );
+						if ( $use_ttf && $font_path ) {
+							imagettftext( $canvas, $font_size, 0, $text_x, $text_y, $glow_color, $font_path, $display_text );
+						} else {
+							imagestring( $canvas, 5, $text_x, $text_y - $text_height, $display_text, $glow_color );
+						}
+					}
+				}
+				
+				// Dessiner l'ombre portée
+				if ( $shadow_enabled && $shadow_intensity > 0 ) {
+					$shadow_offset = $shadow_intensity * 0.5 * $scale_factor;
+					$shadow_alpha = 77; // 0.3 * 255
+					$shadow_color = imagecolorallocatealpha( $canvas, 0, 0, 0, $shadow_alpha );
+					if ( $use_ttf && $font_path ) {
+						imagettftext( $canvas, $font_size, 0, $text_x, $text_y + $shadow_offset, $shadow_color, $font_path, $display_text );
+					} else {
+						imagestring( $canvas, 5, $text_x, $text_y - $text_height + $shadow_offset, $display_text, $shadow_color );
+					}
+				}
+				
+				// Dessiner le texte principal
+				if ( $use_ttf && $font_path ) {
+					imagettftext( $canvas, $font_size, 0, $text_x, $text_y, $number_color_gd, $font_path, $display_text );
+				} else {
+					imagestring( $canvas, 5, $text_x, $text_y - $text_height, $display_text, $number_color_gd );
+				}
+			}
+		}
+		
+		// Dessiner les aiguilles de l'horloge
+		$hands_color_hex = isset( $config['color'] ) ? $config['color'] : '#111111';
+		$hands_rgb = $this->hex_to_rgb( $hands_color_hex );
+		$hands_color = imagecolorallocate( $canvas, $hands_rgb['r'], $hands_rgb['g'], $hands_rgb['b'] );
+		
+		// Aiguille des heures (position 3h pour l'exemple)
+		$hour_length = $output_size * 0.208; // ~150px pour 720px de base
+		$hour_width = max( 2, $output_size * 0.011 ); // ~8px pour 720px
+		$hour_angle = 90; // 3h = 90 degrés
+		$this->draw_hand( $canvas, $center_x, $center_y, $hour_length, $hour_width, $hour_angle, $hands_color, $scale_factor );
+		
+		// Aiguille des minutes (position 12h pour l'exemple)
+		$minute_length = $output_size * 0.306; // ~220px pour 720px
+		$minute_width = max( 1, $output_size * 0.008 ); // ~6px pour 720px
+		$minute_angle = 0; // 12h = 0 degrés
+		$this->draw_hand( $canvas, $center_x, $center_y, $minute_length, $minute_width, $minute_angle, $hands_color, $scale_factor );
+		
+		// Aiguille des secondes (trotteuse) si activée
+		$second_hand = isset( $config['second_hand'] ) ? $config['second_hand'] : 'black';
+		if ( $second_hand !== 'none' ) {
+			$second_color_hex = ( $second_hand === 'red' ) ? '#cc1f1a' : '#111111';
+			$second_rgb = $this->hex_to_rgb( $second_color_hex );
+			$second_color = imagecolorallocate( $canvas, $second_rgb['r'], $second_rgb['g'], $second_rgb['b'] );
+			$second_length = $output_size * 0.306; // ~220px
+			$second_width = max( 1, $output_size * 0.003 ); // ~2px
+			$second_angle = 270; // 9h = 270 degrés pour l'exemple
+			$this->draw_hand( $canvas, $center_x, $center_y, $second_length, $second_width, $second_angle, $second_color, $scale_factor );
+		}
+		
+		// Centre des aiguilles
+		$center_size_hands = max( 8, $output_size * 0.044 ); // ~32px pour 720px
+		$center_color = imagecolorallocate( $canvas, 17, 17, 17 ); // #111111
+		imagefilledellipse( $canvas, $center_x, $center_y, $center_size_hands, $center_size_hands, $center_color );
+		
+		// Dessiner la bordure du cercle
+		$border_width = max( 6, $output_size * 0.006 );
+		$border_color = imagecolorallocate( $canvas, 17, 17, 17 ); // #111111
+		imagesetthickness( $canvas, $border_width );
+		imageellipse( $canvas, $center_x, $center_y, $output_size - $border_width, $output_size - $border_width, $border_color );
+		
+		return $canvas;
+	}
+	
+	/**
+	 * Convertit une couleur hexadécimale en RGB.
+	 *
+	 * @param string $hex Code couleur hexadécimal.
+	 * @return array Tableau avec r, g, b.
+	 */
+	private function hex_to_rgb( $hex ) {
+		$hex = str_replace( '#', '', $hex );
+		if ( strlen( $hex ) == 3 ) {
+			$hex = $hex[0] . $hex[0] . $hex[1] . $hex[1] . $hex[2] . $hex[2];
+		}
+		return array(
+			'r' => hexdec( substr( $hex, 0, 2 ) ),
+			'g' => hexdec( substr( $hex, 2, 2 ) ),
+			'b' => hexdec( substr( $hex, 4, 2 ) ),
+		);
+	}
+	
+	/**
+	 * Charge une image depuis une URL et retourne une ressource GD.
+	 *
+	 * @param string $url URL de l'image.
+	 * @return resource|false Ressource GD ou false.
+	 */
+	private function load_image_resource( $url ) {
+		if ( empty( $url ) ) {
+			return false;
+		}
+		
+		// Convertir l'URL en chemin local si possible
+		$upload_dir = wp_upload_dir();
+		$local_path = str_replace( $upload_dir['baseurl'], $upload_dir['basedir'], $url );
+		
+		if ( file_exists( $local_path ) ) {
+			$image_info = getimagesize( $local_path );
+			if ( ! $image_info ) {
+				return false;
+			}
+			
+			$image = false;
+			switch ( $image_info[2] ) {
+				case IMAGETYPE_JPEG:
+					$image = imagecreatefromjpeg( $local_path );
+					break;
+				case IMAGETYPE_PNG:
+					$image = imagecreatefrompng( $local_path );
+					if ( $image ) {
+						imagealphablending( $image, false );
+						imagesavealpha( $image, true );
+					}
+					break;
+				case IMAGETYPE_GIF:
+					$image = imagecreatefromgif( $local_path );
+					break;
+				case IMAGETYPE_WEBP:
+					$image = imagecreatefromwebp( $local_path );
+					if ( $image ) {
+						imagealphablending( $image, false );
+						imagesavealpha( $image, true );
+					}
+					break;
+				default:
+					return false;
+			}
+			return $image;
+		}
+		
+		// Fallback: télécharger l'image
+		$response = wp_remote_get( $url );
+		if ( is_wp_error( $response ) ) {
+			return false;
+		}
+		
+		$image_data = wp_remote_retrieve_body( $response );
+		if ( empty( $image_data ) ) {
+			return false;
+		}
+		
+		$temp_file = wp_tempnam();
+		file_put_contents( $temp_file, $image_data );
+		
+		$image_info = getimagesize( $temp_file );
+		if ( ! $image_info ) {
+			@unlink( $temp_file );
+			return false;
+		}
+		
+		$image = false;
+		switch ( $image_info[2] ) {
+			case IMAGETYPE_JPEG:
+				$image = imagecreatefromjpeg( $temp_file );
+				break;
+			case IMAGETYPE_PNG:
+				$image = imagecreatefrompng( $temp_file );
+				if ( $image ) {
+					imagealphablending( $image, false );
+					imagesavealpha( $image, true );
+				}
+				break;
+			case IMAGETYPE_GIF:
+				$image = imagecreatefromgif( $temp_file );
+				break;
+			case IMAGETYPE_WEBP:
+				$image = imagecreatefromwebp( $temp_file );
+				if ( $image ) {
+					imagealphablending( $image, false );
+					imagesavealpha( $image, true );
+				}
+				break;
+		}
+		
+		@unlink( $temp_file );
+		return $image;
+	}
+	
+	/**
+	 * Dessine une image circulaire sur le canvas GD avec transformations.
+	 *
+	 * @param resource $canvas Canvas GD.
+	 * @param float    $center_x Centre X.
+	 * @param float    $center_y Centre Y.
+	 * @param float    $diameter Diamètre.
+	 * @param resource $image Ressource image GD.
+	 * @param array    $transform État de transformation (scale, x, y).
+	 * @param float    $scale_factor Facteur d'échelle.
+	 */
+	private function draw_circular_image_gd( $canvas, $center_x, $center_y, $diameter, $image, $transform, $scale_factor = 1.0 ) {
+		if ( ! $image || ! $canvas ) {
+			return;
+		}
+		
+		$radius = $diameter / 2;
+		$image_width = imagesx( $image );
+		$image_height = imagesy( $image );
+		
+		// Créer une image temporaire avec transparence
+		$temp = imagecreatetruecolor( $diameter, $diameter );
+		imagealphablending( $temp, false );
+		imagesavealpha( $temp, true );
+		$transparent = imagecolorallocatealpha( $temp, 0, 0, 0, 127 );
+		imagefill( $temp, 0, 0, $transparent );
+		imagealphablending( $temp, true );
+		
+		// Calculer les dimensions de dessin avec le zoom
+		$scale = isset( $transform['scale'] ) ? floatval( $transform['scale'] ) : 1.0;
+		$base_scale = max( $diameter / $image_width, $diameter / $image_height );
+		$final_scale = $base_scale * $scale;
+		$draw_width = $image_width * $final_scale;
+		$draw_height = $image_height * $final_scale;
+		
+		// Calculer les offsets
+		$x_offset_pct = isset( $transform['x'] ) ? floatval( $transform['x'] ) : 0.0;
+		$y_offset_pct = isset( $transform['y'] ) ? floatval( $transform['y'] ) : 0.0;
+		$translate_x = ( $x_offset_pct / 100 ) * $diameter;
+		$translate_y = ( $y_offset_pct / 100 ) * $diameter;
+		$offset_x = ( $diameter - $draw_width ) / 2 + $translate_x;
+		$offset_y = ( $diameter - $draw_height ) / 2 + $translate_y;
+		
+		// Redimensionner et positionner l'image avec préservation de la transparence
+		imagealphablending( $image, true );
+		imagecopyresampled(
+			$temp,
+			$image,
+			$offset_x,
+			$offset_y,
+			0,
+			0,
+			$draw_width,
+			$draw_height,
+			$image_width,
+			$image_height
+		);
+		
+		// Appliquer le masque circulaire de manière optimisée
+		imagealphablending( $temp, false );
+		imagesavealpha( $temp, true );
+		
+		// Appliquer le masque circulaire en parcourant les pixels
+		$radius_sq = $radius * $radius;
+		$transparent_color = imagecolorallocatealpha( $temp, 0, 0, 0, 127 );
+		
+		// Parcourir les pixels pour appliquer le masque circulaire
+		for ( $x = 0; $x < $diameter; $x++ ) {
+			for ( $y = 0; $y < $diameter; $y++ ) {
+				$dx = $x - $radius;
+				$dy = $y - $radius;
+				$distance_sq = $dx * $dx + $dy * $dy;
+				
+				if ( $distance_sq > $radius_sq ) {
+					// Pixel en dehors du cercle : rendre transparent
+					imagesetpixel( $temp, $x, $y, $transparent_color );
+				}
+			}
+		}
+		
+		imagealphablending( $temp, true );
+		
+		// Copier sur le canvas principal avec préservation de la transparence
+		imagealphablending( $canvas, true );
+		// Utiliser imagecopymerge pour préserver la transparence
+		imagecopymerge(
+			$canvas,
+			$temp,
+			(int) ( $center_x - $radius ),
+			(int) ( $center_y - $radius ),
+			0,
+			0,
+			(int) $diameter,
+			(int) $diameter,
+			100
+		);
+		
+		imagedestroy( $temp );
+	}
+	
+	/**
+	 * Dessine une aiguille d'horloge sur le canvas.
+	 *
+	 * @param resource $canvas Canvas GD.
+	 * @param float    $center_x Centre X.
+	 * @param float    $center_y Centre Y.
+	 * @param float    $length Longueur de l'aiguille.
+	 * @param float    $width Largeur de l'aiguille.
+	 * @param float    $angle Angle en degrés (0 = haut, 90 = droite).
+	 * @param int      $color Couleur GD.
+	 * @param float    $scale_factor Facteur d'échelle.
+	 */
+	private function draw_hand( $canvas, $center_x, $center_y, $length, $width, $angle, $color, $scale_factor = 1.0 ) {
+		$angle_rad = deg2rad( $angle );
+		
+		// Calculer les points de l'aiguille (rectangle arrondi)
+		$end_x = $center_x + sin( $angle_rad ) * $length;
+		$end_y = $center_y - cos( $angle_rad ) * $length;
+		
+		// Angle perpendiculaire pour la largeur
+		$perp_angle = $angle_rad + ( M_PI / 2 );
+		$half_width = $width / 2;
+		
+		// Points du rectangle
+		$p1_x = $center_x + cos( $perp_angle ) * $half_width;
+		$p1_y = $center_y + sin( $perp_angle ) * $half_width;
+		$p2_x = $end_x + cos( $perp_angle ) * $half_width;
+		$p2_y = $end_y + sin( $perp_angle ) * $half_width;
+		$p3_x = $end_x - cos( $perp_angle ) * $half_width;
+		$p3_y = $end_y - sin( $perp_angle ) * $half_width;
+		$p4_x = $center_x - cos( $perp_angle ) * $half_width;
+		$p4_y = $center_y - sin( $perp_angle ) * $half_width;
+		
+		// Dessiner le rectangle arrondi
+		$points = array(
+			(int) $p1_x, (int) $p1_y,
+			(int) $p2_x, (int) $p2_y,
+			(int) $p3_x, (int) $p3_y,
+			(int) $p4_x, (int) $p4_y,
+		);
+		
+		imagefilledpolygon( $canvas, $points, 4, $color );
+		
+		// Dessiner une ombre portée légère
+		$shadow_offset = 2 * $scale_factor;
+		$shadow_color = imagecolorallocatealpha( $canvas, 0, 0, 0, 77 ); // rgba(0,0,0,0.3)
+		$shadow_points = array(
+			(int) ( $p1_x + $shadow_offset ), (int) ( $p1_y + $shadow_offset ),
+			(int) ( $p2_x + $shadow_offset ), (int) ( $p2_y + $shadow_offset ),
+			(int) ( $p3_x + $shadow_offset ), (int) ( $p3_y + $shadow_offset ),
+			(int) ( $p4_x + $shadow_offset ), (int) ( $p4_y + $shadow_offset ),
+		);
+		imagefilledpolygon( $canvas, $shadow_points, 4, $shadow_color );
+		
+		// Redessiner l'aiguille par-dessus l'ombre
+		imagefilledpolygon( $canvas, $points, 4, $color );
+	}
+
+	/**
+	 * Retourne le texte à afficher pour un chiffre d'horloge.
+	 *
+	 * @param int    $number Numéro (1-12).
+	 * @param string $type Type (arabic ou roman).
+	 * @param string $intermediate Points intermédiaires (with ou without).
+	 * @return string Texte à afficher.
+	 */
+	private function get_dial_display_text( $number, $type = 'arabic', $intermediate = 'without' ) {
+		if ( 'roman' === $type ) {
+			$romans = array( 1 => 'I', 2 => 'II', 3 => 'III', 4 => 'IV', 5 => 'V', 6 => 'VI', 7 => 'VII', 8 => 'VIII', 9 => 'IX', 10 => 'X', 11 => 'XI', 12 => 'XII' );
+			return isset( $romans[ $number ] ) ? $romans[ $number ] : (string) $number;
+		}
+		
+		if ( 'with' === $intermediate ) {
+			// Afficher avec points intermédiaires (ex: 1• pour 1)
+			return $number . '•';
+		}
+		
+		return (string) $number;
+	}
+
+	/**
+	 * Génère un PDF HD à partir de la configuration et des images sources d'un item de commande.
+	 */
+	public function generate_order_pdf() {
+		$item_id = isset( $_GET['item_id'] ) ? absint( $_GET['item_id'] ) : 0;
+		$nonce = isset( $_GET['nonce'] ) ? sanitize_text_field( wp_unslash( $_GET['nonce'] ) ) : '';
+
+		if ( ! $item_id || ! wp_verify_nonce( $nonce, 'wc_pc13_generate_pdf_' . $item_id ) ) {
+			wp_die( esc_html__( 'Erreur de sécurité.', 'wc-photo-clock-13' ) );
+		}
+
+		// Récupérer l'item de commande
+		$order_item = new WC_Order_Item_Product( $item_id );
+		if ( ! $order_item->get_id() ) {
+			wp_die( esc_html__( 'Item de commande introuvable.', 'wc-photo-clock-13' ) );
+		}
+
+		// Récupérer la configuration complète
+		$config_meta = $order_item->get_meta( 'wc_pc13_config', true );
+		if ( ! $config_meta ) {
+			wp_die( esc_html__( 'Configuration introuvable.', 'wc-photo-clock-13' ) );
+		}
+
+		$config = json_decode( $config_meta, true );
+		if ( empty( $config ) || ! is_array( $config ) ) {
+			wp_die( esc_html__( 'Configuration invalide.', 'wc-photo-clock-13' ) );
+		}
+
+		$diameter = isset( $config['diameter'] ) ? absint( $config['diameter'] ) : 40;
+		$pdf_size_mm = $diameter * 10; // Convertir cm en mm
+		$pdf_width_points  = $pdf_size_mm * 2.83465; // 1 mm = 2.83465 points
+		$pdf_height_points = $pdf_size_mm * 2.83465;
+
+		// Vérifier que GD est disponible
+		if ( ! function_exists( 'imagecreatetruecolor' ) ) {
+			wp_die( esc_html__( 'GD n\'est pas disponible sur ce serveur.', 'wc-photo-clock-13' ) );
+		}
+
+		// Construire le canvas HD à partir des images sources
+		$base_size = 360; // Taille de base comme côté frontend
+		$canvas = $this->build_high_res_canvas( $config, $base_size );
+		
+		if ( ! $canvas ) {
+			wp_die( esc_html__( 'Erreur lors de la création du canvas HD.', 'wc-photo-clock-13' ) );
+		}
+
+		// Calculer la taille cible pour le PDF en haute résolution (300 DPI)
+		$dpi = 300;
+		$pdf_size_inches = $pdf_size_mm / 25.4; // Convertir mm en pouces
+		$target_pixels = (int) ( $pdf_size_inches * $dpi ); // Taille en pixels à 300 DPI
+		
+		// Redimensionner le canvas pour correspondre à la taille du PDF en haute résolution
+		$canvas_width = imagesx( $canvas );
+		$canvas_height = imagesy( $canvas );
+		
+		if ( $canvas_width !== $target_pixels || $canvas_height !== $target_pixels ) {
+			// Créer un nouveau canvas à la taille cible
+			$resized_canvas = imagecreatetruecolor( $target_pixels, $target_pixels );
+			if ( $resized_canvas ) {
+				imagealphablending( $resized_canvas, false );
+				imagesavealpha( $resized_canvas, true );
+				// Redimensionner avec un filtre de haute qualité
+				imagecopyresampled(
+					$resized_canvas,
+					$canvas,
+					0, 0, 0, 0,
+					$target_pixels,
+					$target_pixels,
+					$canvas_width,
+					$canvas_height
+				);
+				imagedestroy( $canvas );
+				$canvas = $resized_canvas;
+			}
+		}
+
+		// Générer le PDF directement depuis le canvas GD
+		$upload_dir = wp_upload_dir();
+		$pdf_filename = 'wc-pc13-order-' . $item_id . '-' . time() . '.pdf';
+		$pdf_path = $upload_dir['path'] . '/' . $pdf_filename;
+
+		// Générer le PDF directement depuis le canvas GD (sans JPEG intermédiaire)
+		if ( ! $this->generate_pdf_from_canvas( $canvas, $pdf_path, (int) $pdf_width_points, (int) $pdf_height_points ) ) {
+			imagedestroy( $canvas );
+			wp_die( esc_html__( 'Erreur lors de la génération du PDF.', 'wc-photo-clock-13' ) );
+		}
+
+		imagedestroy( $canvas );
+
+		// Créer l'attachment
+		$attachment = array(
+			'post_mime_type' => 'application/pdf',
+			'post_title'     => sanitize_text_field( 'Horloge PDF HD - Commande ' . $order_item->get_order_id() ),
+			'post_content'   => '',
+			'post_status'    => 'inherit',
+		);
+
+		$attachment_id = wp_insert_attachment( $attachment, $pdf_path );
+		if ( is_wp_error( $attachment_id ) ) {
+			@unlink( $pdf_path );
+			wp_die( esc_html__( 'Erreur lors de l\'enregistrement du PDF.', 'wc-photo-clock-13' ) );
+		}
+
+		require_once ABSPATH . 'wp-admin/includes/image.php';
+		wp_update_attachment_metadata( $attachment_id, wp_generate_attachment_metadata( $attachment_id, $pdf_path ) );
+
+		// Sauvegarder les métadonnées PDF dans l'item
+		$pdf_meta_data = array(
+			'id'  => $attachment_id,
+			'url' => wp_get_attachment_url( $attachment_id ),
+		);
+		$order_item->update_meta_data( 'wc_pc13_pdf', wp_json_encode( $pdf_meta_data ) );
+		$order_item->save();
+
+		// Rediriger vers le PDF
+		wp_redirect( wp_get_attachment_url( $attachment_id ) );
+		exit;
 	}
 
 	/**

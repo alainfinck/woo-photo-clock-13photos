@@ -1471,7 +1471,19 @@ let sharedConfigLoaded = false;
 		if (state.currentSlot === 'center') {
 			return state.center;
 		}
-		return state.slots[state.currentSlot];
+		// S'assurer que le slot existe, sinon l'initialiser
+		const slotKey = typeof state.currentSlot === 'number' ? state.currentSlot : parseInt(state.currentSlot, 10);
+		if (!state.slots[slotKey]) {
+			state.slots[slotKey] = {
+				attachment_id: 0,
+				image_url: '',
+				image_url_display: '',
+				x: 0,
+				y: 0,
+				scale: 1,
+			};
+		}
+		return state.slots[slotKey];
 	}
 
 	// Variable pour suivre si on est en train de déplacer (drag actif)
@@ -1496,21 +1508,57 @@ let sharedConfigLoaded = false;
 			updateRingDimensions();
 		}
 
-		Object.keys(state.slots).forEach((key) => {
-			const slotState = state.slots[key];
-			const slot = configurator.querySelector(`${selectors.slot}[data-slot="${key}"] ${selectors.slotImage}`);
-			const slotInner = configurator.querySelector(`${selectors.slot}[data-slot="${key}"] .wc-pc13-slot-inner`);
+		// Parcourir tous les slots (1-12) pour s'assurer qu'ils sont tous mis à jour
+		for (let i = 1; i <= 12; i++) {
+			const slotState = state.slots[i];
+			if (!slotState) {
+				continue;
+			}
+			
+			const slotKeyStr = String(i);
+			const slot = configurator.querySelector(`${selectors.slot}[data-slot="${slotKeyStr}"] ${selectors.slotImage}`);
+			const slotInner = configurator.querySelector(`${selectors.slot}[data-slot="${slotKeyStr}"] .wc-pc13-slot-inner`);
 			if (!slot) {
-				return;
+				// Ne pas logger pour les slots qui n'existent pas encore
+				continue;
+			}
+			
+			// Debug pour vérifier que l'image est bien définie
+			if (slotState.image_url) {
+				console.log('applyTransforms - Slot', i, 'a une image:', slotState.image_url, 'display:', slotState.image_url_display);
 			}
 
-			if (slotState.image_url && state.showSlots) {
+			// Afficher l'image si elle existe (peu importe showSlots, car l'image peut être chargée même si les slots sont masqués)
+			if (slotState.image_url) {
 				// Utiliser image_url_display (thumbnail) pour l'affichage si disponible, sinon image_url
 				const displayUrl = slotState.image_url_display || slotState.image_url;
-				slot.style.backgroundImage = `url(${displayUrl})`;
-				slot.classList.remove('empty');
-				if (slotInner) {
-					slotInner.classList.add('has-image');
+				if (displayUrl) {
+					// S'assurer que l'URL est correctement formatée
+					const imageUrl = displayUrl.trim();
+					if (imageUrl) {
+						slot.style.backgroundImage = `url("${imageUrl}")`;
+						slot.style.backgroundRepeat = 'no-repeat';
+						slot.style.backgroundSize = 'cover';
+						slot.classList.remove('empty');
+						if (slotInner) {
+							slotInner.classList.add('has-image');
+						}
+						console.log('applyTransforms - Image appliquée sur slot', i, 'URL:', imageUrl);
+					} else {
+						console.warn('applyTransforms - URL vide pour slot', i);
+						slot.style.backgroundImage = '';
+						slot.classList.add('empty');
+						if (slotInner) {
+							slotInner.classList.remove('has-image');
+						}
+					}
+				} else {
+					console.warn('applyTransforms - Pas de displayUrl pour slot', i);
+					slot.style.backgroundImage = '';
+					slot.classList.add('empty');
+					if (slotInner) {
+						slotInner.classList.remove('has-image');
+					}
 				}
 			} else {
 				slot.style.backgroundImage = '';
@@ -1522,14 +1570,35 @@ let sharedConfigLoaded = false;
 
 			const { x, y, scale } = clampTransformValues(slotState);
 			slot.style.transform = 'none';
-			slot.style.backgroundSize = `${scale * 100}%`;
+			
+			// Appliquer les styles de background seulement si l'image existe
+			if (slotState.image_url) {
+				// Utiliser le scale pour le backgroundSize (scale * 100% pour zoomer)
+				const backgroundSizeValue = `${scale * 100}%`;
+				slot.style.backgroundSize = backgroundSizeValue;
+				slot.style.backgroundPosition = `${50 + x}% ${50 + y}%`;
+				slot.style.backgroundRepeat = 'no-repeat';
+				// S'assurer que l'image est visible
+				slot.style.opacity = '1';
+				slot.style.visibility = 'visible';
+				
+				// Debug pour vérifier que le scale est appliqué
+				if (window.WCPC13_DEBUG) {
+					console.log('applyTransforms - Slot', i, 'scale appliqué:', scale, 'backgroundSize:', backgroundSizeValue);
+				}
+			} else {
+				// Si pas d'image, réinitialiser les styles
+				slot.style.backgroundSize = '';
+				slot.style.backgroundPosition = '';
+				slot.style.backgroundRepeat = '';
+			}
+			
 			// Utiliser requestAnimationFrame pour optimiser les mises à jour de backgroundPosition
 			// qui sont coûteuses en termes de performance
 			if (isDragging) {
 				// Pendant le drag, désactiver les transitions pour de meilleures performances
 				slot.style.transition = 'none';
 			}
-			slot.style.backgroundPosition = `${50 + x}% ${50 + y}%`;
 			slot.dataset.axisX = x;
 			slot.dataset.axisY = y;
 			slot.dataset.zoom = scale;
@@ -1561,7 +1630,7 @@ let sharedConfigLoaded = false;
 				slotInner.dataset.axisY = y;
 				slotInner.dataset.zoom = scale;
 			}
-		});
+		}
 
 		const centerWrapper = configurator.querySelector(selectors.center);
 		if (centerWrapper) {
@@ -1659,7 +1728,9 @@ let sharedConfigLoaded = false;
 		const centerPanel = configurator.querySelector(selectors.centerPanel);
 
 		if (zoomRange) {
-			zoomRange.value = current.scale;
+			const scaleValue = current.scale || 1;
+			zoomRange.value = scaleValue;
+			console.log('updateSelectionUI - zoomRange mis à jour pour slot:', state.currentSlot, 'scale:', scaleValue);
 		}
 
 		axisRanges.forEach((range) => {
@@ -1898,7 +1969,9 @@ let sharedConfigLoaded = false;
 				const floatingRemove = floatingControls.querySelector('.wc-pc13-floating-remove');
 				
 				if (floatingZoom) {
-					floatingZoom.value = current.scale;
+					const scaleValue = current.scale || 1;
+					floatingZoom.value = scaleValue;
+					console.log('updateSelectionUI - floatingZoom mis à jour pour slot:', state.currentSlot, 'scale:', scaleValue);
 				}
 				if (floatingAxisX) {
 					floatingAxisX.value = current.x;
@@ -1963,8 +2036,14 @@ let sharedConfigLoaded = false;
 		if (!state.showSlots && slot !== 'center') {
 			state.currentSlot = 'center';
 		} else {
-			state.currentSlot = slot;
+			// Convertir en nombre si c'est un nombre valide
+			if (typeof slot === 'string' && slot !== 'center' && !isNaN(parseInt(slot, 10))) {
+				state.currentSlot = parseInt(slot, 10);
+			} else {
+				state.currentSlot = slot;
+			}
 		}
+		console.log('selectSlot called - slot:', slot, 'state.currentSlot:', state.currentSlot);
 		updateSelectionUI();
 	}
 
@@ -2155,12 +2234,38 @@ function applyUploadedImage(data, targetSlot = null) {
 		}
 
 	// Utiliser explicitement targetSlot si fourni, sinon state.currentSlot, sinon 'center'
-	const slotKey = targetSlot !== null && targetSlot !== undefined ? targetSlot : (state.currentSlot || 'center');
+	let slotKey = targetSlot !== null && targetSlot !== undefined ? targetSlot : (state.currentSlot || 'center');
+	
+	// Convertir en nombre si c'est un slot périphérique (1-12)
+	if (slotKey !== 'center' && slotKey !== 'Centre') {
+		const numKey = parseInt(slotKey, 10);
+		if (!isNaN(numKey) && numKey >= 1 && numKey <= 12) {
+			slotKey = numKey;
+		}
+	}
 	
 	// Debug: vérifier que le slotKey est correct
 	console.log('applyUploadedImage - targetSlot:', targetSlot, 'slotKey:', slotKey, 'state.currentSlot:', state.currentSlot, 'data:', data);
 	
-	const target = slotKey === 'center' ? state.center : state.slots[slotKey] || state.center;
+	// Initialiser le slot s'il n'existe pas
+	if (slotKey !== 'center' && !state.slots[slotKey]) {
+		state.slots[slotKey] = {
+			attachment_id: 0,
+			image_url: '',
+			image_url_display: '',
+			x: 0,
+			y: 0,
+			scale: 1,
+		};
+		console.log('applyUploadedImage - Slot initialisé:', slotKey, state.slots[slotKey]);
+	}
+	
+	const target = slotKey === 'center' ? state.center : state.slots[slotKey];
+	
+	if (!target) {
+		console.error('applyUploadedImage - target introuvable pour slotKey:', slotKey, 'state.slots:', state.slots);
+		return;
+	}
 	
 	console.log('applyUploadedImage - target avant:', JSON.parse(JSON.stringify(target)));
 	
@@ -2245,12 +2350,20 @@ function applyUploadedImage(data, targetSlot = null) {
 			target.scale = 1;
 		}
 	} else {
-		// Slots périphériques : utiliser thumbnail pour l'affichage, full_url pour le PDF
-		target.image_url = data.full_url || data.url || ''; // Pour le PDF/export
-		target.image_url_display = data.url || data.full_url || ''; // Thumbnail pour l'affichage
+		// Slots périphériques : utiliser full_url pour l'affichage et le PDF (car le thumbnail peut ne pas exister)
+		// Si full_url n'existe pas, utiliser url, mais vérifier que l'URL est valide
+		const fullUrl = data.full_url || data.url || '';
+		const thumbUrl = data.url || data.full_url || '';
+		
+		// Utiliser full_url pour les deux car c'est l'URL garantie d'exister
+		target.image_url = fullUrl; // Pour le PDF/export
+		target.image_url_display = fullUrl; // Utiliser full_url pour l'affichage aussi
 		target.x = 0;
 		target.y = 0;
 		target.scale = 1;
+		
+		console.log('applyUploadedImage - Slot périphérique mis à jour:', slotKey, 'image_url:', target.image_url, 'image_url_display:', target.image_url_display, 'full_url:', data.full_url, 'url:', data.url);
+		console.log('applyUploadedImage - state.slots après mise à jour:', JSON.parse(JSON.stringify(state.slots[slotKey])));
 	}
 	
 	console.log('applyUploadedImage - image_url défini:', target.image_url, 'full_url:', data.full_url, 'url:', data.url);
@@ -2278,10 +2391,61 @@ function applyUploadedImage(data, targetSlot = null) {
 			}
 		}
 
-		applyTransforms();
-		updateSelectionUI();
-		savePayload();
+	// Forcer la mise à jour de l'affichage pour le slot spécifique
+	console.log('applyUploadedImage - Appel de applyTransforms() pour slotKey:', slotKey);
+	applyTransforms();
+	updateSelectionUI();
+	savePayload();
+	
+	// Forcer un rafraîchissement visuel supplémentaire pour s'assurer que l'image s'affiche
+	if (slotKey !== 'center') {
+		// Utiliser requestAnimationFrame pour s'assurer que le DOM est à jour
+		requestAnimationFrame(() => {
+			setTimeout(() => {
+				const configurator = document.querySelector(selectors.configurator);
+				if (configurator && state.slots[slotKey]) {
+					const slotKeyStr = String(slotKey);
+					const slot = configurator.querySelector(`${selectors.slot}[data-slot="${slotKeyStr}"] ${selectors.slotImage}`);
+					const slotInner = configurator.querySelector(`${selectors.slot}[data-slot="${slotKeyStr}"] .wc-pc13-slot-inner`);
+					const slotState = state.slots[slotKey];
+					
+					if (slot && slotState && slotState.image_url) {
+						const displayUrl = (slotState.image_url_display || slotState.image_url).trim();
+						if (displayUrl) {
+							// Forcer l'affichage de l'image avec tous les styles nécessaires
+							slot.style.setProperty('background-image', `url("${displayUrl}")`, 'important');
+							slot.style.setProperty('background-repeat', 'no-repeat', 'important');
+							slot.style.setProperty('background-size', `${(slotState.scale || 1) * 100}%`, 'important');
+							slot.style.setProperty('background-position', `${50 + (slotState.x || 0)}% ${50 + (slotState.y || 0)}%`, 'important');
+							slot.style.setProperty('opacity', '1', 'important');
+							slot.style.setProperty('visibility', 'visible', 'important');
+							slot.style.setProperty('display', 'block', 'important');
+							slot.classList.remove('empty');
+							if (slotInner) {
+								slotInner.classList.add('has-image');
+							}
+							console.log('applyUploadedImage - Image forcée sur slot:', slotKey, 'URL:', displayUrl, 'slot trouvé:', !!slot, 'styles appliqués');
+							
+							// Vérifier que l'image est bien chargée
+							const testImg = new Image();
+							testImg.onload = () => {
+								console.log('applyUploadedImage - Image chargée avec succès:', displayUrl);
+							};
+							testImg.onerror = () => {
+								console.error('applyUploadedImage - Erreur de chargement de l\'image:', displayUrl);
+							};
+							testImg.src = displayUrl;
+						} else {
+							console.error('applyUploadedImage - URL vide pour slot:', slotKey);
+						}
+					} else {
+						console.error('applyUploadedImage - Slot ou image_url introuvable:', slotKey, 'slot:', !!slot, 'slotState:', !!slotState, 'image_url:', slotState?.image_url);
+					}
+				}
+			}, 200);
+		});
 	}
+}
 
 	function deleteAttachment(attachmentId) {
 		if (!attachmentId) {
@@ -2316,20 +2480,31 @@ function processFile(file, inputEl) {
 
 	// Déterminer le slot cible en priorité : uploadTargetSlot > dataset.targetSlot > state.currentSlot > 'center'
 	// IMPORTANT: Sauvegarder la valeur AVANT de nettoyer
-	const slotKey = uploadTargetSlot
-		|| (inputEl && inputEl.dataset && inputEl.dataset.targetSlot)
-		|| state.currentSlot
-		|| 'center';
+	let slotKey = uploadTargetSlot;
+	if (!slotKey && inputEl && inputEl.dataset && inputEl.dataset.targetSlot) {
+		// Convertir en nombre si c'est un nombre
+		const datasetSlot = inputEl.dataset.targetSlot;
+		slotKey = (datasetSlot === 'center' || datasetSlot === 'Centre') ? 'center' : (parseInt(datasetSlot, 10) || datasetSlot);
+	}
+	if (!slotKey) {
+		slotKey = state.currentSlot;
+	}
+	if (!slotKey) {
+		slotKey = 'center';
+	}
 	
 	const configurator = document.querySelector(selectors.configurator);
 	
 	// Debug: vérifier que le slotKey est bien défini
-	if (window.WCPC13_DEBUG) {
-		console.log('processFile - slotKey:', slotKey, 'uploadTargetSlot:', uploadTargetSlot, 'state.currentSlot:', state.currentSlot);
-	}
+	console.log('processFile - slotKey:', slotKey, 'uploadTargetSlot:', uploadTargetSlot, 'state.currentSlot:', state.currentSlot, 'inputEl.dataset.targetSlot:', inputEl && inputEl.dataset ? inputEl.dataset.targetSlot : 'N/A');
 	
 	// Nettoyer le targetSlot pour les prochains uploads APRÈS avoir sauvegardé la valeur
-	const savedSlotKey = slotKey; // Sauvegarder explicitement
+	// Convertir savedSlotKey en nombre si c'est un nombre valide (pour les slots périphériques)
+	let savedSlotKey = slotKey;
+	if (typeof slotKey === 'string' && slotKey !== 'center' && !isNaN(parseInt(slotKey, 10))) {
+		savedSlotKey = parseInt(slotKey, 10);
+	}
+	
 	if (inputEl && inputEl.dataset) {
 		delete inputEl.dataset.targetSlot;
 	}
@@ -2431,9 +2606,27 @@ function handleFileChange(event) {
 
 	function handleZoomChange(event) {
 		const current = getCurrentSlotState();
-		current.scale = parseFloat(event.target.value);
-		clampTransformValues(current);
+		if (!current) {
+			console.error('handleZoomChange - current slot state introuvable, state.currentSlot:', state.currentSlot);
+			return;
+		}
+		const newScale = parseFloat(event.target.value);
+		if (isNaN(newScale)) {
+			console.warn('handleZoomChange - valeur de zoom invalide (NaN):', event.target.value);
+			return;
+		}
+		// Mettre à jour le scale dans le state
+		current.scale = newScale;
+		// Clamper les valeurs (cela met aussi à jour current.scale, current.x, current.y)
+		const clamped = clampTransformValues(current);
+		// S'assurer que le scale est bien sauvegardé après le clamp
+		current.scale = clamped.scale;
+		current.x = clamped.x;
+		current.y = clamped.y;
+		console.log('handleZoomChange - Slot:', state.currentSlot, 'nouveau scale:', newScale, 'clamped scale:', clamped.scale, 'current.scale:', current.scale);
+		// Forcer la mise à jour de l'affichage
 		applyTransforms();
+		updateSelectionUI();
 		savePayload();
 	}
 
@@ -2815,11 +3008,6 @@ function handleIntermediatePointsChange(event) {
 					generateThumbnail(1, 0.75)
 				]);
 
-				// Uploader le PDF en arrière-plan (non bloquant)
-				uploadPdfForCart().catch((error) => {
-					console.warn('Erreur lors de l\'upload du PDF (non bloquant):', error);
-				});
-
 				// Récupérer les données du formulaire
 				const productId = configurator ? parseInt(configurator.dataset.product, 10) : 0;
 				const payloadInput = document.querySelector(selectors.payload);
@@ -2827,6 +3015,12 @@ function handleIntermediatePointsChange(event) {
 				const previewUrlInput = document.querySelector(selectors.previewUrlInput);
 				const pdfIdInput = document.querySelector(selectors.pdfIdInput);
 				const pdfUrlInput = document.querySelector(selectors.pdfUrlInput);
+
+				// Générer et uploader le PDF HD de façon bloquante pour garantir la présence des métadonnées
+				const pdfData = await uploadPdfForCart();
+				if (!pdfData || (!pdfData.url && !pdfData.attachment_id)) {
+					throw new Error(WCPC13.labels.preview_error || 'PDF non généré');
+				}
 
 				const formData = new FormData();
 				formData.append('action', 'wc_pc13_add_to_cart');
@@ -2838,16 +3032,20 @@ function handleIntermediatePointsChange(event) {
 					formData.append('payload', payloadInput.value);
 				}
 				if (previewIdInput && previewIdInput.value) {
-					formData.append('preview_id', previewIdInput.value);
+					formData.append('wc_pc13_preview_id', previewIdInput.value);
+					formData.append('preview_id', previewIdInput.value); // compat handler ajax
 				}
 				if (previewUrlInput && previewUrlInput.value) {
-					formData.append('preview_url', previewUrlInput.value);
+					formData.append('wc_pc13_preview_url', previewUrlInput.value);
+					formData.append('preview_url', previewUrlInput.value); // compat handler ajax
 				}
 				if (pdfIdInput && pdfIdInput.value) {
-					formData.append('pdf_id', pdfIdInput.value);
+					formData.append('wc_pc13_pdf_id', pdfIdInput.value);
+					formData.append('pdf_id', pdfIdInput.value); // compat handler ajax
 				}
 				if (pdfUrlInput && pdfUrlInput.value) {
-					formData.append('pdf_url', pdfUrlInput.value);
+					formData.append('wc_pc13_pdf_url', pdfUrlInput.value);
+					formData.append('pdf_url', pdfUrlInput.value); // compat handler ajax
 				}
 
 				const response = await fetch(WCPC13.ajax_url, {
@@ -3317,10 +3515,13 @@ function handleIntermediatePointsChange(event) {
 		uploadButton.addEventListener('click', (event) => {
 			event.preventDefault();
 			// Forcer l'upload sur le slot sélectionné (centre ou périphérique)
-			uploadTargetSlot = state.currentSlot || 'center';
+			// S'assurer que state.currentSlot est bien défini
+			const targetSlot = state.currentSlot || 'center';
+			uploadTargetSlot = targetSlot;
 			if (fileInput && fileInput.dataset) {
-				fileInput.dataset.targetSlot = uploadTargetSlot;
+				fileInput.dataset.targetSlot = targetSlot;
 			}
+			console.log('Upload button clicked - targetSlot:', targetSlot, 'state.currentSlot:', state.currentSlot);
 			fileInput.click();
 		});
 	}

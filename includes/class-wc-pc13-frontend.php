@@ -144,6 +144,30 @@ class WC_PC13_Frontend {
 	}
 
 	/**
+	 * Convertit un code couleur hexadécimal en nom lisible.
+	 *
+	 * @param string $color_code Code couleur hexadécimal.
+	 * @return string Nom de la couleur ou code si non trouvé.
+	 */
+	private function get_color_name( $color_code ) {
+		$color_code = strtolower( trim( $color_code ) );
+		
+		$color_map = array(
+			'#111111' => __( 'Noir', 'wc-photo-clock-13' ),
+			'#ffffff' => __( 'Blanc', 'wc-photo-clock-13' ),
+			'#777777' => __( 'Gris', 'wc-photo-clock-13' ),
+			'#cc1f1a' => __( 'Rouge', 'wc-photo-clock-13' ),
+		);
+		
+		// Normaliser le code couleur (ajouter # si manquant)
+		if ( substr( $color_code, 0, 1 ) !== '#' ) {
+			$color_code = '#' . $color_code;
+		}
+		
+		return isset( $color_map[ $color_code ] ) ? $color_map[ $color_code ] : $color_code;
+	}
+
+	/**
 	 * Affiche les données dans le panier.
 	 *
 	 * @param array $item_data Données d’affichage.
@@ -169,42 +193,99 @@ class WC_PC13_Frontend {
 			}
 		}
 
-		// Construire les badges de réglages
-		$badges = array();
+		// Construire la liste des options point par point
+		$options_list = array();
 		
-		// Badge diamètre avec prix
+		// Diamètre avec prix
 		if ( ! empty( $config['diameter'] ) ) {
 			$diameter = absint( $config['diameter'] );
 			$price = isset( $config['diameter_price'] ) ? floatval( $config['diameter_price'] ) : 59;
-			$badges[] = '<span class="wc-pc13-cart-badge wc-pc13-cart-badge-diameter">' . 
-				sprintf( esc_html__( '%dcm %s€', 'wc-photo-clock-13' ), $diameter, number_format_i18n( $price, 0 ) ) . 
-				'</span>';
+			$options_list[] = sprintf( 
+				'<li class="wc-pc13-cart-option"><strong>%s:</strong> %dcm - %s€</li>',
+				esc_html__( 'Diamètre', 'wc-photo-clock-13' ),
+				$diameter,
+				number_format_i18n( $price, 0 )
+			);
 		}
 		
+		// Style et couleur des aiguilles
 		if ( ! empty( $config['hands'] ) && ! empty( $config['color'] ) ) {
-			$color_display = sanitize_hex_color( $config['color'] );
+			$color_code = sanitize_hex_color( $config['color'] );
+			$color_name = $this->get_color_name( $color_code );
 			$hands_label = ucfirst( sanitize_text_field( $config['hands'] ) );
-			$badges[] = '<span class="wc-pc13-cart-badge wc-pc13-cart-badge-hands">' . 
-				'<span class="wc-pc13-cart-color-indicator" style="background-color: ' . esc_attr( $color_display ) . ';"></span>' .
-				esc_html( $hands_label ) . ' ' . esc_html( $color_display ) . 
-				'</span>';
+			$options_list[] = sprintf(
+				'<li class="wc-pc13-cart-option"><strong>%s:</strong> %s <span class="wc-pc13-cart-color-indicator" style="background-color: %s; display: inline-block; width: 12px; height: 12px; border-radius: 50%%; margin-left: 4px; vertical-align: middle;"></span> %s</li>',
+				esc_html__( 'Aiguilles', 'wc-photo-clock-13' ),
+				esc_html( $hands_label ),
+				esc_attr( $color_code ),
+				esc_html( $color_name )
+			);
 		} elseif ( ! empty( $config['hands'] ) ) {
-			$badges[] = '<span class="wc-pc13-cart-badge wc-pc13-cart-badge-hands">' . esc_html( ucfirst( $config['hands'] ) ) . '</span>';
+			$options_list[] = sprintf(
+				'<li class="wc-pc13-cart-option"><strong>%s:</strong> %s</li>',
+				esc_html__( 'Aiguilles', 'wc-photo-clock-13' ),
+				esc_html( ucfirst( $config['hands'] ) )
+			);
 		} elseif ( ! empty( $config['color'] ) ) {
-			$color_display = sanitize_hex_color( $config['color'] );
-			$badges[] = '<span class="wc-pc13-cart-badge wc-pc13-cart-badge-hands">' . 
-				'<span class="wc-pc13-cart-color-indicator" style="background-color: ' . esc_attr( $color_display ) . ';"></span>' .
-				esc_html( $color_display ) . 
-				'</span>';
-		}
-		if ( array_key_exists( 'show_numbers', $config ) && wc_string_to_bool( $config['show_numbers'] ) ) {
-			$badges[] = '<span class="wc-pc13-cart-badge wc-pc13-cart-badge-numbers">' . esc_html__( 'Chiffres', 'wc-photo-clock-13' ) . '</span>';
+			$color_code = sanitize_hex_color( $config['color'] );
+			$color_name = $this->get_color_name( $color_code );
+			$options_list[] = sprintf(
+				'<li class="wc-pc13-cart-option"><strong>%s:</strong> <span class="wc-pc13-cart-color-indicator" style="background-color: %s; display: inline-block; width: 12px; height: 12px; border-radius: 50%%; margin-left: 4px; vertical-align: middle;"></span> %s</li>',
+				esc_html__( 'Couleur des aiguilles', 'wc-photo-clock-13' ),
+				esc_attr( $color_code ),
+				esc_html( $color_name )
+			);
 		}
 
-		// Construire le HTML compact
-		$summary_parts = array();
-		$summary_parts[] = sprintf( __( '%d photo(s) centrale(s)', 'wc-photo-clock-13' ), $center_has_photo ? 1 : 0 );
-		$summary_parts[] = sprintf( __( '%d photo(s) périphérique(s)', 'wc-photo-clock-13' ), $slots_with_photo );
+		// Trotteuse
+		if ( ! empty( $config['second_hand'] ) ) {
+			$second_hand_labels = array(
+				'red' => esc_html__( 'Rouge', 'wc-photo-clock-13' ),
+				'black' => esc_html__( 'Noir', 'wc-photo-clock-13' ),
+				'none' => esc_html__( 'Pas de trotteuse', 'wc-photo-clock-13' ),
+			);
+			$second_hand_value = isset( $second_hand_labels[ $config['second_hand'] ] ) 
+				? $second_hand_labels[ $config['second_hand'] ] 
+				: esc_html( ucfirst( $config['second_hand'] ) );
+			$options_list[] = sprintf(
+				'<li class="wc-pc13-cart-option"><strong>%s:</strong> %s</li>',
+				esc_html__( 'Trotteuse', 'wc-photo-clock-13' ),
+				$second_hand_value
+			);
+		}
+
+		// Chiffres
+		if ( array_key_exists( 'show_numbers', $config ) && wc_string_to_bool( $config['show_numbers'] ) ) {
+			$number_type_labels = array(
+				'arabic' => esc_html__( 'Arabes', 'wc-photo-clock-13' ),
+				'roman' => esc_html__( 'Romains', 'wc-photo-clock-13' ),
+			);
+			$number_type = isset( $config['number_type'] ) && isset( $number_type_labels[ $config['number_type'] ] )
+				? $number_type_labels[ $config['number_type'] ]
+				: esc_html__( 'Arabes', 'wc-photo-clock-13' );
+			
+			$options_list[] = sprintf(
+				'<li class="wc-pc13-cart-option"><strong>%s:</strong> %s</li>',
+				esc_html__( 'Chiffres', 'wc-photo-clock-13' ),
+				$number_type
+			);
+		}
+
+		// Photos
+		$photo_summary = array();
+		if ( $center_has_photo ) {
+			$photo_summary[] = esc_html__( '1 photo centrale', 'wc-photo-clock-13' );
+		}
+		if ( $slots_with_photo > 0 ) {
+			$photo_summary[] = sprintf( esc_html__( '%d photo(s) périphérique(s)', 'wc-photo-clock-13' ), $slots_with_photo );
+		}
+		if ( ! empty( $photo_summary ) ) {
+			$options_list[] = sprintf(
+				'<li class="wc-pc13-cart-option"><strong>%s:</strong> %s</li>',
+				esc_html__( 'Photos', 'wc-photo-clock-13' ),
+				implode( ', ', $photo_summary )
+			);
+		}
 
 		$preview_url = '';
 		$pdf_url = '';
@@ -227,19 +308,21 @@ class WC_PC13_Frontend {
 
 		$download_buttons = '';
 		if ( $preview_url || $pdf_url ) {
-			$download_buttons = '<div class="wc-pc13-cart-download-buttons">';
+			$download_buttons = '<div class="wc-pc13-cart-download-buttons" style="margin-top: 8px;">';
 			if ( $preview_url ) {
-				$download_buttons .= '<a href="' . esc_url( $preview_url ) . '" target="_blank" rel="noopener noreferrer" class="wc-pc13-cart-download-btn">' . esc_html__( 'JPEG', 'wc-photo-clock-13' ) . '</a>';
+				$download_buttons .= '<a href="' . esc_url( $preview_url ) . '" target="_blank" rel="noopener noreferrer" class="wc-pc13-cart-download-btn">' . esc_html__( 'Télécharger JPEG', 'wc-photo-clock-13' ) . '</a>';
 			}
 			if ( $pdf_url ) {
-				$download_buttons .= '<a href="' . esc_url( $pdf_url ) . '" target="_blank" rel="noopener noreferrer" class="wc-pc13-cart-download-btn">' . esc_html__( 'PDF HD', 'wc-photo-clock-13' ) . '</a>';
+				$download_buttons .= '<a href="' . esc_url( $pdf_url ) . '" target="_blank" rel="noopener noreferrer" class="wc-pc13-cart-download-btn">' . esc_html__( 'Télécharger PDF HD', 'wc-photo-clock-13' ) . '</a>';
 			}
 			$download_buttons .= '</div>';
 		}
 
 		$value_html = '<div class="wc-pc13-cart-summary">';
-		if ( ! empty( $badges ) ) {
-			$value_html .= '<div class="wc-pc13-cart-badges">' . implode( '', $badges ) . '</div>';
+		if ( ! empty( $options_list ) ) {
+			$value_html .= '<ul class="wc-pc13-cart-options-list" style="list-style: none; padding: 0; margin: 0;">';
+			$value_html .= implode( '', $options_list );
+			$value_html .= '</ul>';
 		}
 		if ( $download_buttons ) {
 			$value_html .= $download_buttons;
