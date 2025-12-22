@@ -615,6 +615,31 @@ class WC_PC13_Frontend {
 			}
 		}
 
+		// Sauvegarder les styles des slots (bordure et ombre)
+		if ( ! empty( $payload['slot_border'] ) && is_array( $payload['slot_border'] ) ) {
+			$clean['slot_border'] = array(
+				'enabled' => ! empty( $payload['slot_border']['enabled'] ),
+				'width'   => isset( $payload['slot_border']['width'] ) ? max( 1, min( 10, absint( $payload['slot_border']['width'] ) ) ) : 2,
+				'color'   => isset( $payload['slot_border']['color'] ) ? sanitize_hex_color( $payload['slot_border']['color'] ) : '#000000',
+			);
+		} else {
+			$clean['slot_border'] = array(
+				'enabled' => false,
+				'width'   => 2,
+				'color'   => '#000000',
+			);
+		}
+
+		if ( ! empty( $payload['slot_shadow'] ) && is_array( $payload['slot_shadow'] ) ) {
+			$clean['slot_shadow'] = array(
+				'enabled' => ! empty( $payload['slot_shadow']['enabled'] ),
+			);
+		} else {
+			$clean['slot_shadow'] = array(
+				'enabled' => false,
+			);
+		}
+
 		return $clean;
 	}
 

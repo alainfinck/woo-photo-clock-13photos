@@ -111,19 +111,8 @@ $default_show_slots = isset( $default_show_slots ) ? $default_show_slots : true;
 			<p class="wc-pc13-preview-hint" style="display: none;">
 				<span class="wc-pc13-preview-hint-text"><?php esc_html_e( 'Cliquez sur une image périphérique pour l\'éditer.', 'wc-photo-clock-13' ); ?></span>
 			</p>
-			<div class="wc-pc13-download-actions">
-				<button type="button" class="button button-secondary wc-pc13-download-jpeg">
-					<?php esc_html_e( 'Télécharger JPEG', 'wc-photo-clock-13' ); ?>
-				</button>
-				<button type="button" class="button button-secondary wc-pc13-download-pdf">
-					<?php esc_html_e( 'Télécharger en PDF HD', 'wc-photo-clock-13' ); ?>
-				</button>
-				<button type="button" class="button button-secondary wc-pc13-share-btn">
-					<?php esc_html_e( 'Partager', 'wc-photo-clock-13' ); ?>
-				</button>
-				<button type="button" class="button button-secondary wc-pc13-save-email-btn">
-					<?php esc_html_e( 'Sauvegarder par email', 'wc-photo-clock-13' ); ?>
-				</button>
+			<!-- Actions principales : Ajouter au panier et Télécharger -->
+			<div class="wc-pc13-primary-actions">
 				<button type="button" class="button wc-pc13-add-to-cart-btn">
 					<svg class="wc-pc13-cart-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
 						<path d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm-8 2a2 2 0 1 1-4 0 2 2 0 0 1 4 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -131,8 +120,23 @@ $default_show_slots = isset( $default_show_slots ) ? $default_show_slots : true;
 					<span class="wc-pc13-add-to-cart-text"><?php echo esc_html( $button_text ?? __( 'Ajouter au panier', 'wc-photo-clock-13' ) ); ?></span>
 					<span class="wc-pc13-add-to-cart-price" id="wc-pc13-add-to-cart-price">59€</span>
 				</button>
+				<div class="wc-pc13-download-actions-primary">
+					<button type="button" class="button button-secondary wc-pc13-download-jpeg">
+						<?php esc_html_e( 'Télécharger JPEG', 'wc-photo-clock-13' ); ?>
+					</button>
+					<button type="button" class="button button-secondary wc-pc13-download-pdf">
+						<?php esc_html_e( 'Télécharger en PDF HD', 'wc-photo-clock-13' ); ?>
+					</button>
+				</div>
 			</div>
-			<div class="wc-pc13-demo-actions">
+			<!-- Actions secondaires : Partager, Sauvegarder, Images aléatoires et Recherche -->
+			<div class="wc-pc13-secondary-actions">
+				<button type="button" class="button button-secondary wc-pc13-share-btn">
+					<?php esc_html_e( 'Partager', 'wc-photo-clock-13' ); ?>
+				</button>
+				<button type="button" class="button button-secondary wc-pc13-save-email-btn">
+					<?php esc_html_e( 'Sauvegarder par email', 'wc-photo-clock-13' ); ?>
+				</button>
 				<button type="button" class="button wc-pc13-fill-unsplash">
 					<span class="wc-pc13-fill-unsplash-icon">🎲</span>
 					<?php esc_html_e( 'Charger des photos aléatoires', 'wc-photo-clock-13' ); ?>
