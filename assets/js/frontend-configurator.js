@@ -859,7 +859,7 @@ const CENTER_COVER_THRESHOLD = 3;
 		const scale = widthScale * (transformState?.scale || 1);
 		const drawWidth = image.naturalWidth * scale;
 		const drawHeight = image.naturalHeight * scale;
-		
+
 		// Match CSS background-position: (50 + x)% (50 + y)%
 		// CSS background-position percentage formula: position = (containerSize - imageSize) * percentage
 		const xPercent = 50 + (transformState?.x || 0);
@@ -3128,18 +3128,18 @@ const CENTER_COVER_THRESHOLD = 3;
 		if (!state.numbers.glow) {
 			state.numbers.glow = { enabled: true, intensity: 10, color: '#ffffff' };
 		}
-		
+
 		// Récupérer la valeur du slider
 		const slider = event.target;
 		const min = parseInt(slider.min || 1, 10);
 		const max = parseInt(slider.max || 30, 10);
 		let value = parseInt(slider.value, 10);
-		
+
 		// Si le slider a min=0, convertir 0 en 1 (intensité minimale visible)
 		if (min === 0 && value === 0) {
 			value = 1;
 		}
-		
+
 		// S'assurer que la valeur est dans les limites (1-30)
 		if (!Number.isNaN(value)) {
 			state.numbers.glow.intensity = Math.max(1, Math.min(30, value));
@@ -3195,6 +3195,119 @@ const CENTER_COVER_THRESHOLD = 3;
 		state.numbers.intermediatePoints = event.target.value || 'without';
 		applyTransforms();
 		savePayload();
+	}
+
+	/**
+	 * Crée un overlay de loading élégant avec animation.
+	 */
+	function createLoadingOverlay() {
+		const overlay = document.createElement('div');
+		overlay.className = 'wc-pc13-loading-overlay';
+		overlay.innerHTML = `
+			<div class="wc-pc13-loading-content">
+				<div class="wc-pc13-loading-spinner">
+					<svg viewBox="0 0 50 50" class="wc-pc13-spinner-svg">
+						<circle cx="25" cy="25" r="20" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round">
+							<animate attributeName="stroke-dasharray" dur="1.5s" repeatCount="indefinite" values="1,150;90,150;90,150"/>
+							<animate attributeName="stroke-dashoffset" dur="1.5s" repeatCount="indefinite" values="0;-35;-125"/>
+						</circle>
+					</svg>
+				</div>
+				<div class="wc-pc13-loading-message">Préparation en cours...</div>
+				<div class="wc-pc13-loading-progress">
+					<div class="wc-pc13-loading-progress-bar"></div>
+				</div>
+				<div class="wc-pc13-loading-step">Étape 1/3</div>
+			</div>
+		`;
+
+		// Ajouter les styles inline
+		const style = document.createElement('style');
+		style.textContent = `
+			.wc-pc13-loading-overlay {
+				position: fixed;
+				top: 0;
+				left: 0;
+				right: 0;
+				bottom: 0;
+				background: rgba(0, 0, 0, 0.8);
+				backdrop-filter: blur(8px);
+				-webkit-backdrop-filter: blur(8px);
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				z-index: 999999;
+				opacity: 1;
+				transition: opacity 0.3s ease;
+			}
+			.wc-pc13-loading-overlay.is-hiding {
+				opacity: 0;
+			}
+			.wc-pc13-loading-content {
+				text-align: center;
+				color: #fff;
+				padding: 40px;
+				background: rgba(255, 255, 255, 0.1);
+				border-radius: 20px;
+				border: 1px solid rgba(255, 255, 255, 0.2);
+				min-width: 300px;
+			}
+			.wc-pc13-loading-spinner {
+				width: 80px;
+				height: 80px;
+				margin: 0 auto 24px;
+			}
+			.wc-pc13-spinner-svg {
+				width: 100%;
+				height: 100%;
+				color: #10b981;
+				animation: wc-pc13-rotate 2s linear infinite;
+			}
+			@keyframes wc-pc13-rotate {
+				100% { transform: rotate(360deg); }
+			}
+			.wc-pc13-loading-message {
+				font-size: 18px;
+				font-weight: 500;
+				margin-bottom: 20px;
+				min-height: 27px;
+			}
+			.wc-pc13-loading-progress {
+				width: 100%;
+				height: 6px;
+				background: rgba(255, 255, 255, 0.2);
+				border-radius: 3px;
+				overflow: hidden;
+				margin-bottom: 12px;
+			}
+			.wc-pc13-loading-progress-bar {
+				height: 100%;
+				background: linear-gradient(90deg, #10b981, #3b82f6);
+				border-radius: 3px;
+				width: 33%;
+				transition: width 0.5s ease;
+			}
+			.wc-pc13-loading-step {
+				font-size: 14px;
+				color: rgba(255, 255, 255, 0.7);
+			}
+		`;
+		overlay.appendChild(style);
+		return overlay;
+	}
+
+	/**
+	 * Met à jour le message et la progression du loading overlay.
+	 */
+	function updateLoadingMessage(overlay, message, step, totalSteps) {
+		if (!overlay) return;
+		const messageEl = overlay.querySelector('.wc-pc13-loading-message');
+		const progressBar = overlay.querySelector('.wc-pc13-loading-progress-bar');
+		const stepEl = overlay.querySelector('.wc-pc13-loading-step');
+
+		if (messageEl) messageEl.textContent = message;
+		if (progressBar) progressBar.style.width = `${(step / totalSteps) * 100}%`;
+		if (stepEl) stepEl.textContent = `Étape ${step}/${totalSteps}`;
 	}
 
 	function initCustomAddToCart() {
@@ -3254,14 +3367,32 @@ const CENTER_COVER_THRESHOLD = 3;
 			customBtn.classList.add('is-loading');
 			customBtn.disabled = true;
 
+			// Créer l'overlay de loading élégant
+			const loadingOverlay = createLoadingOverlay();
+			document.body.appendChild(loadingOverlay);
+
 			try {
 				savePayload();
 
-				// Générer la vignette et uploader l'aperçu en parallèle
+				// Étape 1: Génération de l'aperçu
+				updateLoadingMessage(loadingOverlay, 'Préparation de l\'aperçu...', 1, 3);
 				const [previewData, thumbnailDataUrl] = await Promise.all([
 					uploadPreviewForCart(),
 					generateThumbnail(1, 0.75)
 				]);
+
+				// Étape 2: Génération du PDF HD (maintenant bloquant)
+				updateLoadingMessage(loadingOverlay, 'Génération du visuel HD...', 2, 3);
+				let pdfData = null;
+				try {
+					pdfData = await uploadPdfForCart();
+				} catch (pdfError) {
+					console.warn('Génération PDF échouée:', pdfError);
+					// Continuer sans PDF si échec
+				}
+
+				// Étape 3: Ajout au panier
+				updateLoadingMessage(loadingOverlay, 'Ajout au panier...', 3, 3);
 
 				// Récupérer les données du formulaire
 				const productId = configurator ? parseInt(configurator.dataset.product, 10) : 0;
@@ -3271,15 +3402,6 @@ const CENTER_COVER_THRESHOLD = 3;
 				const pdfIdInput = document.querySelector(selectors.pdfIdInput);
 				const pdfUrlInput = document.querySelector(selectors.pdfUrlInput);
 
-				// Générer et uploader le PDF HD en arrière-plan (non bloquant)
-				// Le PDF sera généré après l'ajout au panier pour améliorer les performances
-				const pdfPromise = uploadPdfForCart().catch((error) => {
-					console.warn('Génération PDF en arrière-plan échouée:', error);
-					// Ne pas bloquer l'ajout au panier si le PDF échoue
-					return null;
-				});
-
-				// Ajouter au panier immédiatement sans attendre le PDF
 				const formData = new FormData();
 				formData.append('action', 'wc_pc13_add_to_cart');
 				formData.append('nonce', WCPC13.nonce);
@@ -3291,13 +3413,23 @@ const CENTER_COVER_THRESHOLD = 3;
 				}
 				if (previewIdInput && previewIdInput.value) {
 					formData.append('wc_pc13_preview_id', previewIdInput.value);
-					formData.append('preview_id', previewIdInput.value); // compat handler ajax
+					formData.append('preview_id', previewIdInput.value);
 				}
 				if (previewUrlInput && previewUrlInput.value) {
 					formData.append('wc_pc13_preview_url', previewUrlInput.value);
-					formData.append('preview_url', previewUrlInput.value); // compat handler ajax
+					formData.append('preview_url', previewUrlInput.value);
 				}
-				// Le PDF sera ajouté en arrière-plan une fois généré
+				// Ajouter le PDF HD s'il a été généré
+				if (pdfData && pdfData.attachment_id) {
+					formData.append('wc_pc13_pdf_id', pdfData.attachment_id);
+					formData.append('pdf_id', pdfData.attachment_id);
+					if (pdfIdInput) pdfIdInput.value = pdfData.attachment_id;
+				}
+				if (pdfData && pdfData.url) {
+					formData.append('wc_pc13_pdf_url', pdfData.url);
+					formData.append('pdf_url', pdfData.url);
+					if (pdfUrlInput) pdfUrlInput.value = pdfData.url;
+				}
 
 				const response = await fetch(WCPC13.ajax_url, {
 					method: 'POST',
@@ -3314,19 +3446,9 @@ const CENTER_COVER_THRESHOLD = 3;
 					throw new Error(data?.data?.message || WCPC13.labels.preview_error || 'Erreur lors de l\'ajout au panier');
 				}
 
-				// Mettre à jour le PDF en arrière-plan une fois généré
-				pdfPromise.then((pdfData) => {
-					if (pdfData && (pdfData.url || pdfData.attachment_id)) {
-						if (pdfIdInput) {
-							pdfIdInput.value = pdfData.attachment_id || '';
-						}
-						if (pdfUrlInput) {
-							pdfUrlInput.value = pdfData.url || '';
-						}
-						// Mettre à jour le panier avec le PDF (optionnel, peut être fait plus tard)
-						// On peut aussi laisser le PDF être généré lors de la commande
-					}
-				});
+				// Retirer l'overlay
+				loadingOverlay.classList.add('is-hiding');
+				setTimeout(() => loadingOverlay.remove(), 300);
 
 				// Utiliser la vignette générée ou l'URL de prévisualisation
 				const notificationData = {
@@ -3372,6 +3494,11 @@ const CENTER_COVER_THRESHOLD = 3;
 
 			} catch (error) {
 				console.error(error);
+				// Retirer l'overlay de loading
+				if (loadingOverlay && loadingOverlay.parentNode) {
+					loadingOverlay.classList.add('is-hiding');
+					setTimeout(() => loadingOverlay.remove(), 300);
+				}
 				window.alert(error?.message || WCPC13.labels.preview_error || 'Erreur lors de l\'ajout au panier');
 				customBtn.disabled = false;
 				customBtn.classList.remove('is-loading');
@@ -3621,7 +3748,7 @@ const CENTER_COVER_THRESHOLD = 3;
 				numbersToggleLabel.addEventListener('click', function (e) {
 					// Si le clic est sur un toggle enfant (ombre portée, halo lumineux), permettre le clic
 					const clickedCheckbox = e.target.closest('input[type="checkbox"]');
-					if (clickedCheckbox && 
+					if (clickedCheckbox &&
 						(clickedCheckbox.id === 'wc-pc13-number-shadow-enabled' || clickedCheckbox.id === 'wc-pc13-number-glow-enabled')) {
 						// Laisser passer le clic pour les toggles enfants
 						return;
@@ -3630,7 +3757,7 @@ const CENTER_COVER_THRESHOLD = 3;
 					const clickedToggleLabel = e.target.closest('.wc-pc13-toggle');
 					if (clickedToggleLabel && clickedToggleLabel !== numbersToggleLabel) {
 						const toggleCheckbox = clickedToggleLabel.querySelector('input[type="checkbox"]');
-						if (toggleCheckbox && 
+						if (toggleCheckbox &&
 							(toggleCheckbox.id === 'wc-pc13-number-shadow-enabled' || toggleCheckbox.id === 'wc-pc13-number-glow-enabled')) {
 							// Laisser passer le clic pour les toggles enfants
 							return;
@@ -3704,13 +3831,13 @@ const CENTER_COVER_THRESHOLD = 3;
 				// Empêcher la propagation pour que le clic sur le label toggle ne soit pas intercepté par le label parent
 				shadowToggleLabel.addEventListener('click', (e) => {
 					// Vérifier si le clic est bien sur ce toggle (pas sur un élément des numbers-fields)
-					const isClickOnThisToggle = shadowToggleLabel.contains(e.target) && 
+					const isClickOnThisToggle = shadowToggleLabel.contains(e.target) &&
 						!e.target.closest('.wc-pc13-numbers-fields') &&
-						(e.target === shadowToggleLabel || 
-						 e.target === numberShadowEnabled || 
-						 e.target === shadowToggleLabel.querySelector('span') ||
-						 e.target.closest('input') === numberShadowEnabled);
-					
+						(e.target === shadowToggleLabel ||
+							e.target === numberShadowEnabled ||
+							e.target === shadowToggleLabel.querySelector('span') ||
+							e.target.closest('input') === numberShadowEnabled);
+
 					if (isClickOnThisToggle) {
 						// Si le clic est sur le span ou le label, déclencher le checkbox
 						if (e.target !== numberShadowEnabled && e.target.tagName !== 'INPUT') {
@@ -3754,13 +3881,13 @@ const CENTER_COVER_THRESHOLD = 3;
 				// Empêcher la propagation pour que le clic sur le label toggle ne soit pas intercepté par le label parent
 				glowToggleLabel.addEventListener('click', (e) => {
 					// Vérifier si le clic est bien sur ce toggle (pas sur un élément des numbers-fields)
-					const isClickOnThisToggle = glowToggleLabel.contains(e.target) && 
+					const isClickOnThisToggle = glowToggleLabel.contains(e.target) &&
 						!e.target.closest('.wc-pc13-numbers-fields') &&
-						(e.target === glowToggleLabel || 
-						 e.target === numberGlowEnabled || 
-						 e.target === glowToggleLabel.querySelector('span') ||
-						 e.target.closest('input') === numberGlowEnabled);
-					
+						(e.target === glowToggleLabel ||
+							e.target === numberGlowEnabled ||
+							e.target === glowToggleLabel.querySelector('span') ||
+							e.target.closest('input') === numberGlowEnabled);
+
 					if (isClickOnThisToggle) {
 						// Si le clic est sur le span ou le label, déclencher le checkbox
 						if (e.target !== numberGlowEnabled && e.target.tagName !== 'INPUT') {
@@ -3814,7 +3941,7 @@ const CENTER_COVER_THRESHOLD = 3;
 			// S'assurer que le slider a les bonnes valeurs min/max (gauche = min, droite = max)
 			numberGlowIntensity.min = '1';
 			numberGlowIntensity.max = '30';
-			
+
 			// S'assurer que l'intensité est au minimum 1
 			if (state.numbers.glow && state.numbers.glow.intensity !== undefined) {
 				if (state.numbers.glow.intensity < 1) {
@@ -5605,7 +5732,7 @@ const CENTER_COVER_THRESHOLD = 3;
 			// S'assurer que le slider a les bonnes valeurs min/max (gauche = min, droite = max)
 			numberGlowIntensity.min = '1';
 			numberGlowIntensity.max = '30';
-			
+
 			if (sharedConfigLoaded && state.numbers.glow) {
 				// S'assurer que l'intensité est au minimum 1
 				const intensity = Math.max(1, state.numbers.glow.intensity || 10);
