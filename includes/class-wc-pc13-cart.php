@@ -1042,18 +1042,22 @@ class WC_PC13_Cart {
 		
 		// Calculer les dimensions de dessin avec le zoom
 		$scale = isset( $transform['scale'] ) ? floatval( $transform['scale'] ) : 1.0;
-		$base_scale = max( $diameter / $image_width, $diameter / $image_height );
+		// Alignement avec le frontend (CSS background-size: 100% auto)
+		// Le frontend utilise une échelle basée sur la largeur par défaut
+		$base_scale = $diameter / $image_width;
 		$final_scale = $base_scale * $scale;
 		$draw_width = $image_width * $final_scale;
 		$draw_height = $image_height * $final_scale;
 		
 		// Calculer les offsets
+		// Alignement avec le frontend (CSS background-position: (50+x)% (50+y)%)
+		// La position en % CSS est relative à (Container - Image) * pourcentage
 		$x_offset_pct = isset( $transform['x'] ) ? floatval( $transform['x'] ) : 0.0;
 		$y_offset_pct = isset( $transform['y'] ) ? floatval( $transform['y'] ) : 0.0;
-		$translate_x = ( $x_offset_pct / 100 ) * $diameter;
-		$translate_y = ( $y_offset_pct / 100 ) * $diameter;
-		$offset_x = ( $diameter - $draw_width ) / 2 + $translate_x;
-		$offset_y = ( $diameter - $draw_height ) / 2 + $translate_y;
+		$x_percent = 50 + $x_offset_pct;
+		$y_percent = 50 + $y_offset_pct;
+		$offset_x = ( $diameter - $draw_width ) * ( $x_percent / 100 );
+		$offset_y = ( $diameter - $draw_height ) * ( $y_percent / 100 );
 		
 		// Redimensionner et positionner l'image avec préservation de la transparence
 		imagealphablending( $image, true );

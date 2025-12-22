@@ -853,13 +853,19 @@ const CENTER_COVER_THRESHOLD = 3;
 		ctx.translate(centerX - radius, centerY - radius);
 
 		const baseSize = diameter;
-		const scale = Math.max(baseSize / image.naturalWidth, baseSize / image.naturalHeight) * (transformState?.scale || 1);
+		// Match CSS background-size: (scale * 100)% which is width-based
+		// CSS background-size percentage uses container width as reference
+		const widthScale = baseSize / image.naturalWidth;
+		const scale = widthScale * (transformState?.scale || 1);
 		const drawWidth = image.naturalWidth * scale;
 		const drawHeight = image.naturalHeight * scale;
-		const translateX = ((transformState?.x || 0) / 100) * baseSize;
-		const translateY = ((transformState?.y || 0) / 100) * baseSize;
-		const offsetX = (baseSize - drawWidth) / 2 + translateX;
-		const offsetY = (baseSize - drawHeight) / 2 + translateY;
+		
+		// Match CSS background-position: (50 + x)% (50 + y)%
+		// CSS background-position percentage formula: position = (containerSize - imageSize) * percentage
+		const xPercent = 50 + (transformState?.x || 0);
+		const yPercent = 50 + (transformState?.y || 0);
+		const offsetX = (baseSize - drawWidth) * (xPercent / 100);
+		const offsetY = (baseSize - drawHeight) * (yPercent / 100);
 
 		ctx.drawImage(image, offsetX, offsetY, drawWidth, drawHeight);
 
