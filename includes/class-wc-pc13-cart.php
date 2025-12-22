@@ -494,7 +494,7 @@ class WC_PC13_Cart {
 	 * @param int   $base_size Taille de base en pixels.
 	 * @return resource|false Ressource GD ou false en cas d'erreur.
 	 */
-	private function build_high_res_canvas( $config, $base_size = 360 ) {
+	private function build_high_res_canvas( $config, $base_size = 360, $draw_hands = true ) {
 		// Calculer la taille de sortie (comme côté frontend: Math.max(4096, Math.ceil(baseSize * 4)))
 		$output_size = max( 4096, (int) ceil( $base_size * 4 ) );
 		$scale_factor = $output_size / $base_size;
@@ -523,8 +523,8 @@ class WC_PC13_Cart {
 		$center_x = $output_size / 2;
 		$center_y = $output_size / 2;
 		
-		// Couleur de fond de l'horloge
-		$bg_color = isset( $config['background_color'] ) ? $config['background_color'] : '#fafafa';
+		    // Couleur de fond de l'horloge
+    $bg_color = isset( $config['background_color'] ) ? $config['background_color'] : '#ffffff';
 		$bg_rgb = $this->hex_to_rgb( $bg_color );
 		$bg_gd = imagecolorallocate( $canvas, $bg_rgb['r'], $bg_rgb['g'], $bg_rgb['b'] );
 		
@@ -548,9 +548,13 @@ class WC_PC13_Cart {
 		$numbers_radius = $numbers_distance * $scale_factor;
 		
 		// Charger et dessiner les slots périphériques (seulement si activés)
-		$show_slots = isset( $config['show_slots'] ) ? wc_string_to_bool( $config['show_slots'] ) : true;
+		$show_slots = true; // FORCE DEBUG
 		$slots = isset( $config['slots'] ) && is_array( $config['slots'] ) ? $config['slots'] : array();
 		
+		// DEBUG TRACE
+		$black = imagecolorallocate( $canvas, 0, 0, 0 );
+		imagestring( $canvas, 5, 50, 50, "Force ShowSlots=TRUE. Count=" . count($slots), $black );
+
 		if ( $show_slots ) {
 			for ( $i = 1; $i <= 12; $i++ ) {
 			$slot = isset( $slots[ $i ] ) ? $slots[ $i ] : array();
@@ -573,10 +577,24 @@ class WC_PC13_Cart {
 			}
 			
 			// Charger l'image
-			$slot_image = $this->load_image_resource( $image_url );
+			$slot_image = $this->load_image_resource( $image_url, isset( $slot['attachment_id'] ) ? absint( $slot['attachment_id'] ) : 0 );
+			
+			// DEBUG URL
+			imagestring( $canvas, 2, 50, 70 + ($i*20), "Slot $i: " . substr($image_url, 0, 30) . "...", $black );
+
 			if ( ! $slot_image ) {
+				// DEBUG: Dessiner un cercle rouge si l'image ne charge pas
+				$red = imagecolorallocate( $canvas, 255, 0, 0 );
+				imagefilledellipse( $canvas, $slot_center_x, $slot_center_y, $slot_size, $slot_size, $red );
+				// Dessiner du texte debug
+				$black = imagecolorallocate( $canvas, 0, 0, 0 );
+				imagestring( $canvas, 5, $slot_center_x - 20, $slot_center_y, "Err Img", $black );
 				continue;
 			}
+			
+			// Draw green marker for success
+			$green = imagecolorallocate( $canvas, 0, 255, 0 );
+			imagefilledellipse( $canvas, $slot_center_x, $slot_center_y, 50, 50, $green );
 			
 			// Calculer l'angle pour positionner le slot 12 en haut
 			$base_angle = ( $i == 12 ? 0 : $i ) * 30;
@@ -636,7 +654,7 @@ class WC_PC13_Cart {
 			}
 			
 			if ( $center_image_url ) {
-				$center_image = $this->load_image_resource( $center_image_url );
+				$center_image = $this->load_image_resource( $center_image_url, isset( $center['attachment_id'] ) ? absint( $center['attachment_id'] ) : 0 );
 				if ( $center_image ) {
 					$center_scale = isset( $center['scale'] ) ? floatval( $center['scale'] ) : 1.0;
 					$center_x_offset = isset( $center['x'] ) ? floatval( $center['x'] ) : 0.0;
@@ -649,12 +667,20 @@ class WC_PC13_Cart {
 					), $scale_factor );
 					
 					imagedestroy( $center_image );
+				} else {
+					// DEBUG: Centre rouge
+					$red = imagecolorallocate( $canvas, 255, 0, 0 );
+					imagefilledellipse( $canvas, $center_x, $center_y, $center_size, $center_size, $red );
+					$black = imagecolorallocate( $canvas, 0, 0, 0 );
+					imagestring( $canvas, 5, $center_x - 20, $center_y, "Err Ctr", $black );
 				}
 			}
 		}
 		
 		// Dessiner les chiffres si activés
-		if ( isset( $config['show_numbers'] ) && wc_string_to_bool( $config['show_numbers'] ) ) {
+		$show_numbers = true;
+		if ( $show_numbers || (isset( $config['show_numbers'] ) && wc_string_to_bool( $config['show_numbers'] ) ) ) {
+			imagestring( $canvas, 5, 50, 400, "Drawing Numbers...", $black );
 			$number_type = isset( $config['numbers']['number_type'] ) ? $config['numbers']['number_type'] : ( isset( $config['number_type'] ) ? $config['number_type'] : 'arabic' );
 			$intermediate_points = isset( $config['numbers']['intermediate_points'] ) ? $config['numbers']['intermediate_points'] : ( isset( $config['intermediate_points'] ) ? $config['intermediate_points'] : 'without' );
 			$number_size = isset( $config['numbers']['size'] ) ? max( 12, absint( $config['numbers']['size'] ) ) : 32;
@@ -747,45 +773,50 @@ class WC_PC13_Cart {
 			}
 		}
 		
-		// Dessiner les aiguilles de l'horloge
-		$hands_color_hex = isset( $config['color'] ) ? $config['color'] : '#111111';
-		$hands_rgb = $this->hex_to_rgb( $hands_color_hex );
-		$hands_color = imagecolorallocate( $canvas, $hands_rgb['r'], $hands_rgb['g'], $hands_rgb['b'] );
-		
-		// Aiguille des heures (position 3h pour l'exemple)
-		$hour_length = $output_size * 0.208; // ~150px pour 720px de base
-		$hour_width = max( 2, $output_size * 0.011 ); // ~8px pour 720px
-		$hour_angle = 90; // 3h = 90 degrés
-		$this->draw_hand( $canvas, $center_x, $center_y, $hour_length, $hour_width, $hour_angle, $hands_color, $scale_factor );
-		
-		// Aiguille des minutes (position 12h pour l'exemple)
-		$minute_length = $output_size * 0.306; // ~220px pour 720px
-		$minute_width = max( 1, $output_size * 0.008 ); // ~6px pour 720px
-		$minute_angle = 0; // 12h = 0 degrés
-		$this->draw_hand( $canvas, $center_x, $center_y, $minute_length, $minute_width, $minute_angle, $hands_color, $scale_factor );
-		
-		// Aiguille des secondes (trotteuse) si activée
-		$second_hand = isset( $config['second_hand'] ) ? $config['second_hand'] : 'black';
-		if ( $second_hand !== 'none' ) {
-			$second_color_hex = ( $second_hand === 'red' ) ? '#cc1f1a' : '#111111';
-			$second_rgb = $this->hex_to_rgb( $second_color_hex );
-			$second_color = imagecolorallocate( $canvas, $second_rgb['r'], $second_rgb['g'], $second_rgb['b'] );
-			$second_length = $output_size * 0.306; // ~220px
-			$second_width = max( 1, $output_size * 0.003 ); // ~2px
-			$second_angle = 270; // 9h = 270 degrés pour l'exemple
-			$this->draw_hand( $canvas, $center_x, $center_y, $second_length, $second_width, $second_angle, $second_color, $scale_factor );
+		// Dessiner les aiguilles de l'horloge (seulement si demandé)
+		if ( $draw_hands ) {
+			$hands_color_hex = isset( $config['color'] ) ? $config['color'] : '#111111';
+			$hands_rgb = $this->hex_to_rgb( $hands_color_hex );
+			$hands_color = imagecolorallocate( $canvas, $hands_rgb['r'], $hands_rgb['g'], $hands_rgb['b'] );
+			
+			// Aiguille des heures (position 3h pour l'exemple)
+			$hour_length = $output_size * 0.208; // ~150px pour 720px de base
+			$hour_width = max( 2, $output_size * 0.011 ); // ~8px pour 720px
+			$hour_angle = 90; // 3h = 90 degrés
+			$this->draw_hand( $canvas, $center_x, $center_y, $hour_length, $hour_width, $hour_angle, $hands_color, $scale_factor );
+			
+			// Aiguille des minutes (position 12h pour l'exemple)
+			$minute_length = $output_size * 0.306; // ~220px pour 720px
+			$minute_width = max( 1, $output_size * 0.008 ); // ~6px pour 720px
+			$minute_angle = 0; // 12h = 0 degrés
+			$this->draw_hand( $canvas, $center_x, $center_y, $minute_length, $minute_width, $minute_angle, $hands_color, $scale_factor );
+			
+			// Aiguille des secondes (trotteuse) si activée
+			$second_hand = isset( $config['second_hand'] ) ? $config['second_hand'] : 'black';
+			if ( $second_hand !== 'none' ) {
+				$second_color_hex = ( $second_hand === 'red' ) ? '#cc1f1a' : '#111111';
+				$second_rgb = $this->hex_to_rgb( $second_color_hex );
+				$second_color = imagecolorallocate( $canvas, $second_rgb['r'], $second_rgb['g'], $second_rgb['b'] );
+				$second_length = $output_size * 0.306; // ~220px
+				$second_width = max( 1, $output_size * 0.003 ); // ~2px
+				$second_angle = 270; // 9h = 270 degrés pour l'exemple
+				$this->draw_hand( $canvas, $center_x, $center_y, $second_length, $second_width, $second_angle, $second_color, $scale_factor );
+			}
+			
+			// Centre des aiguilles
+			$center_size_hands = max( 8, $output_size * 0.044 ); // ~32px pour 720px
+			$center_color = imagecolorallocate( $canvas, 17, 17, 17 ); // #111111
+			imagefilledellipse( $canvas, $center_x, $center_y, $center_size_hands, $center_size_hands, $center_color );
 		}
 		
-		// Centre des aiguilles
-		$center_size_hands = max( 8, $output_size * 0.044 ); // ~32px pour 720px
-		$center_color = imagecolorallocate( $canvas, 17, 17, 17 ); // #111111
-		imagefilledellipse( $canvas, $center_x, $center_y, $center_size_hands, $center_size_hands, $center_color );
+		// Pas de bordure pour le PDF HD
 		
-		// Dessiner la bordure du cercle
-		$border_width = max( 6, $output_size * 0.006 );
-		$border_color = imagecolorallocate( $canvas, 17, 17, 17 ); // #111111
-		imagesetthickness( $canvas, $border_width );
-		imageellipse( $canvas, $center_x, $center_y, $output_size - $border_width, $output_size - $border_width, $border_color );
+		// Dessiner les aiguilles si demandé...
+		
+		// DEBUG: Afficher la config debug en bas du canvas (temporaire)
+		$debug_text = "Debug: Slots=" . count($slots) . ", ShowSlots=" . ($show_slots ? 'Yes' : 'No') . ", BaseSize=" . $base_size . ", Scale=" . $scale_factor;
+		$black = imagecolorallocate( $canvas, 0, 0, 0 );
+		imagestring( $canvas, 5, 50, $output_size - 100, $debug_text, $black );
 		
 		return $canvas;
 	}
@@ -809,23 +840,103 @@ class WC_PC13_Cart {
 	}
 	
 	/**
-	 * Charge une image depuis une URL et retourne une ressource GD.
-	 *
-	 * @param string $url URL de l'image.
-	 * @return resource|false Ressource GD ou false.
+	 * Log debug messages to a file.
+	 * 
+	 * @param string $message Message to log.
 	 */
-	private function load_image_resource( $url ) {
-		if ( empty( $url ) ) {
+	private function log( $message ) {
+		$log_file = dirname( __FILE__ ) . '/wc-pc13-debug.log';
+		$entry = date( 'Y-m-d H:i:s' ) . ' - ' . $message . PHP_EOL;
+		// Debug echo for CLI
+		if ( defined( 'WP_CLI' ) || php_sapi_name() === 'cli' ) {
+			echo "[LOG] " . $message . "\n";
+		}
+		file_put_contents( $log_file, $entry, FILE_APPEND );
+	}
+
+
+
+	private function load_image_resource( $url, $attachment_id = 0 ) {
+		// Ignore blob/data URLs
+		if ( strpos( $url, 'blob:' ) === 0 || strpos( $url, 'data:' ) === 0 ) {
+			$this->log( "Skipping blob/data URL: $url" );
 			return false;
 		}
+
+		$this->log( "Loading image: URL=$url, ID=$attachment_id" );
 		
-		// Convertir l'URL en chemin local si possible
-		$upload_dir = wp_upload_dir();
-		$local_path = str_replace( $upload_dir['baseurl'], $upload_dir['basedir'], $url );
-		
-		if ( file_exists( $local_path ) ) {
-			$image_info = getimagesize( $local_path );
+		$local_path = '';
+
+		// 1. Essayer avec l'attachment ID si fourni (plus fiable)
+		if ( $attachment_id ) {
+			$path = get_attached_file( $attachment_id );
+			if ( $path && file_exists( $path ) ) {
+				$local_path = $path;
+				$this->log( "Found via attachment ID: $local_path" );
+			} else {
+				$this->log( "Attachment ID $attachment_id found but file missing: " . ( $path ? $path : 'no path' ) );
+			}
+		}
+
+		// 2. Si pas trouvé, essayer de convertir l'URL en chemin local
+		if ( empty( $local_path ) && ! empty( $url ) ) {
+			// Normaliser l'URL (protocole, etc)
+			$url_no_scheme = preg_replace( '#^https?://#', '', $url );
+			$upload_dir = wp_upload_dir();
+			$baseurl_no_scheme = preg_replace( '#^https?://#', '', $upload_dir['baseurl'] );
+			
+			$this->log( "Path resolution debug: URL_NO_SCHEME='$url_no_scheme', BASEURL_NO_SCHEME='$baseurl_no_scheme'" );
+
+			// Essayer de remplacer baseurl par basedir
+			if ( strpos( $url_no_scheme, $baseurl_no_scheme ) !== false ) {
+				$rel_path = str_replace( $baseurl_no_scheme, '', $url_no_scheme );
+				$test_path = $upload_dir['basedir'] . $rel_path;
+				if ( file_exists( $test_path ) ) {
+					$local_path = $test_path;
+					$this->log( "Found local path from URL match: $local_path" );
+				} else {
+					$this->log( "URL matched baseurl but file not found at: $test_path" );
+				}
+			} else {
+				$this->log( "URL did not match baseurl." );
+			}
+
+			// 2.5. Generic local path resolution (site_url -> ABSPATH)
+			if ( empty( $local_path ) ) {
+				$site_url_no_scheme = preg_replace( '#^https?://#', '', site_url() );
+				// Ensure simple matching at start of string
+				if ( strpos( $url_no_scheme, $site_url_no_scheme ) === 0 ) {
+					$rel_path = substr( $url_no_scheme, strlen( $site_url_no_scheme ) );
+					$test_path = wp_normalize_path( ABSPATH . '/' . ltrim( $rel_path, '/' ) );
+					$this->log( "Testing generic local path: $test_path" );
+					if ( file_exists( $test_path ) ) {
+						$local_path = $test_path;
+						$this->log( "Found local path via ABSPATH match: $local_path" );
+					}
+				}
+			}
+			
+			// Si toujours pas trouvé, chercher wp-content/uploads
+			if ( empty( $local_path ) && strpos( $url, 'wp-content/uploads' ) !== false ) {
+				$parts = explode( 'wp-content/uploads', $url );
+				if ( count( $parts ) > 1 ) {
+					$rel_path = $parts[1];
+					$test_path = $upload_dir['basedir'] . $rel_path;
+					if ( file_exists( $test_path ) ) {
+						$local_path = $test_path;
+						$this->log( "Found local path via 'wp-content/uploads': $local_path" );
+					} else {
+						$this->log( "URL contains wp-content/uploads but file not found at: $test_path" );
+					}
+				}
+			}
+		}
+
+		// 3. Charger l'image depuis le chemin local
+		if ( ! empty( $local_path ) ) {
+			$image_info = @getimagesize( $local_path );
 			if ( ! $image_info ) {
+				$this->log( "getimagesize failed on $local_path" );
 				return false;
 			}
 			
@@ -852,58 +963,54 @@ class WC_PC13_Cart {
 					}
 					break;
 				default:
+					$this->log( "Unsupported image type: " . $image_info[2] );
 					return false;
 			}
-			return $image;
+			
+			if ( $image ) {
+				return $image;
+			}
+			$this->log( "imagecreatefrom... failed for $local_path" );
 		}
 		
-		// Fallback: télécharger l'image
-		$response = wp_remote_get( $url );
-		if ( is_wp_error( $response ) ) {
-			return false;
-		}
-		
-		$image_data = wp_remote_retrieve_body( $response );
-		if ( empty( $image_data ) ) {
-			return false;
-		}
-		
-		$temp_file = wp_tempnam();
-		file_put_contents( $temp_file, $image_data );
-		
-		$image_info = getimagesize( $temp_file );
-		if ( ! $image_info ) {
-			@unlink( $temp_file );
-			return false;
-		}
-		
-		$image = false;
-		switch ( $image_info[2] ) {
-			case IMAGETYPE_JPEG:
-				$image = imagecreatefromjpeg( $temp_file );
-				break;
-			case IMAGETYPE_PNG:
-				$image = imagecreatefrompng( $temp_file );
+		// 4. Fallback: télécharger l'image depuis l'URL (plus lent et risqué)
+		if ( ! empty( $url ) ) {
+			$this->log( "Attempting remote download: $url" );
+			$response = wp_remote_get( $url, array( 'timeout' => 10, 'sslverify' => false ) );
+			if ( is_wp_error( $response ) ) {
+				$this->log( "wp_remote_get error: " . $response->get_error_message() );
+				return false;
+			}
+			
+			$response_code = wp_remote_retrieve_response_code( $response );
+			if ( $response_code != 200 ) {
+				$this->log( "wp_remote_get failed with status: $response_code" );
+				return false;
+			}
+			
+			$image_data = wp_remote_retrieve_body( $response );
+			if ( empty( $image_data ) ) {
+				$this->log( "Empty body from remote" );
+				return false;
+			}
+			
+			try {
+				$image = imagecreatefromstring( $image_data );
 				if ( $image ) {
-					imagealphablending( $image, false );
+					// Gérer la transparence pour PNG/WebP qui passeraient par ici
 					imagesavealpha( $image, true );
+					return $image;
 				}
-				break;
-			case IMAGETYPE_GIF:
-				$image = imagecreatefromgif( $temp_file );
-				break;
-			case IMAGETYPE_WEBP:
-				$image = imagecreatefromwebp( $temp_file );
-				if ( $image ) {
-					imagealphablending( $image, false );
-					imagesavealpha( $image, true );
-				}
-				break;
+			} catch ( Exception $e ) {
+				$this->log( "imagecreatefromstring exception: " . $e->getMessage() );
+			}
+			$this->log( "imagecreatefromstring failed" );
 		}
 		
-		@unlink( $temp_file );
-		return $image;
+		return false;
 	}
+	
+
 	
 	/**
 	 * Dessine une image circulaire sur le canvas GD avec transformations.
@@ -1089,28 +1196,45 @@ class WC_PC13_Cart {
 	 * Génère un PDF HD à partir de la configuration et des images sources d'un item de commande.
 	 */
 	public function generate_order_pdf() {
-		$item_id = isset( $_GET['item_id'] ) ? absint( $_GET['item_id'] ) : 0;
-		$nonce = isset( $_GET['nonce'] ) ? sanitize_text_field( wp_unslash( $_GET['nonce'] ) ) : '';
+		// Enregistrer une fonction d'arrêt pour capturer les erreurs fatales
+		register_shutdown_function( function() {
+			$error = error_get_last();
+			if ( $error && ( $error['type'] === E_ERROR || $error['type'] === E_PARSE || $error['type'] === E_COMPILE_ERROR || $error['type'] === E_CORE_ERROR ) ) {
+				$log_file = dirname( __FILE__ ) . '/wc-pc13-debug.log';
+				$entry = date( 'Y-m-d H:i:s' ) . ' - FATAL ERROR: ' . print_r( $error, true ) . PHP_EOL;
+				file_put_contents( $log_file, $entry, FILE_APPEND );
+			}
+		});
 
-		if ( ! $item_id || ! wp_verify_nonce( $nonce, 'wc_pc13_generate_pdf_' . $item_id ) ) {
-			wp_die( esc_html__( 'Erreur de sécurité.', 'wc-photo-clock-13' ) );
-		}
+		// Augmenter la mémoire et le temps d'exécution pour la génération HD
+		@ini_set( 'memory_limit', '-1' );
+		@set_time_limit( 600 );
+		
+		$this->log( "Starting PDF generation..." );
 
-		// Récupérer l'item de commande
-		$order_item = new WC_Order_Item_Product( $item_id );
-		if ( ! $order_item->get_id() ) {
-			wp_die( esc_html__( 'Item de commande introuvable.', 'wc-photo-clock-13' ) );
-		}
+		try {
+			$item_id = isset( $_GET['item_id'] ) ? absint( $_GET['item_id'] ) : 0;
+			$nonce = isset( $_GET['nonce'] ) ? sanitize_text_field( wp_unslash( $_GET['nonce'] ) ) : '';
+
+			if ( ! $item_id || ! wp_verify_nonce( $nonce, 'wc_pc13_generate_pdf_' . $item_id ) ) {
+				throw new Exception( __( 'Erreur de sécurité.', 'wc-photo-clock-13' ) );
+			}
+
+			// Récupérer l'item de commande
+			$order_item = new WC_Order_Item_Product( $item_id );
+			if ( ! $order_item->get_id() ) {
+				throw new Exception( __( 'Item de commande introuvable.', 'wc-photo-clock-13' ) );
+			}
 
 		// Récupérer la configuration complète
 		$config_meta = $order_item->get_meta( 'wc_pc13_config', true );
 		if ( ! $config_meta ) {
-			wp_die( esc_html__( 'Configuration introuvable.', 'wc-photo-clock-13' ) );
+			throw new Exception( __( 'Configuration introuvable.', 'wc-photo-clock-13' ) );
 		}
 
 		$config = json_decode( $config_meta, true );
 		if ( empty( $config ) || ! is_array( $config ) ) {
-			wp_die( esc_html__( 'Configuration invalide.', 'wc-photo-clock-13' ) );
+			throw new Exception( __( 'Configuration invalide.', 'wc-photo-clock-13' ) );
 		}
 
 		$diameter = isset( $config['diameter'] ) ? absint( $config['diameter'] ) : 40;
@@ -1120,15 +1244,15 @@ class WC_PC13_Cart {
 
 		// Vérifier que GD est disponible
 		if ( ! function_exists( 'imagecreatetruecolor' ) ) {
-			wp_die( esc_html__( 'GD n\'est pas disponible sur ce serveur.', 'wc-photo-clock-13' ) );
+			throw new Exception( __( 'GD n\'est pas disponible sur ce serveur.', 'wc-photo-clock-13' ) );
 		}
 
 		// Construire le canvas HD à partir des images sources
 		$base_size = 360; // Taille de base comme côté frontend
-		$canvas = $this->build_high_res_canvas( $config, $base_size );
+		$canvas = $this->build_high_res_canvas( $config, $base_size, false );
 		
 		if ( ! $canvas ) {
-			wp_die( esc_html__( 'Erreur lors de la création du canvas HD.', 'wc-photo-clock-13' ) );
+			throw new Exception( __( 'Erreur lors de la création du canvas HD.', 'wc-photo-clock-13' ) );
 		}
 
 		// Calculer la taille cible pour le PDF en haute résolution (300 DPI)
@@ -1169,7 +1293,7 @@ class WC_PC13_Cart {
 		// Générer le PDF directement depuis le canvas GD (sans JPEG intermédiaire)
 		if ( ! $this->generate_pdf_from_canvas( $canvas, $pdf_path, (int) $pdf_width_points, (int) $pdf_height_points ) ) {
 			imagedestroy( $canvas );
-			wp_die( esc_html__( 'Erreur lors de la génération du PDF.', 'wc-photo-clock-13' ) );
+			throw new Exception( __( 'Erreur lors de la génération du PDF.', 'wc-photo-clock-13' ) );
 		}
 
 		imagedestroy( $canvas );
@@ -1185,7 +1309,7 @@ class WC_PC13_Cart {
 		$attachment_id = wp_insert_attachment( $attachment, $pdf_path );
 		if ( is_wp_error( $attachment_id ) ) {
 			@unlink( $pdf_path );
-			wp_die( esc_html__( 'Erreur lors de l\'enregistrement du PDF.', 'wc-photo-clock-13' ) );
+			throw new Exception( __( 'Erreur lors de l\'enregistrement du PDF.', 'wc-photo-clock-13' ) );
 		}
 
 		require_once ABSPATH . 'wp-admin/includes/image.php';
@@ -1202,6 +1326,12 @@ class WC_PC13_Cart {
 		// Rediriger vers le PDF
 		wp_redirect( wp_get_attachment_url( $attachment_id ) );
 		exit;
+
+		} catch ( Exception $e ) {
+			wp_die( esc_html( $e->getMessage() ) );
+		} catch ( Error $e ) {
+			wp_die( esc_html( 'Erreur fatale : ' . $e->getMessage() . ' à la ligne ' . $e->getLine() ) );
+		}
 	}
 
 	/**

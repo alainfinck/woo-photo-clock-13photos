@@ -1,8 +1,119 @@
+/* S'assurer que le wrapper principal est toujours visible */
+#wrapper {
+	display: block !important;
+	visibility: visible !important;
+	opacity: 1 !important;
+	position: relative !important;
+	width: auto !important;
+	height: auto !important;
+	overflow: visible !important;
+}
+
+/* S'assurer que les conteneurs parents sont visibles */
+.add-to-cart-container,
+.add-to-cart-container form.cart,
+form.cart {
+	display: block !important;
+	visibility: visible !important;
+	opacity: 1 !important;
+	position: relative !important;
+	top: auto !important;
+	left: auto !important;
+	width: auto !important;
+	height: auto !important;
+	overflow: visible !important;
+}
+
 .wc-pc13-configurator {
 	border: 1px solid #e5e5e5;
 	padding: 24px;
 	margin-bottom: 30px;
 	background: #fff;
+	display: block !important;
+	visibility: visible !important;
+	opacity: 1 !important;
+	position: relative !important;
+	top: auto !important;
+	left: auto !important;
+	width: auto !important;
+	height: auto !important;
+	overflow: visible !important;
+}
+
+/* Masquer le bloc de copyright */
+.wc-pc13-copyright {
+	display: none !important;
+}
+
+/* Masquer les métadonnées du produit (Archives, Categories) après le configurateur */
+.wc-pc13-configurator ~ .product_meta,
+.wc-pc13-configurator ~ .entry-meta,
+.product_meta:has(+ .wc-pc13-configurator),
+.entry-meta:has(+ .wc-pc13-configurator),
+.single-product .product_meta,
+.single-product .entry-meta,
+.single-product .product_meta-wrapper,
+.single-product .entry-meta-wrapper,
+.single-product .product-meta,
+.single-product .entry-footer,
+.single-product .entry-footer .posted-on,
+.single-product .entry-footer .cat-links,
+.single-product .entry-footer .tags-links,
+.single-product .posted_in,
+.single-product .tagged_as {
+	display: none !important;
+}
+
+/* Masquer spécifiquement Archives et Categories pour Flatsome */
+.single-product .product_meta .posted_in,
+.single-product .product_meta .tagged_as,
+.single-product .entry-meta .posted-on,
+.single-product .entry-meta .cat-links,
+.single-product .product-meta .posted_in,
+.single-product .product-meta .tagged_as {
+	display: none !important;
+}
+
+/* Masquer le bouton "Ajouter au panier" natif et son conteneur si le configurateur est présent */
+.single-product:has(.wc-pc13-configurator) .single_add_to_cart_button:not(.wc-pc13-add-to-cart-btn),
+.single-product:has(.wc-pc13-configurator) form.cart .single_add_to_cart_button:not(.wc-pc13-add-to-cart-btn),
+form.cart:has(.wc-pc13-configurator) .single_add_to_cart_button:not(.wc-pc13-add-to-cart-btn),
+.wc-pc13-configurator ~ form.cart .single_add_to_cart_button:not(.wc-pc13-add-to-cart-btn),
+.wc-pc13-configurator ~ .add-to-cart-container .single_add_to_cart_button:not(.wc-pc13-add-to-cart-btn),
+.single_add_to_cart_button.wc-pc13-native-button,
+.add-to-cart-container:has(.wc-pc13-configurator) .single_add_to_cart_button:not(.wc-pc13-add-to-cart-btn),
+.add-to-cart-container form:has(.wc-pc13-configurator) .single_add_to_cart_button:not(.wc-pc13-add-to-cart-btn),
+button.single_add_to_cart_button:not(.wc-pc13-add-to-cart-btn),
+.add-to-cart-container button.single_add_to_cart_button:not(.wc-pc13-add-to-cart-btn) {
+	display: none !important;
+	visibility: hidden !important;
+	opacity: 0 !important;
+	position: absolute !important;
+	width: 0 !important;
+	height: 0 !important;
+	overflow: hidden !important;
+	pointer-events: none !important;
+}
+
+/* Masquer le conteneur add-to-cart-container s'il ne contient que le bouton natif */
+.add-to-cart-container:has(.single_add_to_cart_button:not(.wc-pc13-add-to-cart-btn)):not(:has(.wc-pc13-add-to-cart-btn)) {
+	display: none !important;
+}
+
+/* Masquer spécifiquement le bouton dans le conteneur Flatsome */
+.add-to-cart-container .single_add_to_cart_button:not(.wc-pc13-add-to-cart-btn),
+.add-to-cart-container form .single_add_to_cart_button:not(.wc-pc13-add-to-cart-btn),
+.ux-layout-single .add-to-cart-container .single_add_to_cart_button:not(.wc-pc13-add-to-cart-btn) {
+	display: none !important;
+	visibility: hidden !important;
+	opacity: 0 !important;
+	position: absolute !important;
+	width: 0 !important;
+	height: 0 !important;
+	overflow: hidden !important;
+	pointer-events: none !important;
+	margin: 0 !important;
+	padding: 0 !important;
 }
 
 /* Masquer le sélecteur de quantité pour les produits avec configurateur */
@@ -67,6 +178,13 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	flex-direction: column;
 	align-items: center;
 	text-align: center;
+	position: sticky;
+	top: 100px;
+	align-self: flex-start;
+	height: fit-content;
+	max-height: calc(100vh - 120px);
+	overflow: auto;
+	padding-right: 6px;
 }
 
 .wc-pc13-controls-column {
@@ -75,12 +193,17 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 }
 
 .wc-pc13-preview {
-	width: 100%;
-	max-width: 720px;
+	--preview-limit: min(720px, calc(100vh - 320px));
+	--preview-scale: min(1, calc(var(--preview-limit) / 720px));
+	--slot-size: calc(80px * var(--preview-scale));
+	--ring-radius: calc(140px * var(--preview-scale));
+	--center-size: calc(180px * var(--preview-scale));
+	width: min(100%, var(--preview-limit));
+	height: min(100%, var(--preview-limit));
+	max-width: min(100%, var(--preview-limit));
+	max-height: min(100%, var(--preview-limit));
 	aspect-ratio: 1 / 1;
 	position: relative;
-	--slot-size: 80px;
-	--ring-radius: 140px;
 }
 
 /* Panneau flottant pour les contrôles de photo périphérique */
@@ -321,7 +444,7 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	font-size: var(--numbers-size, 32px);
 	font-weight: 600;
 	color: var(--numbers-color, rgba(0, 0, 0, 0.65));
-	text-shadow: 0 0 6px rgba(255, 255, 255, 0.85);
+	text-shadow: 0 0 2px rgba(255, 255, 255, 0.3);
 	pointer-events: none;
 	padding: 4px 6px;
 	border-radius: 12px;
@@ -329,15 +452,15 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 }
 
 .wc-pc13-number-label[data-shadow="true"] {
-	text-shadow: 0 0 6px rgba(255, 255, 255, 0.85), var(--numbers-shadow);
+	text-shadow: 0 0 2px rgba(255, 255, 255, 0.3), var(--numbers-shadow);
 }
 
 .wc-pc13-number-label[data-glow="true"] {
-	text-shadow: 0 0 6px rgba(255, 255, 255, 0.85), var(--numbers-glow);
+	text-shadow: 0 0 2px rgba(255, 255, 255, 0.3), var(--numbers-glow);
 }
 
 .wc-pc13-number-label[data-shadow="true"][data-glow="true"] {
-	text-shadow: 0 0 6px rgba(255, 255, 255, 0.85), var(--numbers-shadow), var(--numbers-glow);
+	text-shadow: 0 0 2px rgba(255, 255, 255, 0.3), var(--numbers-shadow), var(--numbers-glow);
 }
 
 .wc-pc13-preview.show-numbers .wc-pc13-number-label {
@@ -727,6 +850,32 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	pointer-events: auto;
 }
 
+.wc-pc13-toggle:has(.wc-pc13-slots-fields) {
+	flex-direction: column;
+	align-items: stretch;
+	cursor: default;
+}
+
+.wc-pc13-toggle:has(.wc-pc13-slots-fields) > span {
+	cursor: pointer;
+}
+
+/* Empêcher que les interactions dans slots-fields déclenchent le toggle parent */
+.wc-pc13-toggle:has(.wc-pc13-slots-fields) .wc-pc13-slots-fields {
+	pointer-events: auto;
+	cursor: default;
+}
+
+.wc-pc13-toggle:has(.wc-pc13-slots-fields) .wc-pc13-slots-fields * {
+	pointer-events: auto;
+}
+
+.wc-pc13-toggle:has(.wc-pc13-slots-fields) input[type="range"],
+.wc-pc13-toggle:has(.wc-pc13-slots-fields) input[type="color"],
+.wc-pc13-toggle:has(.wc-pc13-slots-fields) select {
+	pointer-events: auto;
+}
+
 .wc-pc13-toggle:hover {
 	background: #f8f8f8;
 	border-color: #21759b;
@@ -824,6 +973,68 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 }
 
 .wc-pc13-numbers-fields.is-active {
+	display: flex;
+}
+
+.wc-pc13-slots-fields {
+	display: none;
+	flex-direction: column;
+	gap: 14px;
+	padding: 16px;
+	border: 1px solid #d0e5f5;
+	border-radius: 10px;
+	background: linear-gradient(135deg, #f8faff 0%, #f0f7ff 100%);
+	margin-top: 12px;
+	width: 100%;
+	pointer-events: auto;
+}
+
+/* Empêcher les interactions dans slots-fields de déclencher le toggle parent */
+.wc-pc13-slots-fields * {
+	pointer-events: auto;
+}
+
+.wc-pc13-slots-fields label {
+	display: grid;
+	grid-template-rows: auto 1fr;
+	gap: 8px;
+	font-weight: 500;
+}
+
+.wc-pc13-slots-fields label span {
+	font-size: 13px;
+	color: #555;
+	font-weight: 500;
+	order: -1;
+	grid-row: 1;
+}
+
+.wc-pc13-slots-fields input[type="range"],
+.wc-pc13-slots-fields input[type="color"],
+.wc-pc13-slots-fields select {
+	width: 100%;
+	order: 1;
+	grid-row: 2;
+}
+
+.wc-pc13-slots-fields input[type="color"] {
+	width: 100%;
+	max-width: 80px;
+	height: 40px;
+	padding: 0;
+	border: 1px solid #ddd;
+	border-radius: 8px;
+	background: transparent;
+	cursor: pointer;
+	transition: all 0.2s ease;
+}
+
+.wc-pc13-slots-fields input[type="color"]:hover {
+	border-color: #21759b;
+	box-shadow: 0 0 0 3px rgba(33, 117, 155, 0.1);
+}
+
+.wc-pc13-slots-fields.is-active {
 	display: flex;
 }
 
@@ -1167,8 +1378,8 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 
 .wc-pc13-download-actions .button {
 	border-radius: 20px;
-	padding: 8px 16px;
-	font-size: 13px;
+	padding: 6px 12px;
+	font-size: 12px;
 	transition: all 0.2s ease;
 	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
@@ -1444,8 +1655,8 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 
 .wc-pc13-demo-actions .button {
 	width: auto;
-	padding: 12px 24px;
-	font-size: 15px;
+	padding: 9px 16px;
+	font-size: 12px;
 	line-height: 1.4;
 	border-radius: 25px;
 	border: none;
@@ -1926,12 +2137,12 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 .wc-pc13-add-to-cart-btn {
 	background: #27ae60 !important;
 	color: rgba(255, 255, 255, 1) !important;
-	font-size: 20px !important;
-	font-weight: 800 !important;
-	line-height: 36px !important;
+	font-size: 16px !important;
+	font-weight: 700 !important;
+	line-height: 28px !important;
 	letter-spacing: 1.1px !important;
-	padding: 14px 32px !important;
-	border-radius: 50px !important;
+	padding: 10px 22px !important;
+	border-radius: 32px !important;
 	border: none !important;
 	box-shadow: 0 6px 16px rgba(39, 174, 96, 0.25);
 	display: inline-flex !important;
@@ -1971,13 +2182,6 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 
 .wc-pc13-add-to-cart-btn:hover::before {
 	left: 100%;
-}
-	transition: all 0.2s ease;
-	width: 100%;
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	gap: 8px;
 }
 
 .wc-pc13-add-to-cart-btn:hover {
@@ -2330,6 +2534,12 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 		max-width: 100%;
 	}
 
+	.wc-pc13-preview-column {
+		position: relative;
+		top: auto;
+		max-height: none;
+	}
+
 	.wc-pc13-preview {
 		max-width: 720px;
 		margin: 0 auto;
@@ -2443,8 +2653,8 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	background: #28a745 !important;
 	border-color: #28a745 !important;
 	color: #ffffff !important;
-	padding: 12px 24px !important;
-	font-size: 14px !important;
+	padding: 10px 20px !important;
+	font-size: 12px !important;
 	font-weight: 600 !important;
 }
 

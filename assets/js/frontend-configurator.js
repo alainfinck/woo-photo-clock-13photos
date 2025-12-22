@@ -105,12 +105,12 @@ const CENTER_COVER_THRESHOLD = 3;
 			// Pour les autres heures, afficher un point
 			return '•';
 		}
-		
+
 		// Si "sans points intermédiaires", toutes les heures affichent des chiffres
 		if (numberType === 'roman') {
 			return toRoman(num);
 		}
-		
+
 		return `${num}`;
 	}
 
@@ -143,12 +143,12 @@ const CENTER_COVER_THRESHOLD = 3;
 		labels.forEach((label) => {
 			const number = parseInt(label.dataset.number || label.textContent, 10);
 			const displayText = getDialDisplayText(number, numberType, intermediatePoints);
-			
+
 			label.textContent = displayText;
 			label.style.setProperty('--numbers-color', state.numbers.color || '#222222');
 			label.style.setProperty('--numbers-size', `${state.numbers.size || 32}px`);
 			label.style.setProperty('--numbers-offset', `${numbersDelta}px`);
-			
+
 			// Appliquer l'ombre portée
 			const shadowEnabled = state.numbers.shadow && state.numbers.shadow.enabled === true;
 			if (shadowEnabled) {
@@ -159,13 +159,19 @@ const CENTER_COVER_THRESHOLD = 3;
 			} else {
 				label.removeAttribute('data-shadow');
 			}
-			
+
 			// Appliquer le halo lumineux
 			const glowEnabled = state.numbers.glow && state.numbers.glow.enabled === true;
 			if (glowEnabled) {
 				const glowIntensity = (state.numbers.glow && state.numbers.glow.intensity) || 10;
-				const glowColor = state.numbers.color || '#222222';
-				const glowValue = `0 0 ${glowIntensity * 2}px ${glowColor}, 0 0 ${glowIntensity * 3}px ${glowColor}`;
+				const glowColor = (state.numbers.glow && state.numbers.glow.color) || '#ffffff';
+				// Utiliser une progression plus fluide : minimum 2px à intensité 1, maximum 60px à intensité 30
+				// Formule : base + (intensité - 1) * facteur pour une progression linéaire mais avec minimum visible
+				const baseGlow = 2; // Halo minimum visible même à intensité 1
+				const maxGlow = 60; // Halo maximum à intensité 30
+				const glowSize1 = baseGlow + ((glowIntensity - 1) / 29) * (maxGlow - baseGlow);
+				const glowSize2 = baseGlow + ((glowIntensity - 1) / 29) * (maxGlow * 1.5 - baseGlow);
+				const glowValue = `0 0 ${glowSize1}px ${glowColor}, 0 0 ${glowSize2}px ${glowColor}`;
 				label.style.setProperty('--numbers-glow', glowValue);
 				label.setAttribute('data-glow', 'true');
 			} else {
@@ -213,7 +219,7 @@ const CENTER_COVER_THRESHOLD = 3;
 	const state = {
 		currentSlot: 'center',
 		color: '#111111',
-		backgroundColor: '#fafafa',
+		backgroundColor: '#ffffff',
 		secondHand: 'black', // 'red', 'black', ou 'none'
 		diameter: 40, // Diamètre par défaut en cm
 		diameterPrice: 59, // Prix par défaut pour 40 cm
@@ -243,6 +249,7 @@ const CENTER_COVER_THRESHOLD = 3;
 			glow: {
 				enabled: false,
 				intensity: 10, // 0-30
+				color: '#ffffff', // Couleur par défaut du halo (blanc)
 			},
 		},
 		slotBorder: {
@@ -253,24 +260,43 @@ const CENTER_COVER_THRESHOLD = 3;
 		slotShadow: {
 			enabled: false,
 		},
-		showSlots: (typeof WCPC13 !== 'undefined' && WCPC13.settings && typeof WCPC13.settings.default_show_slots !== 'undefined') 
-			? WCPC13.settings.default_show_slots 
+		showSlots: (typeof WCPC13 !== 'undefined' && WCPC13.settings && typeof WCPC13.settings.default_show_slots !== 'undefined')
+			? WCPC13.settings.default_show_slots
 			: true,
 	};
 
 	function clampTransformValues(target) {
 		const transform = target || {};
-		const rawScale = Number.isFinite(transform.scale) ? transform.scale : MIN_SCALE;
-		const safeScale = Math.min(Math.max(rawScale, MIN_SCALE), MAX_SCALE);
+
+		// Vérifier si c'est l'image centrale en mode sans photos périphériques
+		const isCenterOnly = (state && state.center === target && !state.showSlots);
+
+		// Si c'est le cas, on autorise un dézoom plus important (jusqu'à 0.1)
+		const effectiveMinScale = isCenterOnly ? 0.1 : MIN_SCALE;
+
+		const rawScale = Number.isFinite(transform.scale) ? transform.scale : effectiveMinScale;
+		const safeScale = Math.min(Math.max(rawScale, effectiveMinScale), MAX_SCALE);
 		transform.scale = safeScale;
 
-		if (safeScale <= 1) {
+		// Si ce n'est PAS le mode centre seul, on empêche le déplacement si le zoom est <= 1
+		if (!isCenterOnly && safeScale <= 1) {
 			transform.x = 0;
 			transform.y = 0;
 			return { x: 0, y: 0, scale: safeScale, maxOffset: 0 };
 		}
 
-		const maxOffset = (safeScale - 1) * 50;
+		// Calculer l'offset max autorisé
+		let maxOffset;
+
+		if (isCenterOnly) {
+			// En mode centre seul, on autorise toujours un déplacement de 50% dans toutes les directions
+			// même si l'image est dézoomée
+			maxOffset = 50;
+		} else {
+			// Comportement standard : l'offset dépend du zoom (plus on zoom, plus on peut bouger)
+			maxOffset = (safeScale - 1) * 50;
+		}
+
 		const rawX = Number.isFinite(transform.x) ? transform.x : 0;
 		const rawY = Number.isFinite(transform.y) ? transform.y : 0;
 		const x = Math.max(-maxOffset, Math.min(maxOffset, rawX));
@@ -282,13 +308,13 @@ const CENTER_COVER_THRESHOLD = 3;
 		return { x: clampedX, y: clampedY, scale: safeScale, maxOffset };
 	}
 
-let dropzoneInstance = null;
-let handsTimer = null;
-let html2canvasLoader = null;
-let jsPDFLoader = null;
-let uploadTargetSlot = null;
-let shareLoading = false;
-let sharedConfigLoaded = false;
+	let dropzoneInstance = null;
+	let handsTimer = null;
+	let html2canvasLoader = null;
+	let jsPDFLoader = null;
+	let uploadTargetSlot = null;
+	let shareLoading = false;
+	let sharedConfigLoaded = false;
 
 	let livePreviewUpdateTimer = null;
 	let livePreviewUpdating = false;
@@ -510,7 +536,7 @@ let sharedConfigLoaded = false;
 					.then((html2canvas) => {
 						return html2canvas(previewEl, {
 							scale: scale,
-							backgroundColor: '#ffffff',
+							backgroundColor: state.backgroundColor || '#ffffff',
 							useCORS: true,
 							allowTaint: false,
 							logging: false,
@@ -531,7 +557,7 @@ let sharedConfigLoaded = false;
 										offsetLeft = centerRect.left - centerWrapperRect.left;
 										offsetTop = centerRect.top - centerWrapperRect.top;
 									}
-									
+
 									// S'assurer que l'image centrale est visible et correctement positionnée
 									clonedCenterEl.style.transform = 'none';
 									clonedCenterEl.style.left = `${offsetLeft * scale}px`;
@@ -545,7 +571,7 @@ let sharedConfigLoaded = false;
 									clonedCenterEl.style.display = 'block';
 									clonedCenterEl.style.visibility = 'visible';
 									clonedCenterEl.style.opacity = '1';
-									
+
 									// S'assurer que le background-image est bien copié
 									if (centerEl && state.center.image_url) {
 										const originalBg = centerComputedStyles.backgroundImage;
@@ -556,23 +582,23 @@ let sharedConfigLoaded = false;
 											clonedCenterEl.style.backgroundImage = `url("${state.center.image_url}")`;
 										}
 									}
-									
+
 									if (centerBackgroundSize) {
 										clonedCenterEl.style.backgroundSize = centerBackgroundSize;
 									} else {
 										clonedCenterEl.style.backgroundSize = 'cover';
 									}
-									
+
 									if (centerBackgroundPosition) {
 										clonedCenterEl.style.backgroundPosition = centerBackgroundPosition;
 									} else {
 										clonedCenterEl.style.backgroundPosition = 'center';
 									}
-									
+
 									if (centerTransformOrigin) {
 										clonedCenterEl.style.transformOrigin = centerTransformOrigin;
 									}
-									
+
 									if (clonedCenterWrapper && centerWrapperRect) {
 										const wrapperLeft = centerWrapperRect.left - previewRect.left;
 										const wrapperTop = centerWrapperRect.top - previewRect.top;
@@ -587,13 +613,13 @@ let sharedConfigLoaded = false;
 										clonedCenterWrapper.style.display = 'block';
 										clonedCenterWrapper.style.visibility = 'visible';
 									}
-									
+
 									// S'assurer que les aiguilles sont au-dessus mais n'obscurcissent pas l'image
 									const clonedHands = clonedDoc.querySelector('.wc-pc13-hands');
 									if (clonedHands) {
 										clonedHands.style.zIndex = '5';
 									}
-									
+
 									if (window.WCPC13_DEBUG) {
 										const cloneRect = clonedCenterEl.getBoundingClientRect();
 										console.groupCollapsed('🪞 DEBUG capturePreview - Clone html2canvas');
@@ -680,17 +706,17 @@ let sharedConfigLoaded = false;
 		try {
 			// Utiliser scale 1 et qualité réduite pour un upload plus rapide
 			const canvas = await capturePreview(1, { printMode: false, skipLivePreviewUpdate: true });
-			
+
 			// Créer une vignette de taille fixe (300x300px) pour le panier
 			const thumbnailSize = 300;
 			const thumbnailCanvas = document.createElement('canvas');
 			thumbnailCanvas.width = thumbnailSize;
 			thumbnailCanvas.height = thumbnailSize;
 			const thumbnailCtx = thumbnailCanvas.getContext('2d');
-			
+
 			// Dessiner le canvas original redimensionné dans la vignette
 			thumbnailCtx.drawImage(canvas, 0, 0, thumbnailSize, thumbnailSize);
-			
+
 			const blob = await canvasToJpegBlob(thumbnailCanvas, 0.75);
 
 			const formData = new FormData();
@@ -806,7 +832,7 @@ let sharedConfigLoaded = false;
 
 		const radius = diameter / 2;
 		const scaleFactor = options.scaleFactor || 1;
-		
+
 		// Dessiner l'ombre portée si activée
 		if (options.shadowEnabled) {
 			ctx.save();
@@ -816,7 +842,7 @@ let sharedConfigLoaded = false;
 			ctx.fill();
 			ctx.restore();
 		}
-		
+
 		ctx.save();
 		ctx.beginPath();
 		ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
@@ -839,7 +865,7 @@ let sharedConfigLoaded = false;
 
 		ctx.restore();
 		ctx.restore();
-		
+
 		// Dessiner la bordure si activée
 		if (options.borderEnabled && options.borderWidth && options.borderColor) {
 			ctx.save();
@@ -891,7 +917,7 @@ let sharedConfigLoaded = false;
 
 		// Dessiner le cercle de fond de l'horloge
 		ctx.save();
-		ctx.fillStyle = state.backgroundColor || '#fafafa';
+		ctx.fillStyle = state.backgroundColor || '#ffffff';
 		ctx.beginPath();
 		ctx.arc(centerX, centerY, outputSize / 2, 0, Math.PI * 2);
 		ctx.closePath();
@@ -1081,7 +1107,7 @@ let sharedConfigLoaded = false;
 				console.log(`[PDF] Slot ${entry.index}: image dessinée à (${slotCenterX.toFixed(1)}, ${slotCenterY.toFixed(1)})`);
 			}
 		});
-		
+
 		if (window.WCPC13_DEBUG) {
 			console.log(`[PDF] ${drawnSlotsCount} photos périphériques dessinées sur ${slotEntries.length}`);
 		}
@@ -1105,14 +1131,15 @@ let sharedConfigLoaded = false;
 			ctx.font = `${Math.round(fontSizePx)}px "Helvetica Neue", "Arial", sans-serif`;
 			ctx.textAlign = 'center';
 			ctx.textBaseline = 'middle';
-			
+
 			// Préparer les effets d'ombre et halo
 			const shadowEnabled = state.numbers.shadow && state.numbers.shadow.enabled;
 			const shadowIntensity = shadowEnabled ? (state.numbers.shadow.intensity || 5) : 0;
 			const glowEnabled = state.numbers.glow && state.numbers.glow.enabled;
 			const glowIntensity = glowEnabled ? (state.numbers.glow.intensity || 10) : 0;
+			const glowColor = glowEnabled ? ((state.numbers.glow && state.numbers.glow.color) || '#ffffff') : null;
 			const numberColor = state.numbers.color || '#222222';
-			
+
 			for (let i = 1; i <= 12; i++) {
 				// Calculer l'angle pour positionner le 12 en haut (comme une vraie horloge)
 				// Avec translateY(-radius) dans le calcul, l'angle 0° place l'élément en haut
@@ -1122,21 +1149,26 @@ let sharedConfigLoaded = false;
 				const angleRad = (angleDeg * Math.PI) / 180;
 				const numberX = centerX + Math.sin(angleRad) * numbersRadius;
 				const numberY = centerY - Math.cos(angleRad) * numbersRadius;
-				
+
 				const displayText = getDialDisplayText(i, numberType, intermediatePoints);
-				
+
 				// Dessiner le halo lumineux d'abord (derrière)
-				if (glowEnabled && glowIntensity > 0) {
+				if (glowEnabled && glowIntensity > 0 && glowColor) {
 					ctx.save();
-					ctx.shadowBlur = glowIntensity * 2 * scaleFactor;
-					ctx.shadowColor = numberColor;
+					// Utiliser une progression plus fluide : minimum 2px à intensité 1, maximum 60px à intensité 30
+					// Formule : base + (intensité - 1) * facteur pour une progression linéaire mais avec minimum visible
+					const baseGlow = 2; // Halo minimum visible même à intensité 1
+					const maxGlow = 60; // Halo maximum à intensité 30
+					const glowBlur = (baseGlow + ((glowIntensity - 1) / 29) * (maxGlow - baseGlow)) * scaleFactor;
+					ctx.shadowBlur = glowBlur;
+					ctx.shadowColor = glowColor;
 					ctx.shadowOffsetX = 0;
 					ctx.shadowOffsetY = 0;
 					ctx.fillStyle = numberColor;
 					ctx.fillText(displayText, numberX, numberY);
 					ctx.restore();
 				}
-				
+
 				// Dessiner l'ombre portée
 				if (shadowEnabled && shadowIntensity > 0) {
 					ctx.save();
@@ -1148,7 +1180,7 @@ let sharedConfigLoaded = false;
 					ctx.fillText(displayText, numberX, numberY);
 					ctx.restore();
 				}
-				
+
 				// Dessiner le texte principal
 				ctx.fillStyle = numberColor;
 				ctx.fillText(displayText, numberX, numberY);
@@ -1157,15 +1189,7 @@ let sharedConfigLoaded = false;
 		}
 
 		// Dessiner le cercle de fond de l'horloge
-		// Dessiner la bordure du cercle
-		ctx.save();
-		ctx.lineWidth = Math.max(6, outputSize * 0.006);
-		ctx.strokeStyle = '#111111';
-		ctx.beginPath();
-		ctx.arc(centerX, centerY, (outputSize / 2) - (ctx.lineWidth / 2), 0, Math.PI * 2);
-		ctx.closePath();
-		ctx.stroke();
-		ctx.restore();
+		// Pas de bordure pour le PDF HD
 
 		const pdfSizeMm = pxToMm(outputSize);
 		return {
@@ -1287,6 +1311,7 @@ let sharedConfigLoaded = false;
 		numberShadowFields: '.wc-pc13-number-shadow-fields',
 		numberGlowEnabled: '#wc-pc13-number-glow-enabled',
 		numberGlowIntensity: '#wc-pc13-number-glow-intensity',
+		numberGlowColor: '#wc-pc13-number-glow-color',
 		numberGlowFields: '.wc-pc13-number-glow-fields',
 		numbersFields: '.wc-pc13-numbers-fields',
 		centerSelectButton: '.wc-pc13-select-center',
@@ -1379,7 +1404,7 @@ let sharedConfigLoaded = false;
 		state.currentRingRadius = radius;
 		// Note: updateNumbersOverlay n'est PAS appelé ici car les chiffres sont indépendants des slots
 		// Les chiffres sont mis à jour dans applyTransforms() quand nécessaire
-		
+
 		// Recalculer le max du slider de distance des chiffres pour qu'il corresponde au bord du cadran
 		const numbersDistanceInput = configurator.querySelector('#wc-pc13-number-distance');
 		if (numbersDistanceInput) {
@@ -1388,7 +1413,7 @@ let sharedConfigLoaded = false;
 			const edgeDistance = (previewWidth / 2) - 10; // -10px de marge pour éviter que les chiffres touchent le bord
 			const maxDistance = Math.max(edgeDistance, 50); // Minimum 50px
 			numbersDistanceInput.max = `${Math.round(maxDistance)}`;
-			
+
 			// S'assurer que la valeur actuelle ne dépasse pas le nouveau max
 			let currentValue = parseInt(numbersDistanceInput.value, 10) || state.numbers.distance || 0;
 			// Si la valeur est 0 (non définie), utiliser 90% du max par défaut
@@ -1401,7 +1426,7 @@ let sharedConfigLoaded = false;
 				state.numbers.distance = maxDistance;
 			}
 			numbersDistanceInput.value = currentValue;
-			
+
 			// Mettre à jour l'affichage de la valeur en pourcentage
 			const valueDisplay = configurator.querySelector('#wc-pc13-number-distance-value');
 			if (valueDisplay && maxDistance > 0) {
@@ -1434,7 +1459,7 @@ let sharedConfigLoaded = false;
 		centerSizeRange.max = state.centerMax;
 
 		const previous = state.center.size;
-		
+
 		// Si les photos périphériques sont désactivées, mettre la taille au maximum
 		if (!state.showSlots) {
 			state.center.size = state.centerMax;
@@ -1443,14 +1468,14 @@ let sharedConfigLoaded = false;
 		}
 
 		centerSizeRange.value = state.center.size;
-		
+
 		// Mettre à jour l'affichage du pourcentage
 		const valueDisplay = configurator.querySelector('#wc-pc13-center-size-value');
 		if (valueDisplay && state.centerMax > 0) {
 			const percentage = Math.round((state.center.size / state.centerMax) * 100);
 			valueDisplay.textContent = `${percentage}%`;
 		}
-		
+
 		return previous !== state.center.size;
 	}
 
@@ -1514,7 +1539,7 @@ let sharedConfigLoaded = false;
 			if (!slotState) {
 				continue;
 			}
-			
+
 			const slotKeyStr = String(i);
 			const slot = configurator.querySelector(`${selectors.slot}[data-slot="${slotKeyStr}"] ${selectors.slotImage}`);
 			const slotInner = configurator.querySelector(`${selectors.slot}[data-slot="${slotKeyStr}"] .wc-pc13-slot-inner`);
@@ -1522,7 +1547,7 @@ let sharedConfigLoaded = false;
 				// Ne pas logger pour les slots qui n'existent pas encore
 				continue;
 			}
-			
+
 			// Debug pour vérifier que l'image est bien définie
 			if (slotState.image_url) {
 				console.log('applyTransforms - Slot', i, 'a une image:', slotState.image_url, 'display:', slotState.image_url_display);
@@ -1570,7 +1595,7 @@ let sharedConfigLoaded = false;
 
 			const { x, y, scale } = clampTransformValues(slotState);
 			slot.style.transform = 'none';
-			
+
 			// Appliquer les styles de background seulement si l'image existe
 			if (slotState.image_url) {
 				// Utiliser le scale pour le backgroundSize (scale * 100% pour zoomer)
@@ -1581,7 +1606,7 @@ let sharedConfigLoaded = false;
 				// S'assurer que l'image est visible
 				slot.style.opacity = '1';
 				slot.style.visibility = 'visible';
-				
+
 				// Debug pour vérifier que le scale est appliqué
 				if (window.WCPC13_DEBUG) {
 					console.log('applyTransforms - Slot', i, 'scale appliqué:', scale, 'backgroundSize:', backgroundSizeValue);
@@ -1592,7 +1617,7 @@ let sharedConfigLoaded = false;
 				slot.style.backgroundPosition = '';
 				slot.style.backgroundRepeat = '';
 			}
-			
+
 			// Utiliser requestAnimationFrame pour optimiser les mises à jour de backgroundPosition
 			// qui sont coûteuses en termes de performance
 			if (isDragging) {
@@ -1602,18 +1627,18 @@ let sharedConfigLoaded = false;
 			slot.dataset.axisX = x;
 			slot.dataset.axisY = y;
 			slot.dataset.zoom = scale;
-			
+
 			// Appliquer les styles de bordure et d'ombre (seulement si le slot n'est pas actif)
 			const slotElement = slot.closest(selectors.slot);
 			const isActive = slotElement && slotElement.classList.contains('active');
-			
+
 			if (!isActive) {
 				if (state.slotBorder.enabled) {
 					slot.style.border = `${state.slotBorder.width}px solid ${state.slotBorder.color}`;
 				} else {
 					slot.style.border = '';
 				}
-				
+
 				if (state.slotShadow.enabled) {
 					slot.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.3)';
 				} else {
@@ -1624,7 +1649,7 @@ let sharedConfigLoaded = false;
 				slot.style.border = '';
 				slot.style.boxShadow = '';
 			}
-			
+
 			if (slotInner) {
 				slotInner.dataset.axisX = x;
 				slotInner.dataset.axisY = y;
@@ -1656,8 +1681,9 @@ let sharedConfigLoaded = false;
 				// Pour le centre, utiliser image_url_display si disponible, sinon image_url
 				const centerDisplayUrl = state.center.image_url_display || state.center.image_url;
 				centerEl.style.backgroundImage = `url(${centerDisplayUrl})`;
+				centerEl.style.backgroundRepeat = 'no-repeat';
 				centerEl.classList.remove('empty');
-				
+
 				// Pendant le drag, désactiver les transitions pour de meilleures performances
 				if (isDragging) {
 					centerEl.style.transition = 'none';
@@ -1727,7 +1753,12 @@ let sharedConfigLoaded = false;
 		const slotFields = configurator.querySelector(selectors.slotFields);
 		const centerPanel = configurator.querySelector(selectors.centerPanel);
 
+		// Calculer le min scale autorisé
+		const isCenterOnly = (state.currentSlot === 'center' && !state.showSlots);
+		const minScale = isCenterOnly ? 0.1 : 1;
+
 		if (zoomRange) {
+			zoomRange.min = minScale;
 			const scaleValue = current.scale || 1;
 			zoomRange.value = scaleValue;
 			console.log('updateSelectionUI - zoomRange mis à jour pour slot:', state.currentSlot, 'scale:', scaleValue);
@@ -1757,7 +1788,7 @@ let sharedConfigLoaded = false;
 		if (centerSizeRange) {
 			centerSizeRange.disabled = !state.center.image_url;
 			centerSizeRange.value = state.center.size;
-			
+
 			// Afficher ou masquer le label du slider selon si une image centrale est présente
 			const centerSizeLabel = configurator.querySelector('.wc-pc13-center-size-label');
 			if (centerSizeLabel) {
@@ -1767,19 +1798,20 @@ let sharedConfigLoaded = false;
 					centerSizeLabel.style.display = 'none';
 				}
 			}
-			
+
 			// Afficher ou masquer les contrôles de zoom/position selon si une image centrale est présente
 			const centerControls = configurator.querySelector('.wc-pc13-center-controls');
 			if (centerControls) {
 				if (state.center.image_url) {
 					centerControls.style.display = 'block';
-					
+
 					// Mettre à jour les valeurs des contrôles
 					const centerZoom = centerControls.querySelector('#wc-pc13-center-zoom');
 					const centerAxisX = centerControls.querySelector('#wc-pc13-center-position-x');
 					const centerAxisY = centerControls.querySelector('#wc-pc13-center-position-y');
-					
+
 					if (centerZoom) {
+						centerZoom.min = minScale;
 						centerZoom.value = state.center.scale || 1;
 					}
 					if (centerAxisX) {
@@ -1788,11 +1820,22 @@ let sharedConfigLoaded = false;
 					if (centerAxisY) {
 						centerAxisY.value = -(state.center.y || 0);
 					}
+
+					// Mettre à jour les labels des sliders
+					// Pour centrer l'axe X/Y si on est dézoomé, on peut vouloir augmenter la plage
+					// Mais on garde les valeurs fixes des inputs HTML pour l'instant (-50 à 50 ou -100 à 100)
+					if (isCenterOnly) {
+						if (centerAxisX) { centerAxisX.max = 100; centerAxisX.min = -100; }
+						if (centerAxisY) { centerAxisY.max = 100; centerAxisY.min = -100; }
+					} else {
+						// Valeurs par défaut (supposées être 50 ou 100 dans le HTML)
+						// On ne touche pas si pas nécessaire, mais ici on relaxe pour centerOnly
+					}
 				} else {
 					centerControls.style.display = 'none';
 				}
 			}
-			
+
 			// Mettre à jour l'affichage du pourcentage
 			const valueDisplay = configurator.querySelector('#wc-pc13-center-size-value');
 			if (valueDisplay && state.centerMax > 0) {
@@ -1837,17 +1880,17 @@ let sharedConfigLoaded = false;
 		const numberShadowEnabled = configurator.querySelector(selectors.numberShadowEnabled);
 		const numberShadowIntensity = configurator.querySelector(selectors.numberShadowIntensity);
 		const numberShadowFields = configurator.querySelector(selectors.numberShadowFields);
-		
+
 		if (numberShadowEnabled) {
 			numberShadowEnabled.checked = !!(state.numbers.shadow && state.numbers.shadow.enabled);
 			numberShadowEnabled.disabled = !numbersEnabled;
 		}
-		
+
 		if (numberShadowIntensity) {
 			numberShadowIntensity.value = (state.numbers.shadow && state.numbers.shadow.intensity) || 5;
 			numberShadowIntensity.disabled = !numbersEnabled || !(state.numbers.shadow && state.numbers.shadow.enabled);
 		}
-		
+
 		if (numberShadowFields) {
 			numberShadowFields.style.display = (state.numbers.shadow && state.numbers.shadow.enabled) ? 'block' : 'none';
 		}
@@ -1855,17 +1898,20 @@ let sharedConfigLoaded = false;
 		const numberGlowEnabled = configurator.querySelector(selectors.numberGlowEnabled);
 		const numberGlowIntensity = configurator.querySelector(selectors.numberGlowIntensity);
 		const numberGlowFields = configurator.querySelector(selectors.numberGlowFields);
-		
+
 		if (numberGlowEnabled) {
 			numberGlowEnabled.checked = !!(state.numbers.glow && state.numbers.glow.enabled);
 			numberGlowEnabled.disabled = !numbersEnabled;
 		}
-		
+
 		if (numberGlowIntensity) {
+			// S'assurer que le slider a les bonnes valeurs min/max (gauche = min, droite = max)
+			numberGlowIntensity.min = '1';
+			numberGlowIntensity.max = '30';
 			numberGlowIntensity.value = (state.numbers.glow && state.numbers.glow.intensity) || 10;
 			numberGlowIntensity.disabled = !numbersEnabled || !(state.numbers.glow && state.numbers.glow.enabled);
 		}
-		
+
 		if (numberGlowFields) {
 			numberGlowFields.style.display = (state.numbers.glow && state.numbers.glow.enabled) ? 'block' : 'none';
 		}
@@ -1881,7 +1927,7 @@ let sharedConfigLoaded = false;
 		if (numbersDistanceInput) {
 			// Ne pas modifier le slider s'il est en cours d'utilisation (pour éviter qu'il disparaisse)
 			const isSliderActive = document.activeElement === numbersDistanceInput;
-			
+
 			let maxDistance = 350; // Valeur par défaut
 			const preview = configurator.querySelector('.wc-pc13-preview');
 			if (preview && state.currentRingRadius) {
@@ -1917,7 +1963,7 @@ let sharedConfigLoaded = false;
 				numbersDistanceInput.value = currentValue;
 			}
 			numbersDistanceInput.disabled = !numbersEnabled;
-			
+
 			// Mettre à jour l'affichage de la valeur en pourcentage
 			const valueDisplay = configurator.querySelector('#wc-pc13-number-distance-value');
 			if (valueDisplay && maxValue > 0) {
@@ -1961,13 +2007,13 @@ let sharedConfigLoaded = false;
 				// Afficher le panneau flottant et le positionner
 				floatingControls.style.display = 'block';
 				positionFloatingControls(state.currentSlot);
-				
+
 				// Mettre à jour les contrôles du panneau flottant
 				const floatingZoom = floatingControls.querySelector('input[data-zoom]');
 				const floatingAxisX = floatingControls.querySelector('input[data-axis="x"]');
 				const floatingAxisY = floatingControls.querySelector('input[data-axis="y"]');
 				const floatingRemove = floatingControls.querySelector('.wc-pc13-floating-remove');
-				
+
 				if (floatingZoom) {
 					const scaleValue = current.scale || 1;
 					floatingZoom.value = scaleValue;
@@ -1999,7 +2045,7 @@ let sharedConfigLoaded = false;
 
 	function savePayload() {
 		const payloadInput = document.querySelector(selectors.payload);
-		
+
 		const payload = {
 			color: state.color,
 			background_color: state.backgroundColor,
@@ -2018,7 +2064,7 @@ let sharedConfigLoaded = false;
 				numberType: state.numbers.numberType || 'arabic',
 				intermediatePoints: state.numbers.intermediatePoints || 'without',
 				shadow: state.numbers.shadow || { enabled: false, intensity: 5 },
-				glow: state.numbers.glow || { enabled: false, intensity: 10 },
+				glow: state.numbers.glow || { enabled: false, intensity: 10, color: '#ffffff' },
 			},
 			slot_border: state.slotBorder,
 			slot_shadow: state.slotShadow,
@@ -2027,7 +2073,7 @@ let sharedConfigLoaded = false;
 		if (payloadInput) {
 			payloadInput.value = JSON.stringify(payload);
 		}
-		
+
 		return payload;
 	}
 
@@ -2070,24 +2116,24 @@ let sharedConfigLoaded = false;
 			return;
 		}
 
-	if (!state.showSlots) {
-		return;
-	}
+		if (!state.showSlots) {
+			return;
+		}
 
 		const floatingControls = configurator.querySelector('.wc-pc13-floating-controls');
 		const preview = configurator.querySelector('.wc-pc13-preview');
-		
+
 		if (!floatingControls || !preview) {
 			return;
 		}
 
 		// Obtenir la position du preview
 		const previewRect = preview.getBoundingClientRect();
-		
+
 		// Centrer le panneau au centre de l'horloge (au niveau des aiguilles)
 		const centerX = previewRect.width / 2;
 		const centerY = previewRect.height / 2;
-		
+
 		floatingControls.style.left = `${centerX}px`;
 		floatingControls.style.top = `${centerY}px`;
 	}
@@ -2162,8 +2208,8 @@ let sharedConfigLoaded = false;
 			const img = new Image();
 			const reader = new FileReader();
 
-			reader.onload = function(e) {
-				img.onload = function() {
+			reader.onload = function (e) {
+				img.onload = function () {
 					// Calculer les nouvelles dimensions en conservant le ratio
 					let width = img.width;
 					let height = img.height;
@@ -2201,14 +2247,14 @@ let sharedConfigLoaded = false;
 					}, 'image/jpeg', quality);
 				};
 
-				img.onerror = function() {
+				img.onerror = function () {
 					reject(new Error('Erreur lors du chargement de l\'image'));
 				};
 
 				img.src = e.target.result;
 			};
 
-			reader.onerror = function() {
+			reader.onerror = function () {
 				reject(new Error('Erreur lors de la lecture du fichier'));
 			};
 
@@ -2300,106 +2346,208 @@ let sharedConfigLoaded = false;
 		return optimalScale;
 	}
 
-function applyUploadedImage(data, targetSlot = null) {
+	function applyUploadedImage(data, targetSlot = null) {
 		if (!data) {
 			return;
 		}
 
-	// Utiliser explicitement targetSlot si fourni, sinon state.currentSlot, sinon 'center'
-	let slotKey = targetSlot !== null && targetSlot !== undefined ? targetSlot : (state.currentSlot || 'center');
-	
-	// Convertir en nombre si c'est un slot périphérique (1-12)
-	if (slotKey !== 'center' && slotKey !== 'Centre') {
-		const numKey = parseInt(slotKey, 10);
-		if (!isNaN(numKey) && numKey >= 1 && numKey <= 12) {
-			slotKey = numKey;
+		// Utiliser explicitement targetSlot si fourni, sinon state.currentSlot, sinon 'center'
+		let slotKey = targetSlot !== null && targetSlot !== undefined ? targetSlot : (state.currentSlot || 'center');
+
+		// Convertir en nombre si c'est un slot périphérique (1-12)
+		if (slotKey !== 'center' && slotKey !== 'Centre') {
+			const numKey = parseInt(slotKey, 10);
+			if (!isNaN(numKey) && numKey >= 1 && numKey <= 12) {
+				slotKey = numKey;
+			}
 		}
-	}
-	
-	// Debug: vérifier que le slotKey est correct
-	console.log('applyUploadedImage - targetSlot:', targetSlot, 'slotKey:', slotKey, 'state.currentSlot:', state.currentSlot, 'data:', data);
-	
-	// Initialiser le slot s'il n'existe pas
-	if (slotKey !== 'center' && !state.slots[slotKey]) {
-		state.slots[slotKey] = {
-			attachment_id: 0,
-			image_url: '',
-			image_url_display: '',
-			x: 0,
-			y: 0,
-			scale: 1,
-		};
-		console.log('applyUploadedImage - Slot initialisé:', slotKey, state.slots[slotKey]);
-	}
-	
-	const target = slotKey === 'center' ? state.center : state.slots[slotKey];
-	
-	if (!target) {
-		console.error('applyUploadedImage - target introuvable pour slotKey:', slotKey, 'state.slots:', state.slots);
-		return;
-	}
-	
-	console.log('applyUploadedImage - target avant:', JSON.parse(JSON.stringify(target)));
-	
-	target.attachment_id = data.attachment_id || 0;
-	// Pour les slots périphériques, utiliser thumbnail pour l'affichage (performance)
-	// Pour le centre, utiliser full_url car l'image est plus grande
-	if (slotKey === 'center') {
-		target.image_url = data.full_url || data.url || '';
-		target.image_url_display = data.full_url || data.url || '';
-		// Calculer le scale optimal pour remplir le cercle sans blanc
-		const imageUrl = target.image_url;
-		if (imageUrl) {
-			const img = new Image();
-			img.onload = function() {
-				const configurator = document.querySelector(selectors.configurator);
-				// Récupérer la taille actuelle du centre
-				let centerSize = target.size || 180;
-				if (!target.size) {
-					const centerSizeRange = configurator ? configurator.querySelector(selectors.centerSizeRange) : null;
-					if (centerSizeRange) {
-						centerSize = parseInt(centerSizeRange.value || 180, 10);
+
+		// Debug: vérifier que le slotKey est correct
+		console.log('applyUploadedImage - targetSlot:', targetSlot, 'slotKey:', slotKey, 'state.currentSlot:', state.currentSlot, 'data:', data);
+
+		// Initialiser le slot s'il n'existe pas
+		if (slotKey !== 'center' && !state.slots[slotKey]) {
+			state.slots[slotKey] = {
+				attachment_id: 0,
+				image_url: '',
+				image_url_display: '',
+				x: 0,
+				y: 0,
+				scale: 1,
+			};
+			console.log('applyUploadedImage - Slot initialisé:', slotKey, state.slots[slotKey]);
+		}
+
+		const target = slotKey === 'center' ? state.center : state.slots[slotKey];
+
+		if (!target) {
+			console.error('applyUploadedImage - target introuvable pour slotKey:', slotKey, 'state.slots:', state.slots);
+			return;
+		}
+
+		console.log('applyUploadedImage - target avant:', JSON.parse(JSON.stringify(target)));
+
+		target.attachment_id = data.attachment_id || 0;
+		// Pour les slots périphériques, utiliser thumbnail pour l'affichage (performance)
+		// Pour le centre, utiliser full_url car l'image est plus grande
+		if (slotKey === 'center') {
+			target.image_url = data.full_url || data.url || '';
+			target.image_url_display = data.full_url || data.url || '';
+			// Calculer le scale optimal pour remplir le cercle sans blanc
+			const imageUrl = target.image_url;
+			if (imageUrl) {
+				const img = new Image();
+				img.onload = function () {
+					const configurator = document.querySelector(selectors.configurator);
+					// Récupérer la taille actuelle du centre
+					let centerSize = target.size || 180;
+					if (!target.size) {
+						const centerSizeRange = configurator ? configurator.querySelector(selectors.centerSizeRange) : null;
+						if (centerSizeRange) {
+							centerSize = parseInt(centerSizeRange.value || 180, 10);
+						}
 					}
-				}
-				
-				// Calculer le zoom optimal pour remplir le cercle
-				target.scale = calculateOptimalZoomForCircle(img.width, img.height, centerSize, DEFAULT_CENTER_INSET);
-				target.x = 0;
-				target.y = 0;
-				
-				// Appliquer les transformations après que le scale soit calculé
-				setTimeout(() => {
+
+					// Calculer le zoom optimal pour remplir le cercle
+					target.scale = calculateOptimalZoomForCircle(img.width, img.height, centerSize, DEFAULT_CENTER_INSET);
+					target.x = 0;
+					target.y = 0;
+
+					// Appliquer les transformations après que le scale soit calculé
+					setTimeout(() => {
+						applyTransforms();
+						updateSelectionUI();
+						savePayload();
+					}, 10);
+				};
+				img.onerror = function () {
+					// En cas d'erreur, utiliser scale par défaut plus élevé pour remplir
+					target.scale = 1.3;
+					target.x = 0;
+					target.y = 0;
 					applyTransforms();
 					updateSelectionUI();
 					savePayload();
-				}, 10);
-			};
-			img.onerror = function() {
-				// En cas d'erreur, utiliser scale par défaut plus élevé pour remplir
-				target.scale = 1.3;
+				};
+				img.src = imageUrl;
+				// Initialiser avec des valeurs par défaut, elles seront mises à jour dans onload
 				target.x = 0;
 				target.y = 0;
+				target.scale = 1;
+
+				// Définir la taille du centre si nécessaire (avant de retourner)
+				const configurator = document.querySelector(selectors.configurator);
+				const centerSizeRange = configurator ? configurator.querySelector(selectors.centerSizeRange) : null;
+				const centerMax = state.centerMax || (centerSizeRange ? parseInt(centerSizeRange.max || `${target.size || 180}`, 10) : (target.size || 180));
+				if (centerMax && !target.size) {
+					// Par défaut, définir la taille à 50% du maximum
+					const defaultSize = Math.round(centerMax * 0.5);
+					target.size = Math.max(CENTER_MIN_SIZE, defaultSize);
+					if (centerSizeRange) {
+						centerSizeRange.value = target.size;
+
+						// Mettre à jour l'affichage du pourcentage
+						const valueDisplay = configurator.querySelector('#wc-pc13-center-size-value');
+						if (valueDisplay && centerMax > 0) {
+							const percentage = Math.round((target.size / centerMax) * 100);
+							valueDisplay.textContent = `${percentage}%`;
+						}
+					}
+				}
+
+				// Appliquer immédiatement pour afficher l'image, le scale sera optimisé dans onload
 				applyTransforms();
 				updateSelectionUI();
 				savePayload();
-			};
-			img.src = imageUrl;
-			// Initialiser avec des valeurs par défaut, elles seront mises à jour dans onload
+				// Retourner ici car le scale optimal sera calculé et appliqué dans img.onload
+				return;
+			} else {
+				// Si pas d'URL, initialiser avec valeurs par défaut
+				target.x = 0;
+				target.y = 0;
+				target.scale = 1;
+			}
+		} else {
+			// Slots périphériques : utiliser full_url pour l'affichage et le PDF (car le thumbnail peut ne pas exister)
+			// Si full_url n'existe pas, utiliser url, mais vérifier que l'URL est valide
+			const fullUrl = data.full_url || data.url || '';
+			const thumbUrl = data.url || data.full_url || '';
+
+			// Utiliser full_url pour les deux car c'est l'URL garantie d'exister
+			target.image_url = fullUrl; // Pour le PDF/export
+			target.image_url_display = fullUrl; // Utiliser full_url pour l'affichage aussi
 			target.x = 0;
 			target.y = 0;
-			target.scale = 1;
-			
-			// Définir la taille du centre si nécessaire (avant de retourner)
+
+			// Calculer le scale optimal pour remplir le rond périphérique
+			const imageUrl = target.image_url;
+			if (imageUrl) {
+				const img = new Image();
+				img.onload = function () {
+					const configurator = document.querySelector(selectors.configurator);
+					// Récupérer la taille actuelle du slot périphérique (ringSize)
+					const ringSize = state.ringSize || 80; // Taille par défaut si non définie
+
+					// Calculer le zoom optimal pour remplir le cercle périphérique
+					// Utiliser le même inset que pour le centre (DEFAULT_CENTER_INSET = 14px)
+					target.scale = calculateOptimalZoomForCircle(img.width, img.height, ringSize, DEFAULT_CENTER_INSET);
+					target.x = 0;
+					target.y = 0;
+
+					// Appliquer les transformations après que le scale soit calculé
+					setTimeout(() => {
+						applyTransforms();
+						updateSelectionUI();
+						savePayload();
+					}, 10);
+				};
+				img.onerror = function () {
+					// En cas d'erreur, utiliser scale par défaut pour remplir
+					target.scale = 1.3;
+					target.x = 0;
+					target.y = 0;
+					applyTransforms();
+					updateSelectionUI();
+					savePayload();
+				};
+				img.src = imageUrl;
+				// Initialiser avec des valeurs par défaut, elles seront mises à jour dans onload
+				target.x = 0;
+				target.y = 0;
+				target.scale = 1;
+			} else {
+				// Si pas d'URL, initialiser avec valeurs par défaut
+				target.x = 0;
+				target.y = 0;
+				target.scale = 1;
+			}
+
+			console.log('applyUploadedImage - Slot périphérique mis à jour:', slotKey, 'image_url:', target.image_url, 'image_url_display:', target.image_url_display, 'full_url:', data.full_url, 'url:', data.url);
+			console.log('applyUploadedImage - state.slots après mise à jour:', JSON.parse(JSON.stringify(state.slots[slotKey])));
+
+			// Appliquer immédiatement pour afficher l'image, le scale sera optimisé dans img.onload
+			applyTransforms();
+			updateSelectionUI();
+			savePayload();
+			// Retourner ici car le scale optimal sera calculé et appliqué dans img.onload
+			return;
+		}
+
+		console.log('applyUploadedImage - image_url défini:', target.image_url, 'full_url:', data.full_url, 'url:', data.url);
+
+		console.log('applyUploadedImage - target après:', JSON.parse(JSON.stringify(target)));
+
+		if (slotKey === 'center') {
 			const configurator = document.querySelector(selectors.configurator);
 			const centerSizeRange = configurator ? configurator.querySelector(selectors.centerSizeRange) : null;
-			const centerMax = state.centerMax || (centerSizeRange ? parseInt(centerSizeRange.max || `${target.size || 180}`, 10) : (target.size || 180));
-			if (centerMax && !target.size) {
+			const centerMax = state.centerMax || (centerSizeRange ? parseInt(centerSizeRange.max || `${state.center.size}`, 10) : state.center.size);
+			if (centerMax) {
 				// Par défaut, définir la taille à 50% du maximum
 				const defaultSize = Math.round(centerMax * 0.5);
 				target.size = Math.max(CENTER_MIN_SIZE, defaultSize);
 				if (centerSizeRange) {
 					centerSizeRange.value = target.size;
-					
+
 					// Mettre à jour l'affichage du pourcentage
 					const valueDisplay = configurator.querySelector('#wc-pc13-center-size-value');
 					if (valueDisplay && centerMax > 0) {
@@ -2408,165 +2556,63 @@ function applyUploadedImage(data, targetSlot = null) {
 					}
 				}
 			}
-			
-			// Appliquer immédiatement pour afficher l'image, le scale sera optimisé dans onload
-			applyTransforms();
-			updateSelectionUI();
-			savePayload();
-			// Retourner ici car le scale optimal sera calculé et appliqué dans img.onload
-			return;
-		} else {
-			// Si pas d'URL, initialiser avec valeurs par défaut
-			target.x = 0;
-			target.y = 0;
-			target.scale = 1;
 		}
-	} else {
-		// Slots périphériques : utiliser full_url pour l'affichage et le PDF (car le thumbnail peut ne pas exister)
-		// Si full_url n'existe pas, utiliser url, mais vérifier que l'URL est valide
-		const fullUrl = data.full_url || data.url || '';
-		const thumbUrl = data.url || data.full_url || '';
-		
-		// Utiliser full_url pour les deux car c'est l'URL garantie d'exister
-		target.image_url = fullUrl; // Pour le PDF/export
-		target.image_url_display = fullUrl; // Utiliser full_url pour l'affichage aussi
-		target.x = 0;
-		target.y = 0;
-		
-		// Calculer le scale optimal pour remplir le rond périphérique
-		const imageUrl = target.image_url;
-		if (imageUrl) {
-			const img = new Image();
-			img.onload = function() {
-				const configurator = document.querySelector(selectors.configurator);
-				// Récupérer la taille actuelle du slot périphérique (ringSize)
-				const ringSize = state.ringSize || 80; // Taille par défaut si non définie
-				
-				// Calculer le zoom optimal pour remplir le cercle périphérique
-				// Utiliser le même inset que pour le centre (DEFAULT_CENTER_INSET = 14px)
-				target.scale = calculateOptimalZoomForCircle(img.width, img.height, ringSize, DEFAULT_CENTER_INSET);
-				target.x = 0;
-				target.y = 0;
-				
-				// Appliquer les transformations après que le scale soit calculé
-				setTimeout(() => {
-					applyTransforms();
-					updateSelectionUI();
-					savePayload();
-				}, 10);
-			};
-			img.onerror = function() {
-				// En cas d'erreur, utiliser scale par défaut pour remplir
-				target.scale = 1.3;
-				target.x = 0;
-				target.y = 0;
-				applyTransforms();
-				updateSelectionUI();
-				savePayload();
-			};
-			img.src = imageUrl;
-			// Initialiser avec des valeurs par défaut, elles seront mises à jour dans onload
-			target.x = 0;
-			target.y = 0;
-			target.scale = 1;
-		} else {
-			// Si pas d'URL, initialiser avec valeurs par défaut
-			target.x = 0;
-			target.y = 0;
-			target.scale = 1;
-		}
-		
-		console.log('applyUploadedImage - Slot périphérique mis à jour:', slotKey, 'image_url:', target.image_url, 'image_url_display:', target.image_url_display, 'full_url:', data.full_url, 'url:', data.url);
-		console.log('applyUploadedImage - state.slots après mise à jour:', JSON.parse(JSON.stringify(state.slots[slotKey])));
-		
-		// Appliquer immédiatement pour afficher l'image, le scale sera optimisé dans img.onload
+
+		// Forcer la mise à jour de l'affichage pour le slot spécifique
+		console.log('applyUploadedImage - Appel de applyTransforms() pour slotKey:', slotKey);
 		applyTransforms();
 		updateSelectionUI();
 		savePayload();
-		// Retourner ici car le scale optimal sera calculé et appliqué dans img.onload
-		return;
-	}
-	
-	console.log('applyUploadedImage - image_url défini:', target.image_url, 'full_url:', data.full_url, 'url:', data.url);
-	
-	console.log('applyUploadedImage - target après:', JSON.parse(JSON.stringify(target)));
 
-		if (slotKey === 'center') {
-			const configurator = document.querySelector(selectors.configurator);
-			const centerSizeRange = configurator ? configurator.querySelector(selectors.centerSizeRange) : null;
-			const centerMax = state.centerMax || (centerSizeRange ? parseInt(centerSizeRange.max || `${state.center.size}`, 10) : state.center.size);
-			if (centerMax) {
-			// Par défaut, définir la taille à 50% du maximum
-			const defaultSize = Math.round(centerMax * 0.5);
-			target.size = Math.max(CENTER_MIN_SIZE, defaultSize);
-			if (centerSizeRange) {
-				centerSizeRange.value = target.size;
-				
-				// Mettre à jour l'affichage du pourcentage
-				const valueDisplay = configurator.querySelector('#wc-pc13-center-size-value');
-				if (valueDisplay && centerMax > 0) {
-					const percentage = Math.round((target.size / centerMax) * 100);
-					valueDisplay.textContent = `${percentage}%`;
-				}
-			}
-			}
-		}
+		// Forcer un rafraîchissement visuel supplémentaire pour s'assurer que l'image s'affiche
+		if (slotKey !== 'center') {
+			// Utiliser requestAnimationFrame pour s'assurer que le DOM est à jour
+			requestAnimationFrame(() => {
+				setTimeout(() => {
+					const configurator = document.querySelector(selectors.configurator);
+					if (configurator && state.slots[slotKey]) {
+						const slotKeyStr = String(slotKey);
+						const slot = configurator.querySelector(`${selectors.slot}[data-slot="${slotKeyStr}"] ${selectors.slotImage}`);
+						const slotInner = configurator.querySelector(`${selectors.slot}[data-slot="${slotKeyStr}"] .wc-pc13-slot-inner`);
+						const slotState = state.slots[slotKey];
 
-	// Forcer la mise à jour de l'affichage pour le slot spécifique
-	console.log('applyUploadedImage - Appel de applyTransforms() pour slotKey:', slotKey);
-	applyTransforms();
-	updateSelectionUI();
-	savePayload();
-	
-	// Forcer un rafraîchissement visuel supplémentaire pour s'assurer que l'image s'affiche
-	if (slotKey !== 'center') {
-		// Utiliser requestAnimationFrame pour s'assurer que le DOM est à jour
-		requestAnimationFrame(() => {
-			setTimeout(() => {
-				const configurator = document.querySelector(selectors.configurator);
-				if (configurator && state.slots[slotKey]) {
-					const slotKeyStr = String(slotKey);
-					const slot = configurator.querySelector(`${selectors.slot}[data-slot="${slotKeyStr}"] ${selectors.slotImage}`);
-					const slotInner = configurator.querySelector(`${selectors.slot}[data-slot="${slotKeyStr}"] .wc-pc13-slot-inner`);
-					const slotState = state.slots[slotKey];
-					
-					if (slot && slotState && slotState.image_url) {
-						const displayUrl = (slotState.image_url_display || slotState.image_url).trim();
-						if (displayUrl) {
-							// Forcer l'affichage de l'image avec tous les styles nécessaires
-							slot.style.setProperty('background-image', `url("${displayUrl}")`, 'important');
-							slot.style.setProperty('background-repeat', 'no-repeat', 'important');
-							slot.style.setProperty('background-size', `${(slotState.scale || 1) * 100}%`, 'important');
-							slot.style.setProperty('background-position', `${50 + (slotState.x || 0)}% ${50 + (slotState.y || 0)}%`, 'important');
-							slot.style.setProperty('opacity', '1', 'important');
-							slot.style.setProperty('visibility', 'visible', 'important');
-							slot.style.setProperty('display', 'block', 'important');
-							slot.classList.remove('empty');
-							if (slotInner) {
-								slotInner.classList.add('has-image');
+						if (slot && slotState && slotState.image_url) {
+							const displayUrl = (slotState.image_url_display || slotState.image_url).trim();
+							if (displayUrl) {
+								// Forcer l'affichage de l'image avec tous les styles nécessaires
+								slot.style.setProperty('background-image', `url("${displayUrl}")`, 'important');
+								slot.style.setProperty('background-repeat', 'no-repeat', 'important');
+								slot.style.setProperty('background-size', `${(slotState.scale || 1) * 100}%`, 'important');
+								slot.style.setProperty('background-position', `${50 + (slotState.x || 0)}% ${50 + (slotState.y || 0)}%`, 'important');
+								slot.style.setProperty('opacity', '1', 'important');
+								slot.style.setProperty('visibility', 'visible', 'important');
+								slot.style.setProperty('display', 'block', 'important');
+								slot.classList.remove('empty');
+								if (slotInner) {
+									slotInner.classList.add('has-image');
+								}
+								console.log('applyUploadedImage - Image forcée sur slot:', slotKey, 'URL:', displayUrl, 'slot trouvé:', !!slot, 'styles appliqués');
+
+								// Vérifier que l'image est bien chargée
+								const testImg = new Image();
+								testImg.onload = () => {
+									console.log('applyUploadedImage - Image chargée avec succès:', displayUrl);
+								};
+								testImg.onerror = () => {
+									console.error('applyUploadedImage - Erreur de chargement de l\'image:', displayUrl);
+								};
+								testImg.src = displayUrl;
+							} else {
+								console.error('applyUploadedImage - URL vide pour slot:', slotKey);
 							}
-							console.log('applyUploadedImage - Image forcée sur slot:', slotKey, 'URL:', displayUrl, 'slot trouvé:', !!slot, 'styles appliqués');
-							
-							// Vérifier que l'image est bien chargée
-							const testImg = new Image();
-							testImg.onload = () => {
-								console.log('applyUploadedImage - Image chargée avec succès:', displayUrl);
-							};
-							testImg.onerror = () => {
-								console.error('applyUploadedImage - Erreur de chargement de l\'image:', displayUrl);
-							};
-							testImg.src = displayUrl;
 						} else {
-							console.error('applyUploadedImage - URL vide pour slot:', slotKey);
+							console.error('applyUploadedImage - Slot ou image_url introuvable:', slotKey, 'slot:', !!slot, 'slotState:', !!slotState, 'image_url:', slotState?.image_url);
 						}
-					} else {
-						console.error('applyUploadedImage - Slot ou image_url introuvable:', slotKey, 'slot:', !!slot, 'slotState:', !!slotState, 'image_url:', slotState?.image_url);
 					}
-				}
-			}, 200);
-		});
+				}, 200);
+			});
+		}
 	}
-}
 
 	function deleteAttachment(attachmentId) {
 		if (!attachmentId) {
@@ -2585,155 +2631,155 @@ function applyUploadedImage(data, targetSlot = null) {
 		}).then(() => undefined);
 	}
 
-function processFile(file, inputEl) {
-	if (!file) {
-		return;
-	}
-
-	const maxBytes = WCPC13.settings && WCPC13.settings.max_upload_bytes ? parseInt(WCPC13.settings.max_upload_bytes, 10) : 0;
-	if (maxBytes && file.size > maxBytes) {
-		window.alert(WCPC13.labels.file_too_large);
-	if (inputEl) {
-		inputEl.value = '';
-	}
-		return;
-	}
-
-	// Déterminer le slot cible en priorité : uploadTargetSlot > dataset.targetSlot > state.currentSlot > 'center'
-	// IMPORTANT: Sauvegarder la valeur AVANT de nettoyer
-	let slotKey = uploadTargetSlot;
-	if (!slotKey && inputEl && inputEl.dataset && inputEl.dataset.targetSlot) {
-		// Convertir en nombre si c'est un nombre
-		const datasetSlot = inputEl.dataset.targetSlot;
-		slotKey = (datasetSlot === 'center' || datasetSlot === 'Centre') ? 'center' : (parseInt(datasetSlot, 10) || datasetSlot);
-	}
-	if (!slotKey) {
-		slotKey = state.currentSlot;
-	}
-	if (!slotKey) {
-		slotKey = 'center';
-	}
-	
-	const configurator = document.querySelector(selectors.configurator);
-	
-	// Debug: vérifier que le slotKey est bien défini
-	console.log('processFile - slotKey:', slotKey, 'uploadTargetSlot:', uploadTargetSlot, 'state.currentSlot:', state.currentSlot, 'inputEl.dataset.targetSlot:', inputEl && inputEl.dataset ? inputEl.dataset.targetSlot : 'N/A');
-	
-	// Nettoyer le targetSlot pour les prochains uploads APRÈS avoir sauvegardé la valeur
-	// Convertir savedSlotKey en nombre si c'est un nombre valide (pour les slots périphériques)
-	let savedSlotKey = slotKey;
-	if (typeof slotKey === 'string' && slotKey !== 'center' && !isNaN(parseInt(slotKey, 10))) {
-		savedSlotKey = parseInt(slotKey, 10);
-	}
-	
-	if (inputEl && inputEl.dataset) {
-		delete inputEl.dataset.targetSlot;
-	}
-	uploadTargetSlot = null;
-
-	const slotElement = configurator
-		? (savedSlotKey === 'center'
-			? configurator.querySelector(selectors.center)
-			: configurator.querySelector(`${selectors.slot}[data-slot="${savedSlotKey}"]`))
-		: null;
-	if (slotElement) {
-		slotElement.classList.add('wc-pc13-slot-loading');
-	}
-	
-	// Afficher le loader
-	let loadingButton = null;
-	let originalText = '';
-	if (savedSlotKey === 'center') {
-		loadingButton = configurator ? configurator.querySelector(selectors.centerSelectButton) : null;
-		if (loadingButton) {
-			originalText = loadingButton.textContent.trim();
+	function processFile(file, inputEl) {
+		if (!file) {
+			return;
 		}
-	} else {
-		// Pour les slots périphériques, trouver le bouton d'upload
-		loadingButton = configurator ? configurator.querySelector('.wc-pc13-upload-button') : null;
-		if (loadingButton) {
-			originalText = loadingButton.textContent.trim();
+
+		const maxBytes = WCPC13.settings && WCPC13.settings.max_upload_bytes ? parseInt(WCPC13.settings.max_upload_bytes, 10) : 0;
+		if (maxBytes && file.size > maxBytes) {
+			window.alert(WCPC13.labels.file_too_large);
+			if (inputEl) {
+				inputEl.value = '';
+			}
+			return;
 		}
-	}
-	
-	if (loadingButton && originalText) {
-		loadingButton.disabled = true;
-		loadingButton.classList.add('wc-pc13-loading');
-		loadingButton.innerHTML = '<span class="wc-pc13-spinner"></span> ' + originalText;
-	}
 
-	// Debug avant uploadFile
-	if (window.WCPC13_DEBUG) {
-		console.log('processFile - Avant uploadFile, savedSlotKey:', savedSlotKey, 'file:', file.name);
-	}
+		// Déterminer le slot cible en priorité : uploadTargetSlot > dataset.targetSlot > state.currentSlot > 'center'
+		// IMPORTANT: Sauvegarder la valeur AVANT de nettoyer
+		let slotKey = uploadTargetSlot;
+		if (!slotKey && inputEl && inputEl.dataset && inputEl.dataset.targetSlot) {
+			// Convertir en nombre si c'est un nombre
+			const datasetSlot = inputEl.dataset.targetSlot;
+			slotKey = (datasetSlot === 'center' || datasetSlot === 'Centre') ? 'center' : (parseInt(datasetSlot, 10) || datasetSlot);
+		}
+		if (!slotKey) {
+			slotKey = state.currentSlot;
+		}
+		if (!slotKey) {
+			slotKey = 'center';
+		}
 
-	// Pour les slots périphériques, redimensionner l'image côté client avant l'upload
-	const isPeripheral = savedSlotKey !== 'center' && savedSlotKey !== 'Centre' && 
-		typeof savedSlotKey === 'number' && savedSlotKey >= 1 && savedSlotKey <= 12;
+		const configurator = document.querySelector(selectors.configurator);
 
-	let uploadPromise;
-	if (isPeripheral) {
-		// Redimensionner l'image côté client à 2000px max pour alléger le serveur
-		uploadPromise = resizeImageForPeripheral(file, 2000, 0.9)
-			.then((resizedBlob) => {
-				// Créer un nouveau File à partir du blob pour l'upload
-				const resizedFile = new File([resizedBlob], file.name, { type: 'image/jpeg' });
+		// Debug: vérifier que le slotKey est bien défini
+		console.log('processFile - slotKey:', slotKey, 'uploadTargetSlot:', uploadTargetSlot, 'state.currentSlot:', state.currentSlot, 'inputEl.dataset.targetSlot:', inputEl && inputEl.dataset ? inputEl.dataset.targetSlot : 'N/A');
+
+		// Nettoyer le targetSlot pour les prochains uploads APRÈS avoir sauvegardé la valeur
+		// Convertir savedSlotKey en nombre si c'est un nombre valide (pour les slots périphériques)
+		let savedSlotKey = slotKey;
+		if (typeof slotKey === 'string' && slotKey !== 'center' && !isNaN(parseInt(slotKey, 10))) {
+			savedSlotKey = parseInt(slotKey, 10);
+		}
+
+		if (inputEl && inputEl.dataset) {
+			delete inputEl.dataset.targetSlot;
+		}
+		uploadTargetSlot = null;
+
+		const slotElement = configurator
+			? (savedSlotKey === 'center'
+				? configurator.querySelector(selectors.center)
+				: configurator.querySelector(`${selectors.slot}[data-slot="${savedSlotKey}"]`))
+			: null;
+		if (slotElement) {
+			slotElement.classList.add('wc-pc13-slot-loading');
+		}
+
+		// Afficher le loader
+		let loadingButton = null;
+		let originalText = '';
+		if (savedSlotKey === 'center') {
+			loadingButton = configurator ? configurator.querySelector(selectors.centerSelectButton) : null;
+			if (loadingButton) {
+				originalText = loadingButton.textContent.trim();
+			}
+		} else {
+			// Pour les slots périphériques, trouver le bouton d'upload
+			loadingButton = configurator ? configurator.querySelector('.wc-pc13-upload-button') : null;
+			if (loadingButton) {
+				originalText = loadingButton.textContent.trim();
+			}
+		}
+
+		if (loadingButton && originalText) {
+			loadingButton.disabled = true;
+			loadingButton.classList.add('wc-pc13-loading');
+			loadingButton.innerHTML = '<span class="wc-pc13-spinner"></span> ' + originalText;
+		}
+
+		// Debug avant uploadFile
+		if (window.WCPC13_DEBUG) {
+			console.log('processFile - Avant uploadFile, savedSlotKey:', savedSlotKey, 'file:', file.name);
+		}
+
+		// Pour les slots périphériques, redimensionner l'image côté client avant l'upload
+		const isPeripheral = savedSlotKey !== 'center' && savedSlotKey !== 'Centre' &&
+			typeof savedSlotKey === 'number' && savedSlotKey >= 1 && savedSlotKey <= 12;
+
+		let uploadPromise;
+		if (isPeripheral) {
+			// Redimensionner l'image côté client à 2000px max pour alléger le serveur
+			uploadPromise = resizeImageForPeripheral(file, 2000, 0.9)
+				.then((resizedBlob) => {
+					// Créer un nouveau File à partir du blob pour l'upload
+					const resizedFile = new File([resizedBlob], file.name, { type: 'image/jpeg' });
+					if (window.WCPC13_DEBUG) {
+						console.log('processFile - Image redimensionnée côté client:', {
+							originalSize: file.size,
+							resizedSize: resizedBlob.size,
+							reduction: Math.round((1 - resizedBlob.size / file.size) * 100) + '%'
+						});
+					}
+					return uploadFile(savedSlotKey, resizedFile);
+				});
+		} else {
+			// Pour le centre, uploader l'image originale
+			uploadPromise = uploadFile(savedSlotKey, file);
+		}
+
+		uploadPromise
+			.then((response) => {
+				// Debug avant applyUploadedImage
 				if (window.WCPC13_DEBUG) {
-					console.log('processFile - Image redimensionnée côté client:', {
-						originalSize: file.size,
-						resizedSize: resizedBlob.size,
-						reduction: Math.round((1 - resizedBlob.size / file.size) * 100) + '%'
-					});
+					console.log('processFile - Réponse uploadFile reçue, savedSlotKey:', savedSlotKey, 'response:', response);
 				}
-				return uploadFile(savedSlotKey, resizedFile);
+				// S'assurer que le slotKey est bien passé à applyUploadedImage
+				applyUploadedImage(response, savedSlotKey);
+			})
+			.catch((error) => {
+				console.error('Erreur uploadFile:', error);
+				window.alert(error);
+			})
+			.finally(() => {
+				if (slotElement) {
+					slotElement.classList.remove('wc-pc13-slot-loading');
+				}
+				// Masquer le loader
+				if (loadingButton && originalText) {
+					loadingButton.disabled = false;
+					loadingButton.classList.remove('wc-pc13-loading');
+					loadingButton.textContent = originalText;
+				}
 			});
-	} else {
-		// Pour le centre, uploader l'image originale
-		uploadPromise = uploadFile(savedSlotKey, file);
+		if (inputEl) {
+			inputEl.value = '';
+		}
 	}
 
-	uploadPromise
-		.then((response) => {
-			// Debug avant applyUploadedImage
-			if (window.WCPC13_DEBUG) {
-				console.log('processFile - Réponse uploadFile reçue, savedSlotKey:', savedSlotKey, 'response:', response);
-			}
-			// S'assurer que le slotKey est bien passé à applyUploadedImage
-			applyUploadedImage(response, savedSlotKey);
-		})
-		.catch((error) => {
-			console.error('Erreur uploadFile:', error);
-			window.alert(error);
-		})
-		.finally(() => {
-			if (slotElement) {
-				slotElement.classList.remove('wc-pc13-slot-loading');
-			}
-			// Masquer le loader
-			if (loadingButton && originalText) {
-				loadingButton.disabled = false;
-				loadingButton.classList.remove('wc-pc13-loading');
-				loadingButton.textContent = originalText;
-			}
-		});
-	if (inputEl) {
-		inputEl.value = '';
-	}
-}
+	function handleFileChange(event) {
+		const file = event.target.files[0];
+		if (!file) {
+			return;
+		}
 
-function handleFileChange(event) {
-	const file = event.target.files[0];
-	if (!file) {
-		return;
-	}
+		// Debug: vérifier les valeurs avant processFile
+		if (window.WCPC13_DEBUG) {
+			console.log('handleFileChange - uploadTargetSlot:', uploadTargetSlot, 'state.currentSlot:', state.currentSlot, 'dataset.targetSlot:', event.target.dataset?.targetSlot);
+		}
 
-	// Debug: vérifier les valeurs avant processFile
-	if (window.WCPC13_DEBUG) {
-		console.log('handleFileChange - uploadTargetSlot:', uploadTargetSlot, 'state.currentSlot:', state.currentSlot, 'dataset.targetSlot:', event.target.dataset?.targetSlot);
+		processFile(file, event.target);
 	}
-
-	processFile(file, event.target);
-}
 
 	function handleRemove() {
 		const current = getCurrentSlotState();
@@ -2791,302 +2837,359 @@ function handleFileChange(event) {
 
 	function handleRingSizeChange(event) {
 		state.ringSize = parseInt(event.target.value, 10);
-	applyTransforms();
-	updateSelectionUI();
+		applyTransforms();
+		updateSelectionUI();
 		savePayload();
 	}
 
-function handleCenterSizeChange(event) {
-	const value = parseInt(event.target.value, 10);
-	if (Number.isNaN(value)) {
-		return;
-	}
-
-	const maxSize = state.centerMax || parseInt(event.target.getAttribute('max') || `${value}`, 10);
-	const clamped = Math.max(CENTER_MIN_SIZE, Math.min(maxSize, value));
-	state.center.size = clamped;
-	
-	// Mettre à jour l'affichage du pourcentage
-	const valueDisplay = document.getElementById('wc-pc13-center-size-value');
-	if (valueDisplay && maxSize > 0) {
-		const percentage = Math.round((clamped / maxSize) * 100);
-		valueDisplay.textContent = `${percentage}%`;
-	}
-	
-	applyTransforms();
-	savePayload();
-}
-
-function handleNumbersToggle(event) {
-	// S'assurer que l'événement vient bien du checkbox et non d'une propagation
-	// Ne traiter que si c'est un clic direct sur la checkbox ou si c'est un événement change depuis la checkbox
-	if (event.type === 'click' && (event.target.type !== 'checkbox' || event.target.id !== 'wc-pc13-show-numbers')) {
-		// Si c'est un clic sur le span, laisser le comportement par défaut du label
-		if (event.target.tagName === 'SPAN' && event.target.closest('.wc-pc13-toggle')) {
-			// Le label gérera automatiquement le clic sur le checkbox
+	function handleCenterSizeChange(event) {
+		const value = parseInt(event.target.value, 10);
+		if (Number.isNaN(value)) {
 			return;
 		}
-		// Pour tout autre élément, empêcher la propagation
-		event.stopPropagation();
-		return;
-	}
-	
-	// Pour l'événement change, s'assurer que c'est bien la bonne checkbox
-	if (event.type === 'change' && (event.target.type !== 'checkbox' || event.target.id !== 'wc-pc13-show-numbers')) {
-		return;
-	}
-	
-	state.showNumbers = !!event.target.checked;
-	
-	const configurator = document.querySelector(selectors.configurator);
-	const numbersFields = configurator ? configurator.querySelector(selectors.numbersFields) : null;
-	
-	// Afficher ou masquer les champs des options des chiffres
-	if (numbersFields) {
-		if (state.showNumbers) {
-			numbersFields.style.display = 'flex';
-			numbersFields.classList.add('is-active');
-		} else {
-			numbersFields.style.display = 'none';
-			numbersFields.classList.remove('is-active');
+
+		const maxSize = state.centerMax || parseInt(event.target.getAttribute('max') || `${value}`, 10);
+		const clamped = Math.max(CENTER_MIN_SIZE, Math.min(maxSize, value));
+		state.center.size = clamped;
+
+		// Mettre à jour l'affichage du pourcentage
+		const valueDisplay = document.getElementById('wc-pc13-center-size-value');
+		if (valueDisplay && maxSize > 0) {
+			const percentage = Math.round((clamped / maxSize) * 100);
+			valueDisplay.textContent = `${percentage}%`;
 		}
+
+		applyTransforms();
+		savePayload();
 	}
-	
-	// Si l'option est activée et que la distance n'est pas encore définie (ou est à 0), définir à 77% par défaut
-	if (state.showNumbers && (!state.numbers.distance || state.numbers.distance === 0)) {
-		const numbersDistanceInput = configurator ? configurator.querySelector(selectors.numbersDistance) : null;
-		if (numbersDistanceInput) {
-			const maxValue = parseInt(numbersDistanceInput.max, 10);
-			if (maxValue > 0) {
-				const defaultDistance = Math.round(maxValue * 0.77); // 77% du max
-				state.numbers.distance = defaultDistance;
-				numbersDistanceInput.value = defaultDistance;
-				
-				// Mettre à jour l'affichage du pourcentage
-				const valueDisplay = configurator.querySelector('#wc-pc13-number-distance-value');
-				if (valueDisplay) {
-					valueDisplay.textContent = '77%';
+
+	function handleNumbersToggle(event) {
+		// S'assurer que l'événement vient bien du checkbox et non d'une propagation
+		// Ne traiter que si c'est un clic direct sur la checkbox ou si c'est un événement change depuis la checkbox
+		if (event.type === 'click' && (event.target.type !== 'checkbox' || event.target.id !== 'wc-pc13-show-numbers')) {
+			// Si c'est un clic sur le span, laisser le comportement par défaut du label
+			if (event.target.tagName === 'SPAN' && event.target.closest('.wc-pc13-toggle')) {
+				// Le label gérera automatiquement le clic sur le checkbox
+				return;
+			}
+			// Pour tout autre élément, empêcher la propagation
+			event.stopPropagation();
+			return;
+		}
+
+		// Pour l'événement change, s'assurer que c'est bien la bonne checkbox
+		if (event.type === 'change' && (event.target.type !== 'checkbox' || event.target.id !== 'wc-pc13-show-numbers')) {
+			return;
+		}
+
+		state.showNumbers = !!event.target.checked;
+
+		const configurator = document.querySelector(selectors.configurator);
+		const numbersFields = configurator ? configurator.querySelector(selectors.numbersFields) : null;
+
+		// Afficher ou masquer les champs des options des chiffres
+		if (numbersFields) {
+			if (state.showNumbers) {
+				numbersFields.style.display = 'flex';
+				numbersFields.classList.add('is-active');
+			} else {
+				numbersFields.style.display = 'none';
+				numbersFields.classList.remove('is-active');
+			}
+		}
+
+		// Si l'option est activée et que la distance n'est pas encore définie (ou est à 0), définir à 77% par défaut
+		if (state.showNumbers && (!state.numbers.distance || state.numbers.distance === 0)) {
+			const numbersDistanceInput = configurator ? configurator.querySelector(selectors.numbersDistance) : null;
+			if (numbersDistanceInput) {
+				const maxValue = parseInt(numbersDistanceInput.max, 10);
+				if (maxValue > 0) {
+					const defaultDistance = Math.round(maxValue * 0.77); // 77% du max
+					state.numbers.distance = defaultDistance;
+					numbersDistanceInput.value = defaultDistance;
+
+					// Mettre à jour l'affichage du pourcentage
+					const valueDisplay = configurator.querySelector('#wc-pc13-number-distance-value');
+					if (valueDisplay) {
+						valueDisplay.textContent = '77%';
+					}
 				}
 			}
 		}
+
+		updateSelectionUI();
+		applyTransforms();
+		savePayload();
 	}
-	
-	updateSelectionUI();
-	applyTransforms();
-	savePayload();
-}
 
-function handleNumbersColorChange(event) {
-	// Empêcher la propagation vers le label parent pour éviter de déclencher le toggle
-	event.stopPropagation();
-	
-	const value = event.target.value;
-	state.numbers.color = value || '#222222';
-	applyTransforms();
-	savePayload();
-}
+	function handleNumbersColorChange(event) {
+		// Empêcher la propagation vers le label parent pour éviter de déclencher le toggle
+		event.stopPropagation();
 
-function handleNumbersSizeChange(event) {
-	// Empêcher la propagation vers le label parent pour éviter de déclencher le toggle
-	event.stopPropagation();
-	
-	const value = parseInt(event.target.value, 10);
-	if (Number.isNaN(value)) {
-		return;
+		const value = event.target.value;
+		state.numbers.color = value || '#222222';
+		applyTransforms();
+		savePayload();
 	}
-	state.numbers.size = Math.max(12, Math.min(150, value));
-	applyTransforms();
-	savePayload();
-}
+
+	function handleNumbersSizeChange(event) {
+		// Empêcher la propagation vers le label parent pour éviter de déclencher le toggle
+		event.stopPropagation();
+
+		const value = parseInt(event.target.value, 10);
+		if (Number.isNaN(value)) {
+			return;
+		}
+		state.numbers.size = Math.max(12, Math.min(150, value));
+		applyTransforms();
+		savePayload();
+	}
 
 
-function handleSlotBorderEnabledChange(event) {
-	state.slotBorder.enabled = !!event.target.checked;
-	const configurator = document.querySelector(selectors.configurator);
-	if (configurator) {
-		const slotBorderFields = configurator.querySelector(selectors.slotBorderFields);
-		if (slotBorderFields) {
-			slotBorderFields.style.display = state.slotBorder.enabled ? 'block' : 'none';
+	function handleSlotBorderEnabledChange(event) {
+		state.slotBorder.enabled = !!event.target.checked;
+		const configurator = document.querySelector(selectors.configurator);
+		if (configurator) {
+			const slotBorderFields = configurator.querySelector(selectors.slotBorderFields);
+			if (slotBorderFields) {
+				slotBorderFields.style.display = state.slotBorder.enabled ? 'block' : 'none';
+			}
+		}
+		applyTransforms();
+		savePayload();
+	}
+
+	function handleSlotBorderColorChange(event) {
+		state.slotBorder.color = event.target.value || '#000000';
+		applyTransforms();
+		savePayload();
+	}
+
+	function handleSlotBorderWidthChange(event) {
+		const value = parseInt(event.target.value, 10);
+		if (Number.isNaN(value)) {
+			return;
+		}
+		state.slotBorder.width = Math.max(1, Math.min(10, value));
+		applyTransforms();
+		savePayload();
+	}
+
+	function handleSlotShadowEnabledChange(event) {
+		state.slotShadow.enabled = !!event.target.checked;
+		applyTransforms();
+		savePayload();
+	}
+
+	function handleNumberShadowEnabledChange(event) {
+		if (!state.numbers.shadow) {
+			state.numbers.shadow = { enabled: false, intensity: 5 };
+		}
+		state.numbers.shadow.enabled = !!event.target.checked;
+
+		const configurator = document.querySelector(selectors.configurator);
+		const shadowFields = configurator ? configurator.querySelector(selectors.numberShadowFields) : null;
+		const shadowIntensity = configurator ? configurator.querySelector(selectors.numberShadowIntensity) : null;
+
+		if (shadowFields) {
+			shadowFields.style.display = state.numbers.shadow.enabled ? 'block' : 'none';
+		}
+
+		if (shadowIntensity) {
+			shadowIntensity.disabled = !state.numbers.shadow.enabled;
+			if (!state.numbers.shadow.intensity) {
+				state.numbers.shadow.intensity = 5;
+				shadowIntensity.value = 5;
+			}
+		}
+
+		updateNumbersOverlay(configurator, state.currentRingRadius);
+		applyTransforms();
+		savePayload();
+	}
+
+	function handleNumberShadowIntensityChange(event) {
+		// Empêcher la propagation vers le label parent pour éviter de déclencher le toggle
+		event.stopPropagation();
+
+		if (!event || !event.target) {
+			return;
+		}
+
+		// S'assurer que c'est bien le slider de l'ombre
+		if (event.target.id !== 'wc-pc13-number-shadow-intensity') {
+			return;
+		}
+
+		if (!state.numbers.shadow) {
+			state.numbers.shadow = { enabled: true, intensity: 5 };
+		}
+		const value = parseInt(event.target.value, 10);
+		if (!Number.isNaN(value)) {
+			// Mettre à jour l'ombre, pas le glow
+			state.numbers.shadow.intensity = Math.max(0, Math.min(20, value));
+		}
+		const configurator = document.querySelector(selectors.configurator);
+		updateNumbersOverlay(configurator, state.currentRingRadius);
+		applyTransforms();
+		savePayload();
+	}
+
+	function handleNumberGlowEnabledChange(event) {
+		if (!state.numbers.glow) {
+			state.numbers.glow = { enabled: false, intensity: 10, color: '#ffffff' };
+		}
+		state.numbers.glow.enabled = !!event.target.checked;
+
+		const configurator = document.querySelector(selectors.configurator);
+		const glowFields = configurator ? configurator.querySelector(selectors.numberGlowFields) : null;
+		const glowIntensity = configurator ? configurator.querySelector(selectors.numberGlowIntensity) : null;
+		const glowColor = configurator ? configurator.querySelector(selectors.numberGlowColor) : null;
+
+		if (glowFields) {
+			glowFields.style.display = state.numbers.glow.enabled ? 'block' : 'none';
+		}
+
+		if (glowIntensity) {
+			glowIntensity.disabled = !state.numbers.glow.enabled;
+			if (!state.numbers.glow.intensity) {
+				state.numbers.glow.intensity = 10;
+				glowIntensity.value = 10;
+			}
+		}
+
+		if (glowColor) {
+			// Toujours initialiser la couleur si elle n'existe pas (blanc par défaut)
+			if (!state.numbers.glow.color) {
+				state.numbers.glow.color = '#ffffff';
+			}
+			// S'assurer que la valeur du sélecteur correspond à la couleur du state
+			if (glowColor.value !== state.numbers.glow.color) {
+				glowColor.value = state.numbers.glow.color;
+			}
+			// Le sélecteur de couleur peut être utilisé même si le glow n'est pas activé (pour prévisualisation)
+			// Mais on le désactive quand le glow n'est pas activé pour cohérence avec l'intensité
+			glowColor.disabled = !state.numbers.glow.enabled;
+		}
+
+		updateNumbersOverlay(configurator, state.currentRingRadius);
+		applyTransforms();
+		savePayload();
+	}
+
+	function handleNumberGlowColorChange(event) {
+		// Empêcher la propagation vers le label parent pour éviter de déclencher le toggle
+		if (event && event.stopPropagation) {
+			event.stopPropagation();
+		}
+
+		if (!event || !event.target) {
+			return;
+		}
+
+		// S'assurer que c'est bien le sélecteur de couleur du glow
+		if (event.target.id !== 'wc-pc13-number-glow-color') {
+			return;
+		}
+
+		if (!state.numbers.glow) {
+			state.numbers.glow = { enabled: false, intensity: 10, color: '#ffffff' };
+		}
+		const color = event.target.value || '#ffffff';
+		state.numbers.glow.color = color;
+
+		const configurator = document.querySelector(selectors.configurator);
+		if (configurator) {
+			updateNumbersOverlay(configurator, state.currentRingRadius);
+			applyTransforms();
+			savePayload();
 		}
 	}
-	applyTransforms();
-	savePayload();
-}
 
-function handleSlotBorderColorChange(event) {
-	state.slotBorder.color = event.target.value || '#000000';
-	applyTransforms();
-	savePayload();
-}
+	function handleNumberGlowIntensityChange(event) {
+		// Empêcher la propagation vers le label parent pour éviter de déclencher le toggle
+		event.stopPropagation();
 
-function handleSlotBorderWidthChange(event) {
-	const value = parseInt(event.target.value, 10);
-	if (Number.isNaN(value)) {
-		return;
-	}
-	state.slotBorder.width = Math.max(1, Math.min(10, value));
-	applyTransforms();
-	savePayload();
-}
-
-function handleSlotShadowEnabledChange(event) {
-	state.slotShadow.enabled = !!event.target.checked;
-	applyTransforms();
-	savePayload();
-}
-
-function handleNumberShadowEnabledChange(event) {
-	if (!state.numbers.shadow) {
-		state.numbers.shadow = { enabled: false, intensity: 5 };
-	}
-	state.numbers.shadow.enabled = !!event.target.checked;
-	
-	const configurator = document.querySelector(selectors.configurator);
-	const shadowFields = configurator ? configurator.querySelector(selectors.numberShadowFields) : null;
-	const shadowIntensity = configurator ? configurator.querySelector(selectors.numberShadowIntensity) : null;
-	
-	if (shadowFields) {
-		shadowFields.style.display = state.numbers.shadow.enabled ? 'block' : 'none';
-	}
-	
-	if (shadowIntensity) {
-		shadowIntensity.disabled = !state.numbers.shadow.enabled;
-		if (!state.numbers.shadow.intensity) {
-			state.numbers.shadow.intensity = 5;
-			shadowIntensity.value = 5;
+		if (!event || !event.target) {
+			return;
 		}
-	}
-	
-	updateNumbersOverlay(configurator, state.currentRingRadius);
-	applyTransforms();
-	savePayload();
-}
 
-function handleNumberShadowIntensityChange(event) {
-	// Empêcher la propagation vers le label parent pour éviter de déclencher le toggle
-	event.stopPropagation();
-	
-	if (!event || !event.target) {
-		return;
-	}
-	
-	// S'assurer que c'est bien le slider de l'ombre
-	if (event.target.id !== 'wc-pc13-number-shadow-intensity') {
-		return;
-	}
-	
-	if (!state.numbers.shadow) {
-		state.numbers.shadow = { enabled: true, intensity: 5 };
-	}
-	const value = parseInt(event.target.value, 10);
-	if (!Number.isNaN(value)) {
-		// Mettre à jour l'ombre, pas le glow
-		state.numbers.shadow.intensity = Math.max(0, Math.min(20, value));
-	}
-	const configurator = document.querySelector(selectors.configurator);
-	updateNumbersOverlay(configurator, state.currentRingRadius);
-	applyTransforms();
-	savePayload();
-}
-
-function handleNumberGlowEnabledChange(event) {
-	if (!state.numbers.glow) {
-		state.numbers.glow = { enabled: false, intensity: 10 };
-	}
-	state.numbers.glow.enabled = !!event.target.checked;
-	
-	const configurator = document.querySelector(selectors.configurator);
-	const glowFields = configurator ? configurator.querySelector(selectors.numberGlowFields) : null;
-	const glowIntensity = configurator ? configurator.querySelector(selectors.numberGlowIntensity) : null;
-	
-	if (glowFields) {
-		glowFields.style.display = state.numbers.glow.enabled ? 'block' : 'none';
-	}
-	
-	if (glowIntensity) {
-		glowIntensity.disabled = !state.numbers.glow.enabled;
-		if (!state.numbers.glow.intensity) {
-			state.numbers.glow.intensity = 10;
-			glowIntensity.value = 10;
+		// S'assurer que c'est bien le slider du glow
+		if (event.target.id !== 'wc-pc13-number-glow-intensity') {
+			return;
 		}
-	}
-	
-	updateNumbersOverlay(configurator, state.currentRingRadius);
-	applyTransforms();
-	savePayload();
-}
 
-function handleNumberGlowIntensityChange(event) {
-	// Empêcher la propagation vers le label parent pour éviter de déclencher le toggle
-	event.stopPropagation();
-	
-	if (!event || !event.target) {
-		return;
-	}
-	
-	// S'assurer que c'est bien le slider du glow
-	if (event.target.id !== 'wc-pc13-number-glow-intensity') {
-		return;
-	}
-	
-	if (!state.numbers.glow) {
-		state.numbers.glow = { enabled: true, intensity: 10 };
-	}
-	const value = parseInt(event.target.value, 10);
-	if (!Number.isNaN(value)) {
-		// Mettre à jour le glow, pas l'ombre
-		state.numbers.glow.intensity = Math.max(0, Math.min(30, value));
-	}
-	
-	const configurator = document.querySelector(selectors.configurator);
-	updateNumbersOverlay(configurator, state.currentRingRadius);
-	applyTransforms();
-	savePayload();
-}
+		if (!state.numbers.glow) {
+			state.numbers.glow = { enabled: true, intensity: 10, color: '#ffffff' };
+		}
+		
+		// Récupérer la valeur du slider
+		const slider = event.target;
+		const min = parseInt(slider.min || 1, 10);
+		const max = parseInt(slider.max || 30, 10);
+		let value = parseInt(slider.value, 10);
+		
+		// Si le slider a min=0, convertir 0 en 1 (intensité minimale visible)
+		if (min === 0 && value === 0) {
+			value = 1;
+		}
+		
+		// S'assurer que la valeur est dans les limites (1-30)
+		if (!Number.isNaN(value)) {
+			state.numbers.glow.intensity = Math.max(1, Math.min(30, value));
+			// Mettre à jour la valeur du slider pour refléter la valeur corrigée
+			slider.value = state.numbers.glow.intensity;
+		}
 
-function handleNumbersDistanceChange(event) {
-	// Empêcher la propagation vers le label parent pour éviter de déclencher le toggle
-	event.stopPropagation();
-	
-	const value = parseInt(event.target.value, 10);
-	if (Number.isNaN(value)) {
-		return;
+		const configurator = document.querySelector(selectors.configurator);
+		updateNumbersOverlay(configurator, state.currentRingRadius);
+		applyTransforms();
+		savePayload();
 	}
-	const maxAttr = parseInt(event.target.getAttribute('max'), 10);
-	// Le slider va de 0 (au centre) à max (collé au bord du cadran)
-	const maxDistance = Number.isNaN(maxAttr) ? 350 : maxAttr; // Fallback à 350 si max non défini
-	const clamped = Math.max(0, Math.min(maxDistance, value));
-	state.numbers.distance = clamped;
-	
-	// Mettre à jour l'affichage de la valeur en pourcentage
-	const valueDisplay = document.getElementById('wc-pc13-number-distance-value');
-	if (valueDisplay && maxDistance > 0) {
-		const percentage = Math.round((clamped / maxDistance) * 100);
-		valueDisplay.textContent = `${percentage}%`;
+
+	function handleNumbersDistanceChange(event) {
+		// Empêcher la propagation vers le label parent pour éviter de déclencher le toggle
+		event.stopPropagation();
+
+		const value = parseInt(event.target.value, 10);
+		if (Number.isNaN(value)) {
+			return;
+		}
+		const maxAttr = parseInt(event.target.getAttribute('max'), 10);
+		// Le slider va de 0 (au centre) à max (collé au bord du cadran)
+		const maxDistance = Number.isNaN(maxAttr) ? 350 : maxAttr; // Fallback à 350 si max non défini
+		const clamped = Math.max(0, Math.min(maxDistance, value));
+		state.numbers.distance = clamped;
+
+		// Mettre à jour l'affichage de la valeur en pourcentage
+		const valueDisplay = document.getElementById('wc-pc13-number-distance-value');
+		if (valueDisplay && maxDistance > 0) {
+			const percentage = Math.round((clamped / maxDistance) * 100);
+			valueDisplay.textContent = `${percentage}%`;
+		}
+
+		applyTransforms();
+		updateSelectionUI();
+		savePayload();
 	}
-	
-	applyTransforms();
-	updateSelectionUI();
-	savePayload();
-}
 
-function handleNumberTypeChange(event) {
-	// Empêcher la propagation vers le label parent pour éviter de déclencher le toggle
-	event.stopPropagation();
-	
-	state.numbers.numberType = event.target.value || 'arabic';
-	applyTransforms();
-	savePayload();
-}
+	function handleNumberTypeChange(event) {
+		// Empêcher la propagation vers le label parent pour éviter de déclencher le toggle
+		event.stopPropagation();
 
-function handleIntermediatePointsChange(event) {
-	// Empêcher la propagation vers le label parent pour éviter de déclencher le toggle
-	event.stopPropagation();
-	
-	state.numbers.intermediatePoints = event.target.value || 'without';
-	applyTransforms();
-	savePayload();
-}
+		state.numbers.numberType = event.target.value || 'arabic';
+		applyTransforms();
+		savePayload();
+	}
+
+	function handleIntermediatePointsChange(event) {
+		// Empêcher la propagation vers le label parent pour éviter de déclencher le toggle
+		event.stopPropagation();
+
+		state.numbers.intermediatePoints = event.target.value || 'without';
+		applyTransforms();
+		savePayload();
+	}
 
 	function initCustomAddToCart() {
 		const configurator = document.querySelector(selectors.configurator);
@@ -3147,7 +3250,7 @@ function handleIntermediatePointsChange(event) {
 
 			try {
 				savePayload();
-				
+
 				// Générer la vignette et uploader l'aperçu en parallèle
 				const [previewData, thumbnailDataUrl] = await Promise.all([
 					uploadPreviewForCart(),
@@ -3235,7 +3338,7 @@ function handleIntermediatePointsChange(event) {
 				// Mettre à jour le panier WooCommerce avec les fragments
 				if (data.data.fragments && typeof jQuery !== 'undefined') {
 					// Appliquer les fragments pour mettre à jour le mini panier
-					jQuery.each(data.data.fragments, function(selector, html) {
+					jQuery.each(data.data.fragments, function (selector, html) {
 						jQuery(selector).replaceWith(html);
 					});
 
@@ -3248,7 +3351,7 @@ function handleIntermediatePointsChange(event) {
 
 					// Déclencher aussi l'événement wc_fragment_refresh pour forcer la mise à jour
 					jQuery(document.body).trigger('wc_fragment_refresh');
-					
+
 					// Réorganiser les éléments du mini-cart
 					setTimeout(reorganizeMiniCart, 100);
 				}
@@ -3273,7 +3376,7 @@ function handleIntermediatePointsChange(event) {
 	function reorganizeMiniCart() {
 		// Trouver tous les éléments li du mini-cart
 		const miniCartItems = document.querySelectorAll('.woocommerce-mini-cart-item');
-		
+
 		miniCartItems.forEach((item, index) => {
 			// Chercher le div.ux-mini-cart-qty dans cet item
 			const qtyDiv = item.querySelector('.ux-mini-cart-qty');
@@ -3321,14 +3424,14 @@ function handleIntermediatePointsChange(event) {
 		const zoomRange = configurator.querySelector(selectors.rangeZoom);
 		const axisRanges = configurator.querySelectorAll(selectors.rangeAxis);
 		const slotSizeRange = configurator.querySelector(selectors.slotSizeRange);
-	const centerSizeRange = configurator.querySelector(selectors.centerSizeRange);
-	const numbersToggle = configurator.querySelector(selectors.numbersToggle);
-	const numbersColor = configurator.querySelector(selectors.numbersColor);
-	const numbersSize = configurator.querySelector(selectors.numbersSize);
-	const numbersDistanceInput = configurator.querySelector(selectors.numbersDistance);
-	const centerSelectBtn = configurator.querySelector(selectors.centerSelectButton);
-	const centerRemoveBtn = configurator.querySelector(selectors.centerRemoveButton);
-	const uploadButton = configurator.querySelector('.wc-pc13-upload-button');
+		const centerSizeRange = configurator.querySelector(selectors.centerSizeRange);
+		const numbersToggle = configurator.querySelector(selectors.numbersToggle);
+		const numbersColor = configurator.querySelector(selectors.numbersColor);
+		const numbersSize = configurator.querySelector(selectors.numbersSize);
+		const numbersDistanceInput = configurator.querySelector(selectors.numbersDistance);
+		const centerSelectBtn = configurator.querySelector(selectors.centerSelectButton);
+		const centerRemoveBtn = configurator.querySelector(selectors.centerRemoveButton);
+		const uploadButton = configurator.querySelector('.wc-pc13-upload-button');
 		const downloadJpegBtn = configurator.querySelector(selectors.downloadJpeg);
 		const downloadPdfBtn = configurator.querySelector(selectors.downloadPdf);
 		const shareBtn = configurator.querySelector(selectors.shareBtn);
@@ -3434,253 +3537,378 @@ function handleIntermediatePointsChange(event) {
 			slotSizeRange.addEventListener('input', handleRingSizeChange);
 		}
 
-	if (centerSizeRange) {
-		centerSizeRange.addEventListener('input', handleCenterSizeChange);
-	}
-	
-	// Contrôles de zoom et position pour la photo centrale
-	const centerZoom = configurator.querySelector('#wc-pc13-center-zoom');
-	const centerAxisX = configurator.querySelector('#wc-pc13-center-position-x');
-	const centerAxisY = configurator.querySelector('#wc-pc13-center-position-y');
-	
-	if (centerZoom) {
-		// Empêcher la propagation des événements
-		centerZoom.addEventListener('click', (e) => e.stopPropagation());
-		centerZoom.addEventListener('mousedown', (e) => e.stopPropagation());
-		centerZoom.addEventListener('input', function(event) {
-			event.stopPropagation();
-			state.center.scale = parseFloat(event.target.value);
-			const clamped = clampTransformValues(state.center);
-			state.center.scale = clamped.scale;
-			applyTransforms();
-			savePayload();
-		});
-	}
-	
-	if (centerAxisX) {
-		// Empêcher la propagation des événements
-		centerAxisX.addEventListener('click', (e) => e.stopPropagation());
-		centerAxisX.addEventListener('mousedown', (e) => e.stopPropagation());
-		centerAxisX.addEventListener('input', function(event) {
-			event.stopPropagation();
-			state.center.x = -parseFloat(event.target.value);
-			const clamped = clampTransformValues(state.center);
-			state.center.x = clamped.x;
-			applyTransforms();
-			savePayload();
-		});
-	}
-	
-	if (centerAxisY) {
-		// Empêcher la propagation des événements
-		centerAxisY.addEventListener('click', (e) => e.stopPropagation());
-		centerAxisY.addEventListener('mousedown', (e) => e.stopPropagation());
-		centerAxisY.addEventListener('input', function(event) {
-			event.stopPropagation();
-			state.center.y = -parseFloat(event.target.value);
-			const clamped = clampTransformValues(state.center);
-			state.center.y = clamped.y;
-			applyTransforms();
-			savePayload();
-		});
-	}
+		if (centerSizeRange) {
+			centerSizeRange.addEventListener('input', handleCenterSizeChange);
+		}
 
-	if (numbersToggle) {
-		numbersToggle.checked = !!state.showNumbers;
-		// Définir l'état initial des champs des chiffres
-		const numbersFields = configurator.querySelector(selectors.numbersFields);
-		if (numbersFields) {
-			if (state.showNumbers) {
-				numbersFields.style.display = 'flex';
-				numbersFields.classList.add('is-active');
-			} else {
-				numbersFields.style.display = 'none';
-				numbersFields.classList.remove('is-active');
-			}
-			
-			// Empêcher les clics sur le div de déclencher la checkbox parente
-			numbersFields.addEventListener('click', function(e) {
-				e.stopPropagation();
-			});
-			numbersFields.addEventListener('mousedown', function(e) {
-				e.stopPropagation();
+		// Contrôles de zoom et position pour la photo centrale
+		const centerZoom = configurator.querySelector('#wc-pc13-center-zoom');
+		const centerAxisX = configurator.querySelector('#wc-pc13-center-position-x');
+		const centerAxisY = configurator.querySelector('#wc-pc13-center-position-y');
+
+		if (centerZoom) {
+			// Empêcher la propagation des événements
+			centerZoom.addEventListener('click', (e) => e.stopPropagation());
+			centerZoom.addEventListener('mousedown', (e) => e.stopPropagation());
+			centerZoom.addEventListener('input', function (event) {
+				event.stopPropagation();
+				state.center.scale = parseFloat(event.target.value);
+				const clamped = clampTransformValues(state.center);
+				state.center.scale = clamped.scale;
+				applyTransforms();
+				savePayload();
 			});
 		}
-		// Ajouter un gestionnaire sur le label parent pour empêcher les clics sur numbers-fields de déclencher le toggle
-		const numbersToggleLabel = numbersToggle.closest('.wc-pc13-toggle');
-		if (numbersToggleLabel) {
-			numbersToggleLabel.addEventListener('click', function(e) {
-				// Si le clic est sur numbers-fields ou ses enfants, empêcher
-				if (e.target.closest('.wc-pc13-numbers-fields')) {
-					e.preventDefault();
+
+		if (centerAxisX) {
+			// Empêcher la propagation des événements
+			centerAxisX.addEventListener('click', (e) => e.stopPropagation());
+			centerAxisX.addEventListener('mousedown', (e) => e.stopPropagation());
+			centerAxisX.addEventListener('input', function (event) {
+				event.stopPropagation();
+				state.center.x = -parseFloat(event.target.value);
+				const clamped = clampTransformValues(state.center);
+				state.center.x = clamped.x;
+				applyTransforms();
+				savePayload();
+			});
+		}
+
+		if (centerAxisY) {
+			// Empêcher la propagation des événements
+			centerAxisY.addEventListener('click', (e) => e.stopPropagation());
+			centerAxisY.addEventListener('mousedown', (e) => e.stopPropagation());
+			centerAxisY.addEventListener('input', function (event) {
+				event.stopPropagation();
+				state.center.y = -parseFloat(event.target.value);
+				const clamped = clampTransformValues(state.center);
+				state.center.y = clamped.y;
+				applyTransforms();
+				savePayload();
+			});
+		}
+
+		if (numbersToggle) {
+			numbersToggle.checked = !!state.showNumbers;
+			// Définir l'état initial des champs des chiffres
+			const numbersFields = configurator.querySelector(selectors.numbersFields);
+			if (numbersFields) {
+				if (state.showNumbers) {
+					numbersFields.style.display = 'flex';
+					numbersFields.classList.add('is-active');
+				} else {
+					numbersFields.style.display = 'none';
+					numbersFields.classList.remove('is-active');
+				}
+
+				// Empêcher les clics sur le div de déclencher la checkbox parente
+				numbersFields.addEventListener('click', function (e) {
 					e.stopPropagation();
-					return false;
+				});
+				numbersFields.addEventListener('mousedown', function (e) {
+					e.stopPropagation();
+				});
+			}
+			// Ajouter un gestionnaire sur le label parent pour empêcher les clics sur numbers-fields de déclencher le toggle
+			const numbersToggleLabel = numbersToggle.closest('.wc-pc13-toggle');
+			if (numbersToggleLabel) {
+				numbersToggleLabel.addEventListener('click', function (e) {
+					// Si le clic est sur un toggle enfant (ombre portée, halo lumineux), permettre le clic
+					const clickedCheckbox = e.target.closest('input[type="checkbox"]');
+					if (clickedCheckbox && 
+						(clickedCheckbox.id === 'wc-pc13-number-shadow-enabled' || clickedCheckbox.id === 'wc-pc13-number-glow-enabled')) {
+						// Laisser passer le clic pour les toggles enfants
+						return;
+					}
+					// Si le clic est sur le label d'un toggle enfant, permettre aussi
+					const clickedToggleLabel = e.target.closest('.wc-pc13-toggle');
+					if (clickedToggleLabel && clickedToggleLabel !== numbersToggleLabel) {
+						const toggleCheckbox = clickedToggleLabel.querySelector('input[type="checkbox"]');
+						if (toggleCheckbox && 
+							(toggleCheckbox.id === 'wc-pc13-number-shadow-enabled' || toggleCheckbox.id === 'wc-pc13-number-glow-enabled')) {
+							// Laisser passer le clic pour les toggles enfants
+							return;
+						}
+					}
+					// Si le clic est sur un input de type color ou range, permettre le clic
+					if (e.target.type === 'color' || e.target.type === 'range') {
+						return;
+					}
+					// Si le clic est sur numbers-fields ou ses enfants (mais pas sur les toggles enfants), empêcher
+					if (e.target.closest('.wc-pc13-numbers-fields') && !e.target.closest('.wc-pc13-number-effects-row')) {
+						e.preventDefault();
+						e.stopPropagation();
+						return false;
+					}
+				}, true); // Utiliser capture phase pour intercepter avant le label
+			}
+
+			numbersToggle.addEventListener('change', handleNumbersToggle);
+		}
+
+		if (numbersColor) {
+			// Empêcher la propagation des événements pour éviter de déclencher le toggle parent
+			numbersColor.addEventListener('click', (e) => e.stopPropagation());
+			numbersColor.addEventListener('mousedown', (e) => e.stopPropagation());
+			numbersColor.addEventListener('change', handleNumbersColorChange);
+		}
+
+		if (numbersSize) {
+			// Empêcher la propagation des événements de clic et mousedown pour éviter de déclencher le toggle parent
+			numbersSize.addEventListener('click', (e) => e.stopPropagation());
+			numbersSize.addEventListener('mousedown', (e) => e.stopPropagation());
+			numbersSize.addEventListener('input', handleNumbersSizeChange);
+		}
+
+		if (numbersDistanceInput) {
+			// Empêcher la propagation des événements de clic et mousedown pour éviter de déclencher le toggle parent
+			numbersDistanceInput.addEventListener('click', (e) => e.stopPropagation());
+			numbersDistanceInput.addEventListener('mousedown', (e) => e.stopPropagation());
+			numbersDistanceInput.addEventListener('input', handleNumbersDistanceChange);
+		}
+
+		const numberTypeSelect = configurator.querySelector(selectors.numberType);
+		if (numberTypeSelect) {
+			numberTypeSelect.value = state.numbers.numberType || 'arabic';
+			// Empêcher la propagation des événements pour éviter de déclencher le toggle parent
+			numberTypeSelect.addEventListener('click', (e) => e.stopPropagation());
+			numberTypeSelect.addEventListener('mousedown', (e) => e.stopPropagation());
+			numberTypeSelect.addEventListener('change', handleNumberTypeChange);
+		}
+
+		const intermediatePointsSelect = configurator.querySelector(selectors.intermediatePoints);
+		if (intermediatePointsSelect) {
+			intermediatePointsSelect.value = state.numbers.intermediatePoints || 'without';
+			// Empêcher la propagation des événements pour éviter de déclencher le toggle parent
+			intermediatePointsSelect.addEventListener('click', (e) => e.stopPropagation());
+			intermediatePointsSelect.addEventListener('mousedown', (e) => e.stopPropagation());
+			intermediatePointsSelect.addEventListener('change', handleIntermediatePointsChange);
+		}
+
+		const numberShadowEnabled = configurator.querySelector(selectors.numberShadowEnabled);
+		const numberShadowIntensity = configurator.querySelector(selectors.numberShadowIntensity);
+		const numberShadowFields = configurator.querySelector(selectors.numberShadowFields);
+
+		if (numberShadowEnabled) {
+			numberShadowEnabled.checked = !!(state.numbers.shadow && state.numbers.shadow.enabled);
+			numberShadowEnabled.addEventListener('change', handleNumberShadowEnabledChange);
+			// S'assurer que le label parent ne bloque pas le clic
+			const shadowToggleLabel = numberShadowEnabled.closest('.wc-pc13-toggle');
+			if (shadowToggleLabel) {
+				// Empêcher la propagation pour que le clic sur le label toggle ne soit pas intercepté par le label parent
+				shadowToggleLabel.addEventListener('click', (e) => {
+					// Vérifier si le clic est bien sur ce toggle (pas sur un élément des numbers-fields)
+					const isClickOnThisToggle = shadowToggleLabel.contains(e.target) && 
+						!e.target.closest('.wc-pc13-numbers-fields') &&
+						(e.target === shadowToggleLabel || 
+						 e.target === numberShadowEnabled || 
+						 e.target === shadowToggleLabel.querySelector('span') ||
+						 e.target.closest('input') === numberShadowEnabled);
+					
+					if (isClickOnThisToggle) {
+						// Si le clic est sur le span ou le label, déclencher le checkbox
+						if (e.target !== numberShadowEnabled && e.target.tagName !== 'INPUT') {
+							e.preventDefault();
+							e.stopPropagation();
+							numberShadowEnabled.checked = !numberShadowEnabled.checked;
+							// Déclencher l'événement change manuellement
+							const changeEvent = new Event('change', { bubbles: true });
+							numberShadowEnabled.dispatchEvent(changeEvent);
+							return false;
+						}
+						// Empêcher la propagation vers le label parent
+						e.stopPropagation();
+					}
+				}, true); // Utiliser capture phase pour intercepter avant le label parent
+			}
+			if (numberShadowFields) {
+				numberShadowFields.style.display = (state.numbers.shadow && state.numbers.shadow.enabled) ? 'block' : 'none';
+			}
+		}
+
+		if (numberShadowIntensity) {
+			numberShadowIntensity.value = (state.numbers.shadow && state.numbers.shadow.intensity) || 5;
+			numberShadowIntensity.disabled = !(state.numbers.shadow && state.numbers.shadow.enabled);
+			// Empêcher la propagation des événements pour éviter de déclencher le toggle parent
+			numberShadowIntensity.addEventListener('click', (e) => e.stopPropagation());
+			numberShadowIntensity.addEventListener('mousedown', (e) => e.stopPropagation());
+			numberShadowIntensity.addEventListener('input', handleNumberShadowIntensityChange);
+		}
+
+		const numberGlowEnabled = configurator.querySelector(selectors.numberGlowEnabled);
+		const numberGlowIntensity = configurator.querySelector(selectors.numberGlowIntensity);
+		const numberGlowFields = configurator.querySelector(selectors.numberGlowFields);
+
+		if (numberGlowEnabled) {
+			numberGlowEnabled.checked = !!(state.numbers.glow && state.numbers.glow.enabled);
+			numberGlowEnabled.addEventListener('change', handleNumberGlowEnabledChange);
+			// S'assurer que le label parent ne bloque pas le clic
+			const glowToggleLabel = numberGlowEnabled.closest('.wc-pc13-toggle');
+			if (glowToggleLabel) {
+				// Empêcher la propagation pour que le clic sur le label toggle ne soit pas intercepté par le label parent
+				glowToggleLabel.addEventListener('click', (e) => {
+					// Vérifier si le clic est bien sur ce toggle (pas sur un élément des numbers-fields)
+					const isClickOnThisToggle = glowToggleLabel.contains(e.target) && 
+						!e.target.closest('.wc-pc13-numbers-fields') &&
+						(e.target === glowToggleLabel || 
+						 e.target === numberGlowEnabled || 
+						 e.target === glowToggleLabel.querySelector('span') ||
+						 e.target.closest('input') === numberGlowEnabled);
+					
+					if (isClickOnThisToggle) {
+						// Si le clic est sur le span ou le label, déclencher le checkbox
+						if (e.target !== numberGlowEnabled && e.target.tagName !== 'INPUT') {
+							e.preventDefault();
+							e.stopPropagation();
+							numberGlowEnabled.checked = !numberGlowEnabled.checked;
+							// Déclencher l'événement change manuellement
+							const changeEvent = new Event('change', { bubbles: true });
+							numberGlowEnabled.dispatchEvent(changeEvent);
+							return false;
+						}
+						// Empêcher la propagation vers le label parent
+						e.stopPropagation();
+					}
+				}, true); // Utiliser capture phase pour intercepter avant le label parent
+			}
+			if (numberGlowFields) {
+				numberGlowFields.style.display = (state.numbers.glow && state.numbers.glow.enabled) ? 'block' : 'none';
+			}
+		}
+
+		const numberGlowColor = configurator.querySelector(selectors.numberGlowColor);
+		if (numberGlowColor) {
+			// Initialiser la couleur du halo (blanc par défaut)
+			if (!state.numbers.glow) {
+				state.numbers.glow = { enabled: false, intensity: 10, color: '#ffffff' };
+			}
+			// Initialiser la couleur du glow si elle n'est pas définie (blanc par défaut)
+			if (!state.numbers.glow.color) {
+				state.numbers.glow.color = '#ffffff';
+			}
+			// S'assurer que la valeur du sélecteur correspond à la couleur du state
+			numberGlowColor.value = state.numbers.glow.color;
+			numberGlowColor.disabled = !(state.numbers.glow && state.numbers.glow.enabled);
+			// Empêcher la propagation des événements pour éviter de déclencher le toggle parent
+			numberGlowColor.addEventListener('click', (e) => {
+				e.stopPropagation();
+			}, true);
+			numberGlowColor.addEventListener('mousedown', (e) => {
+				e.stopPropagation();
+			}, true);
+			numberGlowColor.addEventListener('change', handleNumberGlowColorChange);
+			numberGlowColor.addEventListener('input', handleNumberGlowColorChange);
+			// S'assurer que le sélecteur de couleur peut être utilisé même si le glow n'est pas activé
+			numberGlowColor.addEventListener('focus', (e) => {
+				e.stopPropagation();
+			}, true);
+		}
+
+		if (numberGlowIntensity) {
+			// S'assurer que le slider a les bonnes valeurs min/max (gauche = min, droite = max)
+			numberGlowIntensity.min = '1';
+			numberGlowIntensity.max = '30';
+			
+			// S'assurer que l'intensité est au minimum 1
+			if (state.numbers.glow && state.numbers.glow.intensity !== undefined) {
+				if (state.numbers.glow.intensity < 1) {
+					state.numbers.glow.intensity = 1;
 				}
-			}, true); // Utiliser capture phase pour intercepter avant le label
+			}
+			const intensityValue = (state.numbers.glow && state.numbers.glow.intensity) || 10;
+			numberGlowIntensity.value = Math.max(1, Math.min(30, intensityValue));
+			// S'assurer que la valeur du slider est au minimum 1
+			if (parseInt(numberGlowIntensity.value, 10) < 1) {
+				numberGlowIntensity.value = 1;
+				if (state.numbers.glow) {
+					state.numbers.glow.intensity = 1;
+				}
+			}
+			numberGlowIntensity.disabled = !(state.numbers.glow && state.numbers.glow.enabled);
+			// Empêcher la propagation des événements pour éviter de déclencher le toggle parent
+			numberGlowIntensity.addEventListener('click', (e) => e.stopPropagation());
+			numberGlowIntensity.addEventListener('mousedown', (e) => e.stopPropagation());
+			numberGlowIntensity.addEventListener('input', handleNumberGlowIntensityChange);
 		}
-		
-		numbersToggle.addEventListener('change', handleNumbersToggle);
-	}
 
-	if (numbersColor) {
-		// Empêcher la propagation des événements pour éviter de déclencher le toggle parent
-		numbersColor.addEventListener('click', (e) => e.stopPropagation());
-		numbersColor.addEventListener('mousedown', (e) => e.stopPropagation());
-		numbersColor.addEventListener('change', handleNumbersColorChange);
-	}
+		const slotBorderEnabled = configurator.querySelector(selectors.slotBorderEnabled);
+		const slotBorderColor = configurator.querySelector(selectors.slotBorderColor);
+		const slotBorderWidth = configurator.querySelector(selectors.slotBorderWidth);
+		const slotBorderFields = configurator.querySelector(selectors.slotBorderFields);
+		const slotShadowEnabled = configurator.querySelector(selectors.slotShadowEnabled);
 
-	if (numbersSize) {
-		// Empêcher la propagation des événements de clic et mousedown pour éviter de déclencher le toggle parent
-		numbersSize.addEventListener('click', (e) => e.stopPropagation());
-		numbersSize.addEventListener('mousedown', (e) => e.stopPropagation());
-		numbersSize.addEventListener('input', handleNumbersSizeChange);
-	}
-
-	if (numbersDistanceInput) {
-		// Empêcher la propagation des événements de clic et mousedown pour éviter de déclencher le toggle parent
-		numbersDistanceInput.addEventListener('click', (e) => e.stopPropagation());
-		numbersDistanceInput.addEventListener('mousedown', (e) => e.stopPropagation());
-		numbersDistanceInput.addEventListener('input', handleNumbersDistanceChange);
-	}
-
-	const numberTypeSelect = configurator.querySelector(selectors.numberType);
-	if (numberTypeSelect) {
-		numberTypeSelect.value = state.numbers.numberType || 'arabic';
-		// Empêcher la propagation des événements pour éviter de déclencher le toggle parent
-		numberTypeSelect.addEventListener('click', (e) => e.stopPropagation());
-		numberTypeSelect.addEventListener('mousedown', (e) => e.stopPropagation());
-		numberTypeSelect.addEventListener('change', handleNumberTypeChange);
-	}
-
-	const intermediatePointsSelect = configurator.querySelector(selectors.intermediatePoints);
-	if (intermediatePointsSelect) {
-		intermediatePointsSelect.value = state.numbers.intermediatePoints || 'without';
-		// Empêcher la propagation des événements pour éviter de déclencher le toggle parent
-		intermediatePointsSelect.addEventListener('click', (e) => e.stopPropagation());
-		intermediatePointsSelect.addEventListener('mousedown', (e) => e.stopPropagation());
-		intermediatePointsSelect.addEventListener('change', handleIntermediatePointsChange);
-	}
-
-	const numberShadowEnabled = configurator.querySelector(selectors.numberShadowEnabled);
-	const numberShadowIntensity = configurator.querySelector(selectors.numberShadowIntensity);
-	const numberShadowFields = configurator.querySelector(selectors.numberShadowFields);
-	
-	if (numberShadowEnabled) {
-		numberShadowEnabled.checked = !!(state.numbers.shadow && state.numbers.shadow.enabled);
-		numberShadowEnabled.addEventListener('change', handleNumberShadowEnabledChange);
-		if (numberShadowFields) {
-			numberShadowFields.style.display = (state.numbers.shadow && state.numbers.shadow.enabled) ? 'block' : 'none';
+		if (slotBorderEnabled) {
+			slotBorderEnabled.checked = !!state.slotBorder.enabled;
+			slotBorderEnabled.addEventListener('change', handleSlotBorderEnabledChange);
+			if (slotBorderFields) {
+				slotBorderFields.style.display = state.slotBorder.enabled ? 'block' : 'none';
+			}
 		}
-	}
-	
-	if (numberShadowIntensity) {
-		numberShadowIntensity.value = (state.numbers.shadow && state.numbers.shadow.intensity) || 5;
-		numberShadowIntensity.disabled = !(state.numbers.shadow && state.numbers.shadow.enabled);
-		// Empêcher la propagation des événements pour éviter de déclencher le toggle parent
-		numberShadowIntensity.addEventListener('click', (e) => e.stopPropagation());
-		numberShadowIntensity.addEventListener('mousedown', (e) => e.stopPropagation());
-		numberShadowIntensity.addEventListener('input', handleNumberShadowIntensityChange);
-	}
 
-	const numberGlowEnabled = configurator.querySelector(selectors.numberGlowEnabled);
-	const numberGlowIntensity = configurator.querySelector(selectors.numberGlowIntensity);
-	const numberGlowFields = configurator.querySelector(selectors.numberGlowFields);
-	
-	if (numberGlowEnabled) {
-		numberGlowEnabled.checked = !!(state.numbers.glow && state.numbers.glow.enabled);
-		numberGlowEnabled.addEventListener('change', handleNumberGlowEnabledChange);
-		if (numberGlowFields) {
-			numberGlowFields.style.display = (state.numbers.glow && state.numbers.glow.enabled) ? 'block' : 'none';
+		if (slotBorderColor) {
+			slotBorderColor.value = state.slotBorder.color;
+			slotBorderColor.addEventListener('change', handleSlotBorderColorChange);
 		}
-	}
-	
-	if (numberGlowIntensity) {
-		numberGlowIntensity.value = (state.numbers.glow && state.numbers.glow.intensity) || 10;
-		numberGlowIntensity.disabled = !(state.numbers.glow && state.numbers.glow.enabled);
-		// Empêcher la propagation des événements pour éviter de déclencher le toggle parent
-		numberGlowIntensity.addEventListener('click', (e) => e.stopPropagation());
-		numberGlowIntensity.addEventListener('mousedown', (e) => e.stopPropagation());
-		numberGlowIntensity.addEventListener('input', handleNumberGlowIntensityChange);
-	}
 
-	const slotBorderEnabled = configurator.querySelector(selectors.slotBorderEnabled);
-	const slotBorderColor = configurator.querySelector(selectors.slotBorderColor);
-	const slotBorderWidth = configurator.querySelector(selectors.slotBorderWidth);
-	const slotBorderFields = configurator.querySelector(selectors.slotBorderFields);
-	const slotShadowEnabled = configurator.querySelector(selectors.slotShadowEnabled);
-
-	if (slotBorderEnabled) {
-		slotBorderEnabled.checked = !!state.slotBorder.enabled;
-		slotBorderEnabled.addEventListener('change', handleSlotBorderEnabledChange);
-		if (slotBorderFields) {
-			slotBorderFields.style.display = state.slotBorder.enabled ? 'block' : 'none';
+		if (slotBorderWidth) {
+			slotBorderWidth.value = state.slotBorder.width;
+			slotBorderWidth.addEventListener('input', handleSlotBorderWidthChange);
 		}
-	}
 
-	if (slotBorderColor) {
-		slotBorderColor.value = state.slotBorder.color;
-		slotBorderColor.addEventListener('change', handleSlotBorderColorChange);
-	}
+		if (slotShadowEnabled) {
+			slotShadowEnabled.checked = !!state.slotShadow.enabled;
+			slotShadowEnabled.addEventListener('change', handleSlotShadowEnabledChange);
+		}
 
-	if (slotBorderWidth) {
-		slotBorderWidth.value = state.slotBorder.width;
-		slotBorderWidth.addEventListener('input', handleSlotBorderWidthChange);
-	}
-
-	if (slotShadowEnabled) {
-		slotShadowEnabled.checked = !!state.slotShadow.enabled;
-		slotShadowEnabled.addEventListener('change', handleSlotShadowEnabledChange);
-	}
-
-	if (centerSelectBtn) {
-		centerSelectBtn.addEventListener('click', (event) => {
-			event.preventDefault();
-			// Forcer la sélection du centre et définir le slot cible AVANT de cliquer sur le fileInput
-			state.currentSlot = 'center';
-			selectSlot('center');
-			const fileInput = configurator.querySelector(selectors.fileInput);
-			if (fileInput) {
-				// S'assurer que le slot cible est bien défini AVANT le clic
-				uploadTargetSlot = 'center';
-				fileInput.dataset.targetSlot = 'center';
+		if (centerSelectBtn) {
+			centerSelectBtn.addEventListener('click', (event) => {
+				event.preventDefault();
+				// Forcer la sélection du centre et définir le slot cible AVANT de cliquer sur le fileInput
 				state.currentSlot = 'center';
-				
-				// Debug
-				if (window.WCPC13_DEBUG) {
-					console.log('centerSelectBtn click - uploadTargetSlot:', uploadTargetSlot, 'state.currentSlot:', state.currentSlot, 'dataset.targetSlot:', fileInput.dataset.targetSlot);
+				selectSlot('center');
+				const fileInput = configurator.querySelector(selectors.fileInput);
+				if (fileInput) {
+					// S'assurer que le slot cible est bien défini AVANT le clic
+					uploadTargetSlot = 'center';
+					fileInput.dataset.targetSlot = 'center';
+					state.currentSlot = 'center';
+
+					// Debug
+					if (window.WCPC13_DEBUG) {
+						console.log('centerSelectBtn click - uploadTargetSlot:', uploadTargetSlot, 'state.currentSlot:', state.currentSlot, 'dataset.targetSlot:', fileInput.dataset.targetSlot);
+					}
+
+					// Cliquer sur l'input file
+					fileInput.click();
 				}
-				
-				// Cliquer sur l'input file
+			});
+		}
+
+		if (centerRemoveBtn) {
+			centerRemoveBtn.addEventListener('click', (event) => {
+				event.preventDefault();
+				if (!state.center.image_url) {
+					return;
+				}
+				selectSlot('center');
+				handleRemove();
+			});
+		}
+
+		if (uploadButton && fileInput) {
+			uploadButton.addEventListener('click', (event) => {
+				event.preventDefault();
+				// Forcer l'upload sur le slot sélectionné (centre ou périphérique)
+				// S'assurer que state.currentSlot est bien défini
+				const targetSlot = state.currentSlot || 'center';
+				uploadTargetSlot = targetSlot;
+				if (fileInput && fileInput.dataset) {
+					fileInput.dataset.targetSlot = targetSlot;
+				}
+				console.log('Upload button clicked - targetSlot:', targetSlot, 'state.currentSlot:', state.currentSlot);
 				fileInput.click();
-			}
-		});
-	}
-
-	if (centerRemoveBtn) {
-		centerRemoveBtn.addEventListener('click', (event) => {
-			event.preventDefault();
-			if (!state.center.image_url) {
-				return;
-			}
-			selectSlot('center');
-			handleRemove();
-		});
-	}
-
-	if (uploadButton && fileInput) {
-		uploadButton.addEventListener('click', (event) => {
-			event.preventDefault();
-			// Forcer l'upload sur le slot sélectionné (centre ou périphérique)
-			// S'assurer que state.currentSlot est bien défini
-			const targetSlot = state.currentSlot || 'center';
-			uploadTargetSlot = targetSlot;
-			if (fileInput && fileInput.dataset) {
-				fileInput.dataset.targetSlot = targetSlot;
-			}
-			console.log('Upload button clicked - targetSlot:', targetSlot, 'state.currentSlot:', state.currentSlot);
-			fileInput.click();
-		});
-	}
+			});
+		}
 
 		if (downloadJpegBtn) {
 			downloadJpegBtn.addEventListener('click', (event) => {
@@ -3699,78 +3927,118 @@ function handleIntermediatePointsChange(event) {
 		if (shareBtn) {
 			shareBtn.addEventListener('click', (event) => {
 				event.preventDefault();
-			if (shareLoading) {
-				return;
-			}
-			openShareModal(shareBtn);
+				if (shareLoading) {
+					return;
+				}
+				openShareModal(shareBtn);
 			});
 		}
 
-	const saveEmailBtn = configurator.querySelector(selectors.saveEmailBtn);
-	if (saveEmailBtn) {
-		saveEmailBtn.addEventListener('click', (event) => {
-			event.preventDefault();
-			if (shareLoading) {
-				return;
-			}
-			openEmailModal(saveEmailBtn);
-		});
-	}
+		const saveEmailBtn = configurator.querySelector(selectors.saveEmailBtn);
+		if (saveEmailBtn) {
+			saveEmailBtn.addEventListener('click', (event) => {
+				event.preventDefault();
+				if (shareLoading) {
+					return;
+				}
+				openEmailModal(saveEmailBtn);
+			});
+		}
 
-	// Gestion de la modale email
-	const emailModal = configurator.querySelector(selectors.emailModal);
-	const emailModalClose = configurator.querySelector(selectors.emailModalClose);
-	const emailModalCancel = configurator.querySelector(selectors.emailModalCancel);
-	const emailModalSubmit = configurator.querySelector(selectors.emailModalSubmit);
-	const emailInput = configurator.querySelector(selectors.emailInput);
+		// Gestion de la modale email
+		const emailModal = configurator.querySelector(selectors.emailModal);
+		const emailModalClose = configurator.querySelector(selectors.emailModalClose);
+		const emailModalCancel = configurator.querySelector(selectors.emailModalCancel);
+		const emailModalSubmit = configurator.querySelector(selectors.emailModalSubmit);
+		const emailInput = configurator.querySelector(selectors.emailInput);
 
-	if (emailModalClose) {
-		emailModalClose.addEventListener('click', () => {
-			closeEmailModal();
-		});
-	}
-	if (emailModalCancel) {
-		emailModalCancel.addEventListener('click', () => {
-			closeEmailModal();
-		});
-	}
-	if (emailModal) {
-		emailModal.addEventListener('click', (event) => {
-			if (event.target === emailModal) {
+		if (emailModalClose) {
+			emailModalClose.addEventListener('click', () => {
 				closeEmailModal();
-			}
-		});
-	}
-	if (emailModalSubmit && emailInput) {
-		emailModalSubmit.addEventListener('click', async () => {
-			const email = emailInput.value.trim();
-			if (!email) {
-				emailInput.focus();
-				return;
-			}
-			// Validation basique de l'email
-			const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-			if (!emailRegex.test(email)) {
-				window.alert(WCPC13.labels?.invalid_email || 'Email invalide');
-				emailInput.focus();
-				return;
-			}
-			await saveShareAndSendEmail(email, saveEmailBtn);
-			closeEmailModal();
-		});
-		// Permettre la soumission avec Enter
-		emailInput.addEventListener('keypress', (event) => {
-			if (event.key === 'Enter') {
-				emailModalSubmit.click();
-			}
-		});
-	}
+			});
+		}
+		if (emailModalCancel) {
+			emailModalCancel.addEventListener('click', () => {
+				closeEmailModal();
+			});
+		}
+		if (emailModal) {
+			emailModal.addEventListener('click', (event) => {
+				if (event.target === emailModal) {
+					closeEmailModal();
+				}
+			});
+		}
+		if (emailModalSubmit && emailInput) {
+			emailModalSubmit.addEventListener('click', async () => {
+				const email = emailInput.value.trim();
+				if (!email) {
+					emailInput.focus();
+					return;
+				}
+				// Validation basique de l'email
+				const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+				if (!emailRegex.test(email)) {
+					window.alert(WCPC13.labels?.invalid_email || 'Email invalide');
+					emailInput.focus();
+					return;
+				}
+				await saveShareAndSendEmail(email, saveEmailBtn);
+				closeEmailModal();
+			});
+			// Permettre la soumission avec Enter
+			emailInput.addEventListener('keypress', (event) => {
+				if (event.key === 'Enter') {
+					emailModalSubmit.click();
+				}
+			});
+		}
 
 		const showSlotsToggle = configurator.querySelector(selectors.showSlotsToggle);
 		if (showSlotsToggle) {
 			showSlotsToggle.checked = !!state.showSlots;
+			// Gérer l'affichage/masquage du div des options des slots
+			const slotsFields = configurator.querySelector('.wc-pc13-slots-fields');
+			if (slotsFields) {
+				if (state.showSlots) {
+					slotsFields.style.display = 'flex';
+					slotsFields.classList.add('is-active');
+				} else {
+					slotsFields.style.display = 'none';
+					slotsFields.classList.remove('is-active');
+				}
+				// Empêcher les clics sur le div de déclencher la checkbox parente
+				slotsFields.addEventListener('click', function (e) {
+					e.stopPropagation();
+				});
+				slotsFields.addEventListener('mousedown', function (e) {
+					e.stopPropagation();
+				});
+			}
+			// Ajouter un gestionnaire sur le label parent pour empêcher les clics sur slots-fields de déclencher le toggle
+			const slotsToggleLabel = showSlotsToggle.closest('.wc-pc13-toggle');
+			if (slotsToggleLabel) {
+				slotsToggleLabel.addEventListener('click', function (e) {
+					// Si le clic est sur slots-fields ou ses enfants, empêcher
+					if (e.target.closest('.wc-pc13-slots-fields')) {
+						e.preventDefault();
+						e.stopPropagation();
+						return false;
+					}
+				}, true); // Utiliser capture phase pour intercepter avant le label
+			}
 			showSlotsToggle.addEventListener('change', (e) => {
 				state.showSlots = !!e.target.checked;
+				// Afficher ou masquer les champs des options des slots
+				if (slotsFields) {
+					if (state.showSlots) {
+						slotsFields.style.display = 'flex';
+						slotsFields.classList.add('is-active');
+					} else {
+						slotsFields.style.display = 'none';
+						slotsFields.classList.remove('is-active');
+					}
+				}
 				// Si on masque les slots, forcer la sélection sur le centre et mettre la taille au maximum
 				if (!state.showSlots) {
 					selectSlot('center');
@@ -3779,7 +4047,7 @@ function handleIntermediatePointsChange(event) {
 					if (centerSizeRange && state.centerMax) {
 						state.center.size = state.centerMax;
 						centerSizeRange.value = state.centerMax;
-						
+
 						// Mettre à jour l'affichage du pourcentage
 						const valueDisplay = configurator.querySelector('#wc-pc13-center-size-value');
 						if (valueDisplay && state.centerMax > 0) {
@@ -3980,7 +4248,7 @@ function handleIntermediatePointsChange(event) {
 		// Gérer le changement de couleur de fond
 		const backgroundColorInput = document.querySelector(selectors.backgroundColorInput);
 		if (backgroundColorInput) {
-			state.backgroundColor = backgroundColorInput.value || '#fafafa';
+			state.backgroundColor = backgroundColorInput.value || '#ffffff';
 			backgroundColorInput.addEventListener('change', (event) => {
 				state.backgroundColor = event.target.value;
 				updateBackgroundColor();
@@ -4000,7 +4268,7 @@ function handleIntermediatePointsChange(event) {
 				state.diameterPrice = parseFloat(selectedOption.dataset.price) || 59;
 			}
 			updateTotalPrice();
-			
+
 			diameterInput.addEventListener('change', (event) => {
 				state.diameter = parseInt(event.target.value, 10) || 40;
 				// Extraire le prix depuis l'attribut data-price de l'option sélectionnée
@@ -4019,7 +4287,7 @@ function handleIntermediatePointsChange(event) {
 			// Initialiser la trotteuse depuis la valeur sélectionnée
 			state.secondHand = secondHandInput.value || 'black';
 			updateSecondHand();
-			
+
 			secondHandInput.addEventListener('change', (event) => {
 				state.secondHand = event.target.value || 'black';
 				updateSecondHand();
@@ -4051,7 +4319,7 @@ function handleIntermediatePointsChange(event) {
 			hand.style.background = color;
 			hand.style.boxShadow = needsOutline ? '0 0 0 1px rgba(0, 0, 0, 0.2)' : 'none';
 		});
-		
+
 		updateSecondHand();
 	}
 
@@ -4205,7 +4473,7 @@ function handleIntermediatePointsChange(event) {
 				handsTimer = requestAnimationFrame(animate);
 			}
 		};
-		
+
 		setHandsRotation(new Date());
 		handsTimer = requestAnimationFrame(animate);
 	}
@@ -4223,7 +4491,7 @@ function handleIntermediatePointsChange(event) {
 			if (!targetState) {
 				return;
 			}
-			
+
 			const pointerId = event.pointerId;
 			const startX = event.clientX;
 			const startY = event.clientY;
@@ -4258,7 +4526,7 @@ function handleIntermediatePointsChange(event) {
 					hasMoved = true;
 					// Empêcher le comportement par défaut seulement quand on drag
 					moveEvent.preventDefault();
-					
+
 					// Marquer qu'on est en train de déplacer
 					if (!isDragging) {
 						isDragging = true;
@@ -4274,7 +4542,7 @@ function handleIntermediatePointsChange(event) {
 				targetState.x = initialX + deltaXPercent;
 				targetState.y = initialY + deltaYPercent;
 				clampTransformValues(targetState);
-				
+
 				// Utiliser requestAnimationFrame pour optimiser les mises à jour pendant le drag
 				// skipExpensiveUpdates = true pour éviter updateRingDimensions pendant le drag
 				if (rafId === null) {
@@ -4291,13 +4559,13 @@ function handleIntermediatePointsChange(event) {
 				}
 				document.removeEventListener('pointermove', handleMove);
 				document.removeEventListener('pointerup', handleUp);
-				
+
 				// Annuler le requestAnimationFrame en cours si nécessaire
 				if (rafId !== null) {
 					cancelAnimationFrame(rafId);
 					rafId = null;
 				}
-				
+
 				// Si on a déplacé, sauvegarder et mettre à jour l'UI une seule fois à la fin
 				if (hasMoved) {
 					isDragging = false; // Réactiver les transitions
@@ -4314,7 +4582,7 @@ function handleIntermediatePointsChange(event) {
 				} else {
 					isDragging = false;
 				}
-				
+
 				// Si c'était juste un clic (pas un drag), ne rien faire de plus
 				// Le clic normal sera géré par bindSlotClicks
 			};
@@ -4587,7 +4855,7 @@ function handleIntermediatePointsChange(event) {
 					scale: 1,
 				};
 			}
-			
+
 			// Utiliser l'image de démonstration correspondante (index 0-11)
 			const slotDemo = DEMO_IMAGES.slots && DEMO_IMAGES.slots[i - 1] ? DEMO_IMAGES.slots[i - 1] : null;
 			if (slotDemo && slotDemo.image_url) {
@@ -4608,7 +4876,7 @@ function handleIntermediatePointsChange(event) {
 				state.slots[i].scale = 1;
 				filledCount++;
 			}
-			
+
 			if (window.WCPC13_DEBUG) {
 				console.log('WCPC13 demo fill - slot', i, state.slots[i]);
 			}
@@ -4670,7 +4938,7 @@ function handleIntermediatePointsChange(event) {
 				state.center.attachment_id = 0;
 				state.center.x = 0;
 				state.center.y = 0;
-				
+
 				const configurator = document.querySelector(selectors.configurator);
 				const centerSizeRange = configurator ? configurator.querySelector(selectors.centerSizeRange) : null;
 				const centerMax = state.centerMax || (centerSizeRange ? parseInt(centerSizeRange.max || `${state.center.size}`, 10) : state.center.size);
@@ -4682,22 +4950,22 @@ function handleIntermediatePointsChange(event) {
 						centerSizeRange.value = state.center.size;
 					}
 				}
-				
+
 				// Calculer le zoom optimal pour remplir le cercle
 				let centerSize = state.center.size || 180;
 				if (centerSizeRange) {
 					centerSize = parseInt(centerSizeRange.value || centerSize, 10);
 				}
-				
+
 				// Charger l'image pour obtenir ses dimensions et calculer le zoom optimal
 				const img = new Image();
-				img.onload = function() {
+				img.onload = function () {
 					state.center.scale = calculateOptimalZoomForCircle(img.width, img.height, centerSize, DEFAULT_CENTER_INSET);
 					applyTransforms();
 					updateSelectionUI();
 					savePayload();
 				};
-				img.onerror = function() {
+				img.onerror = function () {
 					// En cas d'erreur, utiliser un scale par défaut
 					state.center.scale = 1.3;
 					applyTransforms();
@@ -4711,7 +4979,7 @@ function handleIntermediatePointsChange(event) {
 			for (let i = 1; i <= 12; i++) {
 				const imageIndex = i < images.length ? i : (i % images.length);
 				const image = images[imageIndex];
-				
+
 				if (!state.slots[i]) {
 					state.slots[i] = {
 						attachment_id: 0,
@@ -4721,7 +4989,7 @@ function handleIntermediatePointsChange(event) {
 						scale: 1,
 					};
 				}
-				
+
 				if (image && image.url) {
 					state.slots[i].attachment_id = 0;
 					// Pour les slots périphériques, utiliser l'URL complète (regular) pour l'affichage
@@ -4758,36 +5026,36 @@ function handleIntermediatePointsChange(event) {
 	function openUnsplashModal() {
 		const unsplashModal = document.querySelector(selectors.unsplashModal);
 		const searchInput = unsplashModal ? unsplashModal.querySelector(selectors.unsplashSearchInput) : null;
-		
+
 		if (unsplashModal) {
 			unsplashModal.style.display = 'flex';
 			document.body.style.overflow = 'hidden';
-			
+
 			// Focus sur l'input de recherche
 			if (searchInput) {
 				setTimeout(() => {
 					searchInput.focus();
 				}, 100);
 			}
-			
+
 			// Réinitialiser l'affichage
 			const grid = unsplashModal.querySelector(selectors.unsplashGrid);
 			const loading = unsplashModal.querySelector(selectors.unsplashLoading);
 			const empty = unsplashModal.querySelector(selectors.unsplashEmpty);
 			const modalBody = unsplashModal.querySelector('.wc-pc13-unsplash-modal-body');
 			const suggestions = unsplashModal.querySelector('#wc-pc13-unsplash-suggestions');
-			
+
 			if (grid) grid.innerHTML = '';
 			if (loading) loading.style.display = 'none';
 			if (empty) empty.style.display = 'none';
 			if (suggestions) suggestions.style.display = 'flex';
-			
+
 			// Réinitialiser l'observer de scroll
 			if (unsplashScrollObserver) {
 				unsplashScrollObserver.disconnect();
 				unsplashScrollObserver = null;
 			}
-			
+
 			// Supprimer la sentinelle et le loader
 			if (modalBody) {
 				const sentinel = modalBody.querySelector('#wc-pc13-unsplash-sentinel');
@@ -4795,7 +5063,7 @@ function handleIntermediatePointsChange(event) {
 				const loadMore = modalBody.querySelector('.wc-pc13-unsplash-load-more');
 				if (loadMore) loadMore.remove();
 			}
-			
+
 			// Réinitialiser les variables
 			unsplashCurrentQuery = '';
 			unsplashCurrentPage = 1;
@@ -4832,7 +5100,7 @@ function handleIntermediatePointsChange(event) {
 			if (grid) grid.innerHTML = '';
 			if (empty) empty.style.display = 'none';
 		}
-		
+
 		// Masquer les suggestions lors d'une recherche (nouvelle ou chargement supplémentaire)
 		const suggestions = unsplashModal.querySelector('#wc-pc13-unsplash-suggestions');
 		if (suggestions) suggestions.style.display = 'none';
@@ -4877,7 +5145,7 @@ function handleIntermediatePointsChange(event) {
 			}
 
 			const images = data.data.images;
-			
+
 			// Masquer le chargement initial
 			if (!append && loading) loading.style.display = 'none';
 			if (append) hideUnsplashLoadingMore(modalBody);
@@ -4897,26 +5165,26 @@ function handleIntermediatePointsChange(event) {
 						const item = document.createElement('div');
 						item.className = 'wc-pc13-unsplash-item';
 						item.dataset.index = startIndex + index;
-						
+
 						const img = document.createElement('img');
 						img.src = image.thumb || image.url;
 						img.alt = `Photo ${startIndex + index + 1}`;
 						img.loading = 'lazy';
-						
+
 						// Animation d'apparition
 						item.style.opacity = '0';
 						item.style.transform = 'scale(0.9)';
-						
+
 						item.appendChild(img);
 						grid.appendChild(item);
-						
+
 						// Animation avec délai
 						setTimeout(() => {
 							item.style.transition = 'all 0.3s ease';
 							item.style.opacity = '1';
 							item.style.transform = 'scale(1)';
 						}, (startIndex + index) * 20);
-						
+
 						// Sélection de l'image
 						item.addEventListener('click', () => {
 							selectUnsplashImage(image);
@@ -5042,24 +5310,24 @@ function handleIntermediatePointsChange(event) {
 
 		// Charger l'image pour obtenir ses dimensions et calculer le zoom optimal
 		const img = new Image();
-		img.onload = function() {
+		img.onload = function () {
 			target.scale = calculateOptimalZoomForCircle(img.width, img.height, centerSize, DEFAULT_CENTER_INSET);
 			applyTransforms();
 			updateSelectionUI();
 			savePayload();
 			scheduleLivePreviewUpdate();
-			
+
 			// Déplacer la page vers l'aperçu de l'horloge
 			scrollToPreview();
 		};
-		img.onerror = function() {
+		img.onerror = function () {
 			// En cas d'erreur, utiliser un scale par défaut
 			target.scale = 1.3;
 			applyTransforms();
 			updateSelectionUI();
 			savePayload();
 			scheduleLivePreviewUpdate();
-			
+
 			// Déplacer la page vers l'aperçu de l'horloge
 			scrollToPreview();
 		};
@@ -5097,7 +5365,7 @@ function handleIntermediatePointsChange(event) {
 
 		// Charger la configuration partagée si un paramètre share est présent
 		await loadSharedConfig();
-		
+
 		// Si mode central, désactiver les photos périphériques par défaut et mettre la taille centrale à 100%
 		if (mode === 'central' && !sharedConfigLoaded) {
 			state.showSlots = false;
@@ -5122,14 +5390,14 @@ function handleIntermediatePointsChange(event) {
 						state.center.size = state.centerMax;
 						centerSizeRange.max = state.centerMax;
 						centerSizeRange.value = state.center.size;
-						
+
 						// Mettre à jour l'affichage du pourcentage
 						const valueDisplay = configurator.querySelector('#wc-pc13-center-size-value');
 						if (valueDisplay && state.centerMax > 0) {
 							const percentage = Math.round((state.center.size / state.centerMax) * 100);
 							valueDisplay.textContent = `${percentage}%`;
 						}
-						
+
 						applyTransforms();
 					}
 				}, 100);
@@ -5144,7 +5412,7 @@ function handleIntermediatePointsChange(event) {
 				state.center.size = Math.max(CENTER_MIN_SIZE, sanitized);
 				centerSizeRange.value = state.center.size;
 			}
-			
+
 			// Afficher ou masquer le label du slider selon si une image centrale est présente ou si mode central
 			const centerSizeLabel = configurator.querySelector('.wc-pc13-center-size-label');
 			if (centerSizeLabel) {
@@ -5154,18 +5422,18 @@ function handleIntermediatePointsChange(event) {
 					centerSizeLabel.style.display = 'none';
 				}
 			}
-			
+
 			// Afficher ou masquer les contrôles de zoom/position selon si une image centrale est présente
 			const centerControls = configurator.querySelector('.wc-pc13-center-controls');
 			if (centerControls) {
 				if (state.center.image_url) {
 					centerControls.style.display = 'block';
-					
+
 					// Mettre à jour les valeurs des contrôles
 					const centerZoom = centerControls.querySelector('#wc-pc13-center-zoom');
 					const centerAxisX = centerControls.querySelector('#wc-pc13-center-position-x');
 					const centerAxisY = centerControls.querySelector('#wc-pc13-center-position-y');
-					
+
 					if (centerZoom) {
 						centerZoom.value = state.center.scale || 1;
 					}
@@ -5179,7 +5447,7 @@ function handleIntermediatePointsChange(event) {
 					centerControls.style.display = 'none';
 				}
 			}
-			
+
 			// Mettre à jour l'affichage du pourcentage
 			const valueDisplay = configurator.querySelector('#wc-pc13-center-size-value');
 			if (valueDisplay && state.centerMax > 0) {
@@ -5226,14 +5494,26 @@ function handleIntermediatePointsChange(event) {
 				}
 				showSlotsToggle.disabled = false;
 			}
-			
+
+			// Gérer l'affichage/masquage du div des options des slots
+			const slotsFields = configurator.querySelector('.wc-pc13-slots-fields');
+			if (slotsFields) {
+				if (state.showSlots) {
+					slotsFields.style.display = 'flex';
+					slotsFields.classList.add('is-active');
+				} else {
+					slotsFields.style.display = 'none';
+					slotsFields.classList.remove('is-active');
+				}
+			}
+
 			// Si les photos périphériques sont désactivées, mettre la taille centrale au maximum
 			if (!state.showSlots && state.centerMax) {
 				const centerSizeRange = configurator.querySelector(selectors.centerSizeRange);
 				if (centerSizeRange) {
 					state.center.size = state.centerMax;
 					centerSizeRange.value = state.centerMax;
-					
+
 					// Mettre à jour l'affichage du pourcentage
 					const valueDisplay = configurator.querySelector('#wc-pc13-center-size-value');
 					if (valueDisplay && state.centerMax > 0) {
@@ -5241,7 +5521,7 @@ function handleIntermediatePointsChange(event) {
 					}
 				}
 			}
-			
+
 			// Mettre à jour l'affichage du message d'aide
 			updateRingDimensions();
 		}
@@ -5305,23 +5585,58 @@ function handleIntermediatePointsChange(event) {
 		// Initialiser le halo lumineux
 		const numberGlowEnabled = configurator.querySelector(selectors.numberGlowEnabled);
 		const numberGlowIntensity = configurator.querySelector(selectors.numberGlowIntensity);
+		const numberGlowColor = configurator.querySelector(selectors.numberGlowColor);
 		const numberGlowFields = configurator.querySelector(selectors.numberGlowFields);
 		if (numberGlowEnabled) {
 			if (sharedConfigLoaded && state.numbers.glow) {
 				numberGlowEnabled.checked = !!(state.numbers.glow.enabled);
 			} else {
-				state.numbers.glow = state.numbers.glow || { enabled: false, intensity: 10 };
+				state.numbers.glow = state.numbers.glow || { enabled: false, intensity: 10, color: '#ffffff' };
 				numberGlowEnabled.checked = state.numbers.glow.enabled;
 			}
 		}
 		if (numberGlowIntensity) {
+			// S'assurer que le slider a les bonnes valeurs min/max (gauche = min, droite = max)
+			numberGlowIntensity.min = '1';
+			numberGlowIntensity.max = '30';
+			
 			if (sharedConfigLoaded && state.numbers.glow) {
-				numberGlowIntensity.value = state.numbers.glow.intensity || 10;
+				// S'assurer que l'intensité est au minimum 1
+				const intensity = Math.max(1, state.numbers.glow.intensity || 10);
+				if (state.numbers.glow.intensity < 1) {
+					state.numbers.glow.intensity = intensity;
+				}
+				numberGlowIntensity.value = intensity;
 			} else {
-				state.numbers.glow = state.numbers.glow || { enabled: false, intensity: 10 };
+				state.numbers.glow = state.numbers.glow || { enabled: false, intensity: 10, color: '#ffffff' };
+				// S'assurer que l'intensité est au minimum 1
+				if (state.numbers.glow.intensity < 1) {
+					state.numbers.glow.intensity = 1;
+				}
 				numberGlowIntensity.value = state.numbers.glow.intensity;
 			}
 			numberGlowIntensity.disabled = !(state.numbers.glow && state.numbers.glow.enabled);
+		}
+		if (numberGlowColor) {
+			// Initialiser le glow si nécessaire (blanc par défaut)
+			if (!state.numbers.glow) {
+				state.numbers.glow = { enabled: false, intensity: 10, color: '#ffffff' };
+			}
+			// Initialiser la couleur du glow si elle n'est pas définie (blanc par défaut)
+			if (!state.numbers.glow.color) {
+				state.numbers.glow.color = '#ffffff';
+			}
+			// Utiliser la couleur du glow si disponible depuis la config partagée
+			if (sharedConfigLoaded && state.numbers.glow && state.numbers.glow.color) {
+				numberGlowColor.value = state.numbers.glow.color;
+			} else {
+				// Utiliser la couleur du state ou blanc par défaut
+				const defaultColor = state.numbers.glow.color || '#ffffff';
+				state.numbers.glow.color = defaultColor;
+				numberGlowColor.value = defaultColor;
+			}
+			// Le sélecteur de couleur ne doit être désactivé que si le glow n'est pas activé
+			numberGlowColor.disabled = !(state.numbers.glow && state.numbers.glow.enabled);
 		}
 		if (numberGlowFields) {
 			numberGlowFields.style.display = (state.numbers.glow && state.numbers.glow.enabled) ? 'block' : 'none';
@@ -5350,7 +5665,7 @@ function handleIntermediatePointsChange(event) {
 					initialDistance = (!Number.isNaN(inputValue) && inputValue >= 0) ? inputValue : null;
 				}
 			}
-			
+
 			// Si initialDistance est null, calculer selon l'état de l'option "Afficher les chiffres"
 			if (initialDistance === null || initialDistance === undefined) {
 				const maxValue = parseInt(numbersDistanceInput.max, 10) || 350;
@@ -5358,10 +5673,10 @@ function handleIntermediatePointsChange(event) {
 				const defaultPercentage = state.showNumbers ? 0.77 : 0.9;
 				initialDistance = Math.round(maxValue * defaultPercentage);
 			}
-			
+
 			state.numbers.distance = Math.max(0, initialDistance);
 			numbersDistanceInput.value = state.numbers.distance;
-			
+
 			// Mettre à jour l'affichage de la valeur en pourcentage
 			const valueDisplay = configurator.querySelector('#wc-pc13-number-distance-value');
 			if (valueDisplay && numbersDistanceInput.max) {
@@ -5385,7 +5700,7 @@ function handleIntermediatePointsChange(event) {
 		const slotBorderColor = configurator.querySelector(selectors.slotBorderColor);
 		const slotBorderWidth = configurator.querySelector(selectors.slotBorderWidth);
 		const slotShadowEnabled = configurator.querySelector(selectors.slotShadowEnabled);
-		
+
 		if (slotBorderEnabled) {
 			state.slotBorder.enabled = !!slotBorderEnabled.checked;
 		}
@@ -5402,7 +5717,7 @@ function handleIntermediatePointsChange(event) {
 			state.slotShadow.enabled = !!slotShadowEnabled.checked;
 		}
 
-			updateRingDimensions();
+		updateRingDimensions();
 
 		initSlots();
 		addPlaceholders();
@@ -5484,165 +5799,165 @@ function handleIntermediatePointsChange(event) {
 		}, 5000);
 	}
 
-// Fonctions de partage
-let currentShareUrl = '';
+	// Fonctions de partage
+	let currentShareUrl = '';
 
-function setShareLoadingState(isLoading, shareBtn) {
-	shareLoading = !!isLoading;
-	if (!shareBtn) {
-		return;
-	}
-	if (!shareBtn.dataset.originalText) {
-		shareBtn.dataset.originalText = shareBtn.textContent.trim();
-	}
-	if (shareLoading) {
-		shareBtn.disabled = true;
-		shareBtn.innerHTML = `<span class="wc-pc13-spinner"></span> ${shareBtn.dataset.originalText}`;
-	} else {
-		shareBtn.disabled = false;
-		shareBtn.innerHTML = shareBtn.dataset.originalText || shareBtn.textContent;
-	}
-}
-
-async function openShareModal(shareBtn = null) {
-	const configurator = document.querySelector(selectors.configurator);
-	if (!configurator) {
-		return;
-	}
-
-	const productId = configurator.dataset.product;
-	if (!productId) {
-		window.alert('ID produit manquant');
-		return;
-	}
-
-	const shareModal = configurator.querySelector(selectors.shareModal);
-	const shareUrlInput = configurator.querySelector(selectors.shareUrlInput);
-
-	// Afficher le modal rapidement avec un état de chargement
-	if (shareModal) {
-		shareModal.style.display = 'flex';
-	}
-	if (shareUrlInput) {
-		shareUrlInput.value = WCPC13.labels?.loading || 'Génération du lien...';
-		shareUrlInput.disabled = true;
-	}
-	setShareLoadingState(true, shareBtn);
-
-	// Sauvegarder la configuration et obtenir le lien de partage
-	try {
-		const payload = savePayload();
-		
-		// Vérifier que le payload est valide
-		if (!payload || typeof payload !== 'object') {
-			throw new Error('Configuration invalide : payload manquant');
+	function setShareLoadingState(isLoading, shareBtn) {
+		shareLoading = !!isLoading;
+		if (!shareBtn) {
+			return;
 		}
-		
-		const payloadJson = JSON.stringify(payload);
-		if (!payloadJson || payloadJson === '{}') {
-			throw new Error('Configuration invalide : payload vide');
+		if (!shareBtn.dataset.originalText) {
+			shareBtn.dataset.originalText = shareBtn.textContent.trim();
 		}
-		
-		const formData = new FormData();
-		formData.append('action', 'wc_pc13_save_share');
-		formData.append('nonce', WCPC13.nonce);
-		formData.append('product_id', productId);
-		formData.append('payload', payloadJson);
+		if (shareLoading) {
+			shareBtn.disabled = true;
+			shareBtn.innerHTML = `<span class="wc-pc13-spinner"></span> ${shareBtn.dataset.originalText}`;
+		} else {
+			shareBtn.disabled = false;
+			shareBtn.innerHTML = shareBtn.dataset.originalText || shareBtn.textContent;
+		}
+	}
 
-		const response = await fetch(WCPC13.ajax_url, {
-			method: 'POST',
-			credentials: 'same-origin',
-			body: formData,
-		});
-
-		if (!response.ok) {
-			throw new Error('Erreur lors de la sauvegarde');
+	async function openShareModal(shareBtn = null) {
+		const configurator = document.querySelector(selectors.configurator);
+		if (!configurator) {
+			return;
 		}
 
-		const data = await response.json();
-		if (!data || !data.success || !data.data) {
-			throw new Error(data?.data?.message || 'Erreur lors de la sauvegarde');
+		const productId = configurator.dataset.product;
+		if (!productId) {
+			window.alert('ID produit manquant');
+			return;
 		}
 
-		currentShareUrl = data.data.share_url || '';
-		if (shareUrlInput) {
-			shareUrlInput.value = currentShareUrl;
-			shareUrlInput.disabled = false;
-		}
+		const shareModal = configurator.querySelector(selectors.shareModal);
+		const shareUrlInput = configurator.querySelector(selectors.shareUrlInput);
 
-		// Mettre à jour les liens de partage social
-		updateSocialShareLinks();
-
-		// Afficher le modal (déjà affiché, mais on s'assure de l'état)
+		// Afficher le modal rapidement avec un état de chargement
 		if (shareModal) {
 			shareModal.style.display = 'flex';
 		}
-	} catch (error) {
-		console.error('Erreur lors de l\'ouverture du modal de partage:', error);
-		window.alert(error?.message || 'Erreur lors de la génération du lien de partage');
-		if (shareModal) {
-			shareModal.style.display = 'none';
+		if (shareUrlInput) {
+			shareUrlInput.value = WCPC13.labels?.loading || 'Génération du lien...';
+			shareUrlInput.disabled = true;
 		}
-	} finally {
-		setShareLoadingState(false, shareBtn);
+		setShareLoadingState(true, shareBtn);
+
+		// Sauvegarder la configuration et obtenir le lien de partage
+		try {
+			const payload = savePayload();
+
+			// Vérifier que le payload est valide
+			if (!payload || typeof payload !== 'object') {
+				throw new Error('Configuration invalide : payload manquant');
+			}
+
+			const payloadJson = JSON.stringify(payload);
+			if (!payloadJson || payloadJson === '{}') {
+				throw new Error('Configuration invalide : payload vide');
+			}
+
+			const formData = new FormData();
+			formData.append('action', 'wc_pc13_save_share');
+			formData.append('nonce', WCPC13.nonce);
+			formData.append('product_id', productId);
+			formData.append('payload', payloadJson);
+
+			const response = await fetch(WCPC13.ajax_url, {
+				method: 'POST',
+				credentials: 'same-origin',
+				body: formData,
+			});
+
+			if (!response.ok) {
+				throw new Error('Erreur lors de la sauvegarde');
+			}
+
+			const data = await response.json();
+			if (!data || !data.success || !data.data) {
+				throw new Error(data?.data?.message || 'Erreur lors de la sauvegarde');
+			}
+
+			currentShareUrl = data.data.share_url || '';
+			if (shareUrlInput) {
+				shareUrlInput.value = currentShareUrl;
+				shareUrlInput.disabled = false;
+			}
+
+			// Mettre à jour les liens de partage social
+			updateSocialShareLinks();
+
+			// Afficher le modal (déjà affiché, mais on s'assure de l'état)
+			if (shareModal) {
+				shareModal.style.display = 'flex';
+			}
+		} catch (error) {
+			console.error('Erreur lors de l\'ouverture du modal de partage:', error);
+			window.alert(error?.message || 'Erreur lors de la génération du lien de partage');
+			if (shareModal) {
+				shareModal.style.display = 'none';
+			}
+		} finally {
+			setShareLoadingState(false, shareBtn);
+		}
 	}
-}
 
-async function saveShareAndSendEmail(email, triggerBtn = null) {
-	const configurator = document.querySelector(selectors.configurator);
-	if (!configurator) {
-		return;
+	async function saveShareAndSendEmail(email, triggerBtn = null) {
+		const configurator = document.querySelector(selectors.configurator);
+		if (!configurator) {
+			return;
+		}
+
+		const productId = configurator.dataset.product;
+		if (!productId) {
+			window.alert('ID produit manquant');
+			return;
+		}
+
+		setShareLoadingState(true, triggerBtn);
+		try {
+			const payload = savePayload();
+			if (!payload || typeof payload !== 'object') {
+				throw new Error('Configuration invalide : payload manquant');
+			}
+
+			const payloadJson = JSON.stringify(payload);
+			if (!payloadJson || payloadJson === '{}') {
+				throw new Error('Configuration invalide : payload vide');
+			}
+
+			const formData = new FormData();
+			formData.append('action', 'wc_pc13_save_share_email');
+			formData.append('nonce', WCPC13.nonce);
+			formData.append('product_id', productId);
+			formData.append('payload', payloadJson);
+			formData.append('email', email);
+
+			const response = await fetch(WCPC13.ajax_url, {
+				method: 'POST',
+				credentials: 'same-origin',
+				body: formData,
+			});
+
+			if (!response.ok) {
+				throw new Error('Erreur lors de la sauvegarde');
+			}
+
+			const data = await response.json();
+			if (!data || !data.success || !data.data) {
+				throw new Error(data?.data?.message || 'Erreur lors de la sauvegarde');
+			}
+
+			currentShareUrl = data.data.share_url || '';
+			window.alert(WCPC13.labels?.email_sent || 'Lien envoyé par email.');
+		} catch (error) {
+			console.error('Erreur lors de l’envoi du lien par email:', error);
+			window.alert(error?.message || 'Erreur lors de l’envoi du lien par email');
+		} finally {
+			setShareLoadingState(false, triggerBtn);
+		}
 	}
-
-	const productId = configurator.dataset.product;
-	if (!productId) {
-		window.alert('ID produit manquant');
-		return;
-	}
-
-	setShareLoadingState(true, triggerBtn);
-	try {
-		const payload = savePayload();
-		if (!payload || typeof payload !== 'object') {
-			throw new Error('Configuration invalide : payload manquant');
-		}
-
-		const payloadJson = JSON.stringify(payload);
-		if (!payloadJson || payloadJson === '{}') {
-			throw new Error('Configuration invalide : payload vide');
-		}
-
-		const formData = new FormData();
-		formData.append('action', 'wc_pc13_save_share_email');
-		formData.append('nonce', WCPC13.nonce);
-		formData.append('product_id', productId);
-		formData.append('payload', payloadJson);
-		formData.append('email', email);
-
-		const response = await fetch(WCPC13.ajax_url, {
-			method: 'POST',
-			credentials: 'same-origin',
-			body: formData,
-		});
-
-		if (!response.ok) {
-			throw new Error('Erreur lors de la sauvegarde');
-		}
-
-		const data = await response.json();
-		if (!data || !data.success || !data.data) {
-			throw new Error(data?.data?.message || 'Erreur lors de la sauvegarde');
-		}
-
-		currentShareUrl = data.data.share_url || '';
-		window.alert(WCPC13.labels?.email_sent || 'Lien envoyé par email.');
-	} catch (error) {
-		console.error('Erreur lors de l’envoi du lien par email:', error);
-		window.alert(error?.message || 'Erreur lors de l’envoi du lien par email');
-	} finally {
-		setShareLoadingState(false, triggerBtn);
-	}
-}
 
 	function closeShareModal() {
 		const configurator = document.querySelector(selectors.configurator);
@@ -5779,7 +6094,7 @@ async function saveShareAndSendEmail(email, triggerBtn = null) {
 				helpMessage.className = 'wc-pc13-help-modal-message success';
 				helpMessage.style.display = 'block';
 				form.reset();
-				
+
 				// Fermer le modal après 3 secondes
 				setTimeout(() => {
 					closeHelpModal();
@@ -5960,8 +6275,8 @@ async function saveShareAndSendEmail(email, triggerBtn = null) {
 				state.showNumbers = sharedConfig.showNumbers;
 			}
 			if (sharedConfig.numbers) {
-				state.numbers = { 
-					...state.numbers, 
+				state.numbers = {
+					...state.numbers,
 					...sharedConfig.numbers,
 					numberType: sharedConfig.numbers.numberType || state.numbers.numberType || 'arabic',
 					intermediatePoints: sharedConfig.numbers.intermediatePoints || state.numbers.intermediatePoints || 'without',
@@ -6035,7 +6350,7 @@ async function saveShareAndSendEmail(email, triggerBtn = null) {
 		const slotBorderWidth = configurator.querySelector(selectors.slotBorderWidth);
 		const slotBorderFields = configurator.querySelector(selectors.slotBorderFields);
 		const slotShadowEnabled = configurator.querySelector(selectors.slotShadowEnabled);
-		
+
 		if (slotBorderEnabled) {
 			slotBorderEnabled.checked = !!state.slotBorder.enabled;
 			if (slotBorderFields) {
@@ -6069,19 +6384,19 @@ async function saveShareAndSendEmail(email, triggerBtn = null) {
 
 		// Appliquer les images
 		updatePreview();
-		
+
 		// Réorganiser le mini-cart au chargement
 		setTimeout(reorganizeMiniCart, 500);
-		
+
 		// Écouter les événements de mise à jour du panier
 		if (typeof jQuery !== 'undefined') {
-			jQuery(document.body).on('added_to_cart', function() {
+			jQuery(document.body).on('added_to_cart', function () {
 				setTimeout(reorganizeMiniCart, 100);
 			});
-			jQuery(document.body).on('wc_fragment_refresh', function() {
+			jQuery(document.body).on('wc_fragment_refresh', function () {
 				setTimeout(reorganizeMiniCart, 100);
 			});
-			jQuery(document.body).on('updated_cart_totals', function() {
+			jQuery(document.body).on('updated_cart_totals', function () {
 				setTimeout(reorganizeMiniCart, 100);
 			});
 		}

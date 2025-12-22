@@ -124,6 +124,23 @@ $default_show_slots = isset( $default_show_slots ) ? $default_show_slots : true;
 				<button type="button" class="button button-secondary wc-pc13-save-email-btn">
 					<?php esc_html_e( 'Sauvegarder par email', 'wc-photo-clock-13' ); ?>
 				</button>
+				<button type="button" class="button wc-pc13-add-to-cart-btn">
+					<svg class="wc-pc13-cart-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+						<path d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm-8 2a2 2 0 1 1-4 0 2 2 0 0 1 4 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+					</svg>
+					<span class="wc-pc13-add-to-cart-text"><?php echo esc_html( $button_text ?? __( 'Ajouter au panier', 'wc-photo-clock-13' ) ); ?></span>
+					<span class="wc-pc13-add-to-cart-price" id="wc-pc13-add-to-cart-price">59€</span>
+				</button>
+			</div>
+			<div class="wc-pc13-demo-actions">
+				<button type="button" class="button wc-pc13-fill-unsplash">
+					<span class="wc-pc13-fill-unsplash-icon">🎲</span>
+					<?php esc_html_e( 'Charger des photos aléatoires', 'wc-photo-clock-13' ); ?>
+				</button>
+				<button type="button" class="button wc-pc13-search-unsplash-btn">
+					<span class="wc-pc13-search-icon">🔍</span>
+					<?php esc_html_e( 'Rechercher une photo', 'wc-photo-clock-13' ); ?>
+				</button>
 			</div>
 			<div class="wc-pc13-email-modal" style="display: none;">
 				<div class="wc-pc13-email-modal-content">
@@ -180,16 +197,6 @@ $default_show_slots = isset( $default_show_slots ) ? $default_show_slots : true;
 					</div>
 				</div>
 			</div>
-			<div class="wc-pc13-demo-actions">
-				<button type="button" class="button wc-pc13-fill-unsplash">
-					<span class="wc-pc13-fill-unsplash-icon">🎲</span>
-					<?php esc_html_e( 'Charger des photos aléatoires', 'wc-photo-clock-13' ); ?>
-				</button>
-				<button type="button" class="button wc-pc13-search-unsplash-btn">
-					<span class="wc-pc13-search-icon">🔍</span>
-					<?php esc_html_e( 'Rechercher une photo', 'wc-photo-clock-13' ); ?>
-				</button>
-			</div>
 			
 			<!-- Modal de recherche Unsplash -->
 			<div id="wc-pc13-unsplash-modal" class="wc-pc13-unsplash-modal" style="display: none;">
@@ -237,45 +244,6 @@ $default_show_slots = isset( $default_show_slots ) ? $default_show_slots : true;
 							</div>
 						</div>
 					</div>
-				</div>
-			</div>
-			<div class="wc-pc13-add-to-cart">
-				<button type="button" class="button button-primary wc-pc13-add-to-cart-btn">
-					<svg class="wc-pc13-cart-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-						<path d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm-8 2a2 2 0 1 1-4 0 2 2 0 0 1 4 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-					</svg>
-					<span class="wc-pc13-add-to-cart-text"><?php echo esc_html( $button_text ?? __( 'Ajouter au panier', 'wc-photo-clock-13' ) ); ?></span>
-					<span class="wc-pc13-add-to-cart-price" id="wc-pc13-add-to-cart-price">59€</span>
-				</button>
-				<p class="wc-pc13-add-to-cart-note"><?php esc_html_e( 'Vos réglages seront ajoutés au panier avec ce produit.', 'wc-photo-clock-13' ); ?></p>
-			</div>
-			<div class="wc-pc13-tutorial">
-				<h4 class="wc-pc13-tutorial-title"><?php esc_html_e( 'Comment utiliser le configurateur', 'wc-photo-clock-13' ); ?></h4>
-				<div class="wc-pc13-tutorial-steps">
-					<div class="wc-pc13-tutorial-step">
-						<span class="wc-pc13-tutorial-icon">1️⃣</span>
-						<div class="wc-pc13-tutorial-content">
-							<strong><?php esc_html_e( 'Ajoutez vos photos', 'wc-photo-clock-13' ); ?></strong>
-							<p><?php esc_html_e( 'Cliquez sur une zone de l\'horloge (centre ou périphérie) puis sélectionnez une image depuis votre ordinateur ou glissez-déposez-la directement.', 'wc-photo-clock-13' ); ?></p>
-						</div>
-					</div>
-					<div class="wc-pc13-tutorial-step">
-						<span class="wc-pc13-tutorial-icon">2️⃣</span>
-						<div class="wc-pc13-tutorial-content">
-							<strong><?php esc_html_e( 'Ajustez et personnalisez', 'wc-photo-clock-13' ); ?></strong>
-							<p><?php esc_html_e( 'Utilisez les contrôles à droite pour ajuster le zoom, la position de chaque photo, choisir le diamètre, la couleur des aiguilles et les options d\'affichage.', 'wc-photo-clock-13' ); ?></p>
-						</div>
-					</div>
-					<div class="wc-pc13-tutorial-step">
-						<span class="wc-pc13-tutorial-icon">3️⃣</span>
-						<div class="wc-pc13-tutorial-content">
-							<strong><?php esc_html_e( 'Prévisualisez et ajoutez au panier', 'wc-photo-clock-13' ); ?></strong>
-							<p><?php esc_html_e( 'Votre horloge se met à jour en temps réel. Téléchargez un aperçu si besoin, puis ajoutez votre création au panier.', 'wc-photo-clock-13' ); ?></p>
-						</div>
-					</div>
-				</div>
-				<div class="wc-pc13-tutorial-tips">
-					<p><strong>💡 <?php esc_html_e( 'Astuce', 'wc-photo-clock-13' ); ?>:</strong> <?php esc_html_e( 'Utilisez le bouton "Charger des photos aléatoires" pour tester rapidement le configurateur.', 'wc-photo-clock-13' ); ?></p>
 				</div>
 			</div>
 		</div>
@@ -332,7 +300,7 @@ $default_show_slots = isset( $default_show_slots ) ? $default_show_slots : true;
 							</svg>
 						</button>
 					<button type="button" class="button button-secondary wc-pc13-select-center">
-						<?php esc_html_e( 'Envoyer une image centrale', 'wc-photo-clock-13' ); ?>
+						<?php esc_html_e( 'Sélectionner une image', 'wc-photo-clock-13' ); ?>
 					</button>
 					</div>
 					<label for="wc-pc13-center-size" class="wc-pc13-center-size-label" style="display: none;">
@@ -405,9 +373,13 @@ $default_show_slots = isset( $default_show_slots ) ? $default_show_slots : true;
 							</label>
 						</div>
 						<div class="wc-pc13-number-glow-fields" style="display: none;">
+							<label for="wc-pc13-number-glow-color">
+								<span><?php esc_html_e( 'Couleur du halo', 'wc-photo-clock-13' ); ?></span>
+								<input type="color" id="wc-pc13-number-glow-color" name="wc_pc13_number_glow_color" value="#ffffff">
+							</label>
 							<label for="wc-pc13-number-glow-intensity">
 								<span><?php esc_html_e( 'Intensité du halo', 'wc-photo-clock-13' ); ?></span>
-								<input type="range" id="wc-pc13-number-glow-intensity" name="wc_pc13_number_glow_intensity" min="0" max="30" step="1" value="10">
+								<input type="range" id="wc-pc13-number-glow-intensity" name="wc_pc13_number_glow_intensity" min="1" max="30" step="1" value="10">
 							</label>
 						</div>
 					</div>
@@ -415,30 +387,34 @@ $default_show_slots = isset( $default_show_slots ) ? $default_show_slots : true;
 				<label class="wc-pc13-toggle">
 					<input type="checkbox" id="wc-pc13-show-slots" name="wc_pc13_show_slots" value="1" <?php echo ( isset( $default_show_slots ) && $default_show_slots ) ? 'checked' : ''; ?>>
 					<span><?php esc_html_e( 'Afficher les photos périphériques', 'wc-photo-clock-13' ); ?></span>
-				</label>
-					<label for="wc-pc13-slot-size"><?php esc_html_e( 'Taille des photos périphériques', 'wc-photo-clock-13' ); ?></label>
-					<input type="range" id="wc-pc13-slot-size" name="wc_pc13_slot_size" min="50" max="160" step="1" value="110">
-					<div class="wc-pc13-slot-styling">
-						<h5><?php esc_html_e( 'Style des photos périphériques', 'wc-photo-clock-13' ); ?></h5>
-						<label class="wc-pc13-toggle">
-							<input type="checkbox" id="wc-pc13-slot-border-enabled" name="wc_pc13_slot_border_enabled" value="1">
-							<span><?php esc_html_e( 'Activer le contour', 'wc-photo-clock-13' ); ?></span>
+					<div class="wc-pc13-slots-fields">
+						<label for="wc-pc13-slot-size">
+							<span><?php esc_html_e( 'Taille des photos périphériques', 'wc-photo-clock-13' ); ?></span>
+							<input type="range" id="wc-pc13-slot-size" name="wc_pc13_slot_size" min="50" max="160" step="1" value="110">
 						</label>
-						<div class="wc-pc13-slot-border-fields">
-							<label for="wc-pc13-slot-border-color">
-								<span><?php esc_html_e( 'Couleur du contour', 'wc-photo-clock-13' ); ?></span>
-								<input type="color" id="wc-pc13-slot-border-color" name="wc_pc13_slot_border_color" value="#000000">
+						<div class="wc-pc13-slot-styling">
+							<h5><?php esc_html_e( 'Style des photos périphériques', 'wc-photo-clock-13' ); ?></h5>
+							<label class="wc-pc13-toggle">
+								<input type="checkbox" id="wc-pc13-slot-border-enabled" name="wc_pc13_slot_border_enabled" value="1">
+								<span><?php esc_html_e( 'Activer le contour', 'wc-photo-clock-13' ); ?></span>
 							</label>
-							<label for="wc-pc13-slot-border-width">
-								<span><?php esc_html_e( 'Épaisseur du contour', 'wc-photo-clock-13' ); ?></span>
-								<input type="range" id="wc-pc13-slot-border-width" name="wc_pc13_slot_border_width" min="1" max="10" step="1" value="2">
+							<div class="wc-pc13-slot-border-fields">
+								<label for="wc-pc13-slot-border-color">
+									<span><?php esc_html_e( 'Couleur du contour', 'wc-photo-clock-13' ); ?></span>
+									<input type="color" id="wc-pc13-slot-border-color" name="wc_pc13_slot_border_color" value="#000000">
+								</label>
+								<label for="wc-pc13-slot-border-width">
+									<span><?php esc_html_e( 'Épaisseur du contour', 'wc-photo-clock-13' ); ?></span>
+									<input type="range" id="wc-pc13-slot-border-width" name="wc_pc13_slot_border_width" min="1" max="10" step="1" value="2">
+								</label>
+							</div>
+							<label class="wc-pc13-toggle">
+								<input type="checkbox" id="wc-pc13-slot-shadow-enabled" name="wc_pc13_slot_shadow_enabled" value="1">
+								<span><?php esc_html_e( 'Activer l\'ombre portée', 'wc-photo-clock-13' ); ?></span>
 							</label>
 						</div>
-						<label class="wc-pc13-toggle">
-							<input type="checkbox" id="wc-pc13-slot-shadow-enabled" name="wc_pc13_slot_shadow_enabled" value="1">
-							<span><?php esc_html_e( 'Activer l\'ombre portée', 'wc-photo-clock-13' ); ?></span>
-						</label>
 					</div>
+				</label>
 			</div>
 
 			<div class="wc-pc13-slot-editor">
@@ -470,6 +446,36 @@ $default_show_slots = isset( $default_show_slots ) ? $default_show_slots : true;
 				</div>
 			</div>
 		</div>
+</div>
+
+<div class="wc-pc13-tutorial">
+	<h4 class="wc-pc13-tutorial-title"><?php esc_html_e( 'Comment utiliser le configurateur', 'wc-photo-clock-13' ); ?></h4>
+	<div class="wc-pc13-tutorial-steps">
+		<div class="wc-pc13-tutorial-step">
+			<span class="wc-pc13-tutorial-icon">1️⃣</span>
+			<div class="wc-pc13-tutorial-content">
+				<strong><?php esc_html_e( 'Ajoutez vos photos', 'wc-photo-clock-13' ); ?></strong>
+				<p><?php esc_html_e( 'Cliquez sur une zone de l\'horloge (centre ou périphérie) puis sélectionnez une image depuis votre ordinateur ou glissez-déposez-la directement.', 'wc-photo-clock-13' ); ?></p>
+			</div>
+		</div>
+		<div class="wc-pc13-tutorial-step">
+			<span class="wc-pc13-tutorial-icon">2️⃣</span>
+			<div class="wc-pc13-tutorial-content">
+				<strong><?php esc_html_e( 'Ajustez et personnalisez', 'wc-photo-clock-13' ); ?></strong>
+				<p><?php esc_html_e( 'Utilisez les contrôles à droite pour ajuster le zoom, la position de chaque photo, choisir le diamètre, la couleur des aiguilles et les options d\'affichage.', 'wc-photo-clock-13' ); ?></p>
+			</div>
+		</div>
+		<div class="wc-pc13-tutorial-step">
+			<span class="wc-pc13-tutorial-icon">3️⃣</span>
+			<div class="wc-pc13-tutorial-content">
+				<strong><?php esc_html_e( 'Prévisualisez et ajoutez au panier', 'wc-photo-clock-13' ); ?></strong>
+				<p><?php esc_html_e( 'Votre horloge se met à jour en temps réel. Téléchargez un aperçu si besoin, puis ajoutez votre création au panier.', 'wc-photo-clock-13' ); ?></p>
+			</div>
+		</div>
+	</div>
+	<div class="wc-pc13-tutorial-tips">
+		<p><strong>💡 <?php esc_html_e( 'Astuce', 'wc-photo-clock-13' ); ?>:</strong> <?php esc_html_e( 'Utilisez le bouton "Charger des photos aléatoires" pour tester rapidement le configurateur.', 'wc-photo-clock-13' ); ?></p>
+	</div>
 	</div>
 
 	<input type="hidden" name="wc_pc13_payload" id="wc-pc13-payload">

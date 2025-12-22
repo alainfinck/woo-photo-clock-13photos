@@ -56,6 +56,11 @@ class WC_PC13_Frontend {
 		add_action( 'woocommerce_after_add_to_cart_quantity', array( $this, 'hide_quantity_selector_end' ), 5 );
 		add_action( 'wp_ajax_wc_pc13_send_help', array( $this, 'handle_help_request' ) );
 		add_action( 'wp_ajax_nopriv_wc_pc13_send_help', array( $this, 'handle_help_request' ) );
+		// Masquer les métadonnées du produit (Archives, Categories) pour les produits avec configurateur
+		add_action( 'woocommerce_single_product_summary', array( $this, 'hide_product_meta' ), 99 );
+		add_action( 'woocommerce_after_single_product_summary', array( $this, 'hide_product_meta_after' ), 1 );
+		// Retirer le bouton "Ajouter au panier" natif pour les produits avec configurateur
+		add_action( 'template_redirect', array( $this, 'remove_native_add_to_cart_button' ) );
 	}
 
 	/**
@@ -572,14 +577,20 @@ class WC_PC13_Frontend {
 
 			// Gérer le halo lumineux
 			if ( isset( $payload['numbers']['glow'] ) && is_array( $payload['numbers']['glow'] ) ) {
+				$glow_color = isset( $payload['numbers']['glow']['color'] ) ? sanitize_hex_color( $payload['numbers']['glow']['color'] ) : null;
+				if ( ! $glow_color ) {
+					$glow_color = '#ffffff';
+				}
 				$clean['numbers']['glow'] = array(
 					'enabled'    => ! empty( $payload['numbers']['glow']['enabled'] ),
-					'intensity'  => isset( $payload['numbers']['glow']['intensity'] ) ? max( 0, min( 30, absint( $payload['numbers']['glow']['intensity'] ) ) ) : 10,
+					'intensity'  => isset( $payload['numbers']['glow']['intensity'] ) ? max( 1, min( 30, absint( $payload['numbers']['glow']['intensity'] ) ) ) : 1,
+					'color'      => $glow_color,
 				);
 			} else {
 				$clean['numbers']['glow'] = array(
 					'enabled'    => false,
-					'intensity'  => 10,
+					'intensity'  => 1,
+					'color'      => '#ffffff',
 				);
 			}
 
@@ -1019,6 +1030,131 @@ class WC_PC13_Frontend {
 	 */
 	public function hide_quantity_selector_end() {
 		// Le style est déjà ajouté dans hide_quantity_selector
+	}
+
+	/**
+	 * Masque les métadonnées du produit (Archives, Categories) pour les produits avec configurateur.
+	 */
+	public function hide_product_meta() {
+		global $product;
+
+		if ( ! $product instanceof WC_Product ) {
+			return;
+		}
+
+		$enabled = $product->get_meta( '_wc_pc13_enabled' );
+		if ( 'yes' === $enabled ) {
+			// Masquer les métadonnées via CSS
+			add_action( 'wp_footer', array( $this, 'hide_product_meta_css' ), 999 );
+		}
+	}
+
+	/**
+	 * Masque les métadonnées après le résumé du produit.
+	 */
+	public function hide_product_meta_after() {
+		global $product;
+
+		if ( ! $product instanceof WC_Product ) {
+			return;
+		}
+
+		$enabled = $product->get_meta( '_wc_pc13_enabled' );
+		if ( 'yes' === $enabled ) {
+			// Masquer via remove_action pour les hooks WooCommerce
+			remove_action( 'woocommerce_single_product_summary', 'woocommerce_template_single_meta', 40 );
+			remove_action( 'woocommerce_after_single_product_summary', 'woocommerce_output_product_data_tabs', 10 );
+		}
+	}
+
+	/**
+	 * Retire le bouton "Ajouter au panier" natif pour les produits avec configurateur.
+	 */
+	public function remove_native_add_to_cart_button() {
+		if ( ! is_product() ) {
+			return;
+		}
+
+		global $product;
+
+		if ( ! $product instanceof WC_Product ) {
+			return;
+		}
+
+		$enabled = $product->get_meta( '_wc_pc13_enabled' );
+		if ( 'yes' === $enabled ) {
+			// Retirer le hook qui affiche le bouton "Ajouter au panier"
+			remove_action( 'woocommerce_single_product_summary', 'woocommerce_template_single_add_to_cart', 30 );
+			// Retirer aussi pour les thèmes qui utilisent d'autres hooks
+			remove_action( 'woocommerce_after_single_product_summary', 'woocommerce_template_single_add_to_cart', 5 );
+			// Ajouter un filtre pour masquer le bouton via CSS
+			add_action( 'wp_head', array( $this, 'hide_native_button_css' ), 999 );
+		}
+	}
+
+	/**
+	 * Ajoute le CSS pour masquer le bouton natif.
+	 */
+	public function hide_native_button_css() {
+		global $product;
+
+		if ( ! $product instanceof WC_Product ) {
+			return;
+		}
+
+		$enabled = $product->get_meta( '_wc_pc13_enabled' );
+		if ( 'yes' === $enabled ) {
+			echo '<style>
+				.single-product .single_add_to_cart_button:not(.wc-pc13-add-to-cart-btn),
+				.add-to-cart-container .single_add_to_cart_button:not(.wc-pc13-add-to-cart-btn),
+				form.cart .single_add_to_cart_button:not(.wc-pc13-add-to-cart-btn) {
+					display: none !important;
+					visibility: hidden !important;
+					opacity: 0 !important;
+					position: absolute !important;
+					width: 0 !important;
+					height: 0 !important;
+					overflow: hidden !important;
+					pointer-events: none !important;
+				}
+			</style>';
+		}
+	}
+
+	/**
+	 * Ajoute le CSS pour masquer les métadonnées.
+	 */
+	public function hide_product_meta_css() {
+		global $product;
+
+		if ( ! $product instanceof WC_Product ) {
+			return;
+		}
+
+		$enabled = $product->get_meta( '_wc_pc13_enabled' );
+		if ( 'yes' === $enabled ) {
+			echo '<style>
+				.single-product .product_meta,
+				.single-product .entry-meta,
+				.single-product .product_meta-wrapper,
+				.single-product .entry-meta-wrapper,
+				.single-product .product-meta,
+				.single-product .entry-footer,
+				.single-product .entry-footer .posted-on,
+				.single-product .entry-footer .cat-links,
+				.single-product .entry-footer .tags-links,
+				.single-product .posted_in,
+				.single-product .tagged_as,
+				.single-product .product_meta .posted_in,
+				.single-product .product_meta .tagged_as,
+				.single-product .entry-meta .posted-on,
+				.single-product .entry-meta .cat-links,
+				.single-product .product-meta .posted_in,
+				.single-product .product-meta .tagged_as {
+					display: none !important;
+				}
+			</style>';
+		}
 	}
 
 	/**

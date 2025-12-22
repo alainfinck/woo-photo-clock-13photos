@@ -55,7 +55,21 @@ class WC_PC13_Ajax {
 	 * Traitement de l’upload.
 	 */
 	public function handle_upload() {
-		check_ajax_referer( 'wc_pc13_nonce', 'nonce' );
+		// Vérifier si la requête est vide (souvent dû à post_max_size dépassé)
+		if ( empty( $_POST ) && empty( $_FILES ) && isset( $_SERVER['CONTENT_LENGTH'] ) && $_SERVER['CONTENT_LENGTH'] > 0 ) {
+			$max_size = ini_get( 'post_max_size' );
+			wp_send_json_error( array( 
+				'message' => sprintf( 
+					/* translators: %s: max size */
+					__( 'Le fichier est trop volumineux (limite serveur : %s).', 'wc-photo-clock-13' ), 
+					$max_size 
+				) 
+			) );
+		}
+
+		if ( ! check_ajax_referer( 'wc_pc13_nonce', 'nonce', false ) ) {
+			wp_send_json_error( array( 'message' => __( 'Session expirée, veuillez recharger la page.', 'wc-photo-clock-13' ) ) );
+		}
 
 		if ( empty( $_FILES['file'] ) ) {
 			wp_send_json_error( array( 'message' => __( 'Aucun fichier reçu.', 'wc-photo-clock-13' ) ) );
