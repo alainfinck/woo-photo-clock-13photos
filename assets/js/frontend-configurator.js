@@ -1366,6 +1366,16 @@ const CENTER_COVER_THRESHOLD = 3;
 		slotBorderWidth: '#wc-pc13-slot-border-width',
 		slotBorderFields: '.wc-pc13-slot-border-fields',
 		slotShadowEnabled: '#wc-pc13-slot-shadow-enabled',
+		arBtn: '.wc-pc13-ar-btn',
+		arModal: '#wc-pc13-ar-modal',
+		arModalClose: '.wc-pc13-ar-modal-close',
+		arVideo: '#wc-pc13-ar-video',
+		arClockOverlay: '#wc-pc13-ar-clock-overlay',
+		arClockImage: '#wc-pc13-ar-clock-image',
+		arSize: '#wc-pc13-ar-size',
+		arCapture: '.wc-pc13-ar-capture',
+		arReset: '.wc-pc13-ar-reset',
+		arError: '.wc-pc13-ar-error',
 	};
 
 	function updateRingDimensions() {
@@ -3308,6 +3318,300 @@ const CENTER_COVER_THRESHOLD = 3;
 		if (messageEl) messageEl.textContent = message;
 		if (progressBar) progressBar.style.width = `${(step / totalSteps) * 100}%`;
 		if (stepEl) stepEl.textContent = `Étape ${step}/${totalSteps}`;
+	}
+
+	/**
+	 * Initialise la fonctionnalité AR (réalité augmentée).
+	 */
+	let arStream = null;
+	let arDragState = { active: false, startX: 0, startY: 0, offsetX: 0, offsetY: 0 };
+
+	function initAR() {
+		const configurator = document.querySelector(selectors.configurator);
+		if (!configurator) return;
+
+		const arBtn = configurator.querySelector(selectors.arBtn);
+		const arModal = document.querySelector(selectors.arModal);
+		if (!arBtn || !arModal) return;
+
+		const arModalClose = arModal.querySelector(selectors.arModalClose);
+		const arVideo = arModal.querySelector(selectors.arVideo);
+		const arClockOverlay = arModal.querySelector(selectors.arClockOverlay);
+		const arClockImage = arModal.querySelector(selectors.arClockImage);
+		const arSizeInput = arModal.querySelector(selectors.arSize);
+		const arCaptureBtn = arModal.querySelector(selectors.arCapture);
+		const arResetBtn = arModal.querySelector(selectors.arReset);
+		const arError = arModal.querySelector(selectors.arError);
+
+		// Ajouter les styles AR
+		const arStyles = document.createElement('style');
+		arStyles.textContent = `
+			.wc-pc13-ar-modal {
+				position: fixed;
+				top: 0;
+				left: 0;
+				right: 0;
+				bottom: 0;
+				background: rgba(0, 0, 0, 0.95);
+				z-index: 999999;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+			}
+			.wc-pc13-ar-modal-content {
+				width: 100%;
+				max-width: 800px;
+				max-height: 100vh;
+				background: #1a1a2e;
+				border-radius: 12px;
+				overflow: hidden;
+				display: flex;
+				flex-direction: column;
+			}
+			.wc-pc13-ar-header {
+				display: flex;
+				justify-content: space-between;
+				align-items: center;
+				padding: 16px 20px;
+				background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+				color: #fff;
+			}
+			.wc-pc13-ar-header h3 {
+				margin: 0;
+				font-size: 18px;
+			}
+			.wc-pc13-ar-modal-close {
+				background: none;
+				border: none;
+				color: #fff;
+				font-size: 28px;
+				cursor: pointer;
+				line-height: 1;
+				padding: 0;
+			}
+			.wc-pc13-ar-body {
+				flex: 1;
+				display: flex;
+				flex-direction: column;
+				padding: 16px;
+			}
+			.wc-pc13-ar-instructions {
+				text-align: center;
+				color: #a0a0a0;
+				margin-bottom: 12px;
+			}
+			.wc-pc13-ar-container {
+				position: relative;
+				width: 100%;
+				aspect-ratio: 4/3;
+				background: #000;
+				border-radius: 8px;
+				overflow: hidden;
+			}
+			#wc-pc13-ar-video {
+				width: 100%;
+				height: 100%;
+				object-fit: cover;
+			}
+			.wc-pc13-ar-clock-overlay {
+				position: absolute;
+				top: 50%;
+				left: 50%;
+				transform: translate(-50%, -50%);
+				cursor: grab;
+				touch-action: none;
+				transition: box-shadow 0.2s;
+			}
+			.wc-pc13-ar-clock-overlay:active {
+				cursor: grabbing;
+			}
+			.wc-pc13-ar-clock-overlay img {
+				width: 200px;
+				height: 200px;
+				border-radius: 50%;
+				box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+				pointer-events: none;
+			}
+			.wc-pc13-ar-controls {
+				margin-top: 16px;
+				display: flex;
+				flex-direction: column;
+				gap: 12px;
+			}
+			.wc-pc13-ar-size-control {
+				color: #fff;
+			}
+			.wc-pc13-ar-size-control label {
+				display: flex;
+				flex-direction: column;
+				gap: 8px;
+			}
+			.wc-pc13-ar-size-control input[type="range"] {
+				width: 100%;
+			}
+			.wc-pc13-ar-actions {
+				display: flex;
+				gap: 10px;
+				justify-content: center;
+			}
+			.wc-pc13-ar-error {
+				background: rgba(255, 0, 0, 0.1);
+				border: 1px solid #ff4444;
+				color: #ff6666;
+				padding: 16px;
+				border-radius: 8px;
+				text-align: center;
+			}
+		`;
+		document.head.appendChild(arStyles);
+
+		// Ouvrir le modal AR
+		arBtn.addEventListener('click', async () => {
+			// Générer l'aperçu de l'horloge
+			try {
+				const canvas = await capturePreview(1, { printMode: false, skipLivePreviewUpdate: true });
+				const dataUrl = canvas.toDataURL('image/png');
+				arClockImage.src = dataUrl;
+				arClockImage.style.width = `${arSizeInput.value}px`;
+				arClockImage.style.height = `${arSizeInput.value}px`;
+			} catch (error) {
+				console.error('Erreur lors de la capture pour AR:', error);
+			}
+
+			arModal.style.display = 'flex';
+			arError.style.display = 'none';
+
+			// Réinitialiser la position
+			arClockOverlay.style.top = '50%';
+			arClockOverlay.style.left = '50%';
+			arClockOverlay.style.transform = 'translate(-50%, -50%)';
+			arDragState = { active: false, startX: 0, startY: 0, offsetX: 0, offsetY: 0 };
+
+			// Démarrer la caméra
+			try {
+				arStream = await navigator.mediaDevices.getUserMedia({
+					video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+				});
+				arVideo.srcObject = arStream;
+			} catch (err) {
+				console.error('Erreur caméra:', err);
+				arError.style.display = 'block';
+			}
+		});
+
+		// Fermer le modal AR
+		const closeAR = () => {
+			arModal.style.display = 'none';
+			if (arStream) {
+				arStream.getTracks().forEach(track => track.stop());
+				arStream = null;
+			}
+		};
+
+		arModalClose.addEventListener('click', closeAR);
+		arModal.addEventListener('click', (e) => {
+			if (e.target === arModal) closeAR();
+		});
+
+		// Changer la taille de l'horloge
+		arSizeInput.addEventListener('input', () => {
+			const size = arSizeInput.value;
+			arClockImage.style.width = `${size}px`;
+			arClockImage.style.height = `${size}px`;
+		});
+
+		// Drag & drop pour positionner l'horloge
+		const startDrag = (e) => {
+			arDragState.active = true;
+			const rect = arClockOverlay.getBoundingClientRect();
+			const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+			const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+			arDragState.startX = clientX - rect.left - rect.width / 2;
+			arDragState.startY = clientY - rect.top - rect.height / 2;
+		};
+
+		const moveDrag = (e) => {
+			if (!arDragState.active) return;
+			e.preventDefault();
+			const container = arClockOverlay.parentElement;
+			const containerRect = container.getBoundingClientRect();
+			const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+			const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+			let x = clientX - containerRect.left - arDragState.startX;
+			let y = clientY - containerRect.top - arDragState.startY;
+
+			// Limiter aux bords
+			const clockSize = parseInt(arSizeInput.value);
+			x = Math.max(clockSize / 2, Math.min(containerRect.width - clockSize / 2, x));
+			y = Math.max(clockSize / 2, Math.min(containerRect.height - clockSize / 2, y));
+
+			arClockOverlay.style.left = `${x}px`;
+			arClockOverlay.style.top = `${y}px`;
+			arClockOverlay.style.transform = 'translate(-50%, -50%)';
+		};
+
+		const endDrag = () => {
+			arDragState.active = false;
+		};
+
+		arClockOverlay.addEventListener('mousedown', startDrag);
+		arClockOverlay.addEventListener('touchstart', startDrag, { passive: false });
+		document.addEventListener('mousemove', moveDrag);
+		document.addEventListener('touchmove', moveDrag, { passive: false });
+		document.addEventListener('mouseup', endDrag);
+		document.addEventListener('touchend', endDrag);
+
+		// Réinitialiser la position
+		arResetBtn.addEventListener('click', () => {
+			arClockOverlay.style.top = '50%';
+			arClockOverlay.style.left = '50%';
+			arClockOverlay.style.transform = 'translate(-50%, -50%)';
+			arSizeInput.value = 200;
+			arClockImage.style.width = '200px';
+			arClockImage.style.height = '200px';
+		});
+
+		// Capturer une photo
+		arCaptureBtn.addEventListener('click', () => {
+			const container = arClockOverlay.parentElement;
+			const canvas = document.createElement('canvas');
+			canvas.width = arVideo.videoWidth;
+			canvas.height = arVideo.videoHeight;
+			const ctx = canvas.getContext('2d');
+
+			// Dessiner la vidéo
+			ctx.drawImage(arVideo, 0, 0);
+
+			// Calculer la position de l'horloge sur le canvas
+			const containerRect = container.getBoundingClientRect();
+			const overlayRect = arClockOverlay.getBoundingClientRect();
+			const scaleX = arVideo.videoWidth / containerRect.width;
+			const scaleY = arVideo.videoHeight / containerRect.height;
+
+			const clockX = (overlayRect.left - containerRect.left + overlayRect.width / 2) * scaleX;
+			const clockY = (overlayRect.top - containerRect.top + overlayRect.height / 2) * scaleY;
+			const clockSize = parseInt(arSizeInput.value) * scaleX;
+
+			// Dessiner l'horloge
+			const clockImg = new Image();
+			clockImg.onload = () => {
+				ctx.save();
+				ctx.beginPath();
+				ctx.arc(clockX, clockY, clockSize / 2, 0, Math.PI * 2);
+				ctx.closePath();
+				ctx.clip();
+				ctx.drawImage(clockImg, clockX - clockSize / 2, clockY - clockSize / 2, clockSize, clockSize);
+				ctx.restore();
+
+				// Télécharger
+				const link = document.createElement('a');
+				link.download = `horloge-ar-${Date.now()}.jpg`;
+				link.href = canvas.toDataURL('image/jpeg', 0.9);
+				link.click();
+			};
+			clockImg.src = arClockImage.src;
+		});
 	}
 
 	function initCustomAddToCart() {
@@ -6533,6 +6837,9 @@ const CENTER_COVER_THRESHOLD = 3;
 				setTimeout(reorganizeMiniCart, 100);
 			});
 		}
+
+		// Initialiser la RA
+		initAR();
 	}
 
 	$(init);

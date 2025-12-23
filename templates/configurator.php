@@ -145,6 +145,10 @@ $default_show_slots = isset( $default_show_slots ) ? $default_show_slots : true;
 					<span class="wc-pc13-search-icon">🔍</span>
 					<?php esc_html_e( 'Rechercher une photo', 'wc-photo-clock-13' ); ?>
 				</button>
+				<button type="button" class="button button-secondary wc-pc13-ar-btn">
+					<span class="wc-pc13-ar-icon">📱</span>
+					<?php esc_html_e( 'Voir dans mon intérieur (AR)', 'wc-photo-clock-13' ); ?>
+				</button>
 			</div>
 			<div class="wc-pc13-email-modal" style="display: none;">
 				<div class="wc-pc13-email-modal-content">
@@ -246,6 +250,42 @@ $default_show_slots = isset( $default_show_slots ) ? $default_show_slots : true;
 							<div class="wc-pc13-unsplash-empty" style="display: none;">
 								<p><?php esc_html_e( 'Aucune photo trouvée. Essayez un autre mot-clé.', 'wc-photo-clock-13' ); ?></p>
 							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+			
+			<!-- Modal AR pour visualiser l'horloge dans son intérieur -->
+			<div id="wc-pc13-ar-modal" class="wc-pc13-ar-modal" style="display: none;">
+				<div class="wc-pc13-ar-modal-content">
+					<div class="wc-pc13-ar-header">
+						<h3><?php esc_html_e( 'Visualisez votre horloge dans votre intérieur', 'wc-photo-clock-13' ); ?></h3>
+						<button type="button" class="wc-pc13-ar-modal-close" aria-label="<?php esc_attr_e( 'Fermer', 'wc-photo-clock-13' ); ?>">×</button>
+					</div>
+					<div class="wc-pc13-ar-body">
+						<div class="wc-pc13-ar-instructions">
+							<p><?php esc_html_e( 'Pointez votre caméra vers un mur, puis déplacez et redimensionnez l\'horloge avec vos doigts.', 'wc-photo-clock-13' ); ?></p>
+						</div>
+						<div class="wc-pc13-ar-container">
+							<video id="wc-pc13-ar-video" autoplay playsinline muted></video>
+							<div id="wc-pc13-ar-clock-overlay" class="wc-pc13-ar-clock-overlay">
+								<img id="wc-pc13-ar-clock-image" src="" alt="<?php esc_attr_e( 'Aperçu horloge', 'wc-photo-clock-13' ); ?>">
+							</div>
+						</div>
+						<div class="wc-pc13-ar-controls">
+							<div class="wc-pc13-ar-size-control">
+								<label for="wc-pc13-ar-size">
+									<span><?php esc_html_e( 'Taille de l\'horloge', 'wc-photo-clock-13' ); ?></span>
+									<input type="range" id="wc-pc13-ar-size" min="50" max="400" step="10" value="200">
+								</label>
+							</div>
+							<div class="wc-pc13-ar-actions">
+								<button type="button" class="button wc-pc13-ar-capture"><?php esc_html_e( 'Capturer la photo', 'wc-photo-clock-13' ); ?></button>
+								<button type="button" class="button button-secondary wc-pc13-ar-reset"><?php esc_html_e( 'Réinitialiser position', 'wc-photo-clock-13' ); ?></button>
+							</div>
+						</div>
+						<div class="wc-pc13-ar-error" style="display: none;">
+							<p><?php esc_html_e( 'Impossible d\'accéder à la caméra. Veuillez autoriser l\'accès à la caméra dans votre navigateur.', 'wc-photo-clock-13' ); ?></p>
 						</div>
 					</div>
 				</div>
