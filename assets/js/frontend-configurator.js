@@ -6838,7 +6838,191 @@ const CENTER_COVER_THRESHOLD = 3;
 			});
 		}
 
-		// Initialiser la RA
+		/**
+	 * Initialise la fonctionnalité AR (réalité augmentée) avec WebXR (Three.js).
+	 * Charge Three.js dynamiquement uniquement au clic.
+	 */
+		function initAR() {
+			const configurator = document.querySelector(selectors.configurator);
+			if (!configurator) return;
+
+			const arBtn = configurator.querySelector(selectors.arBtn);
+			if (!arBtn) return;
+
+			// Vérifier si l'environnement est sécurisé (HTTPS ou localhost)
+			const isSecure = window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname.endsWith('.local');
+			// Note : .local est souvent traité comme sécurisé par Safari mais pas forcément Chrome/Firefox sans flags.
+			// On avertira l'utilisateur si l'API XR n'est pas dispo.
+
+			let threeLoaded = false;
+
+			// Fonction pour charger Three.js
+			const loadThreeJS = () => {
+				return new Promise((resolve, reject) => {
+					if (threeLoaded || window.THREE) {
+						threeLoaded = true;
+						resolve();
+						return;
+					}
+					const script = document.createElement('script');
+					script.src = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
+					script.onload = () => {
+						threeLoaded = true;
+						resolve();
+					};
+					script.onerror = reject;
+					document.head.appendChild(script);
+				});
+			};
+
+			arBtn.addEventListener('click', async (e) => {
+				e.preventDefault();
+
+				// Vérification support WebXR
+				if (!navigator.xr) {
+					window.alert("Votre navigateur ne supporte pas la Réalité Augmentée (WebXR), ou vous n'êtes pas en HTTPS.");
+					return;
+				}
+				const isArSupported = await navigator.xr.isSessionSupported('immersive-ar');
+				if (!isArSupported) {
+					window.alert("Le mode AR n'est pas supporté par votre appareil ou navigateur.");
+					return;
+				}
+
+				// Feedback chargement
+				const originalText = arBtn.innerHTML;
+				arBtn.innerHTML = '<span class="wc-pc13-loading-spinner" style="display:inline-block; width:16px; height:16px; border:2px solid currentColor; border-right-color:transparent; border-radius:50%; animation:spin 1s linear infinite; margin-right:8px;"></span> Chargement 3D...';
+
+				try {
+					// 1. Charger Three.js
+					await loadThreeJS();
+
+					// 2. Générer la texture de l'horloge
+					const canvas = await capturePreview(1, { printMode: false, skipLivePreviewUpdate: true });
+					const texture = new THREE.CanvasTexture(canvas);
+
+					// 3. Lancer la session AR
+					startARSession(texture);
+
+				} catch (err) {
+					console.error("Erreur AR:", err);
+					window.alert("Impossible de lancer l'AR : " + err.message);
+				} finally {
+					arBtn.innerHTML = originalText;
+				}
+			});
+
+			async function startARSession(texture) {
+				// Configuration Three.js de base pour AR
+				const scene = new THREE.Scene();
+				const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
+				const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+				renderer.setSize(window.innerWidth, window.innerHeight);
+				renderer.xr.enabled = true;
+
+				// Lumière
+				const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
+				scene.add(light);
+
+				// Création de l'horloge 3D (Cylindre plat)
+				// Diamètre réel : on prend 40cm (0.4m) par défaut ou la valeur configurée
+				let realDiameter = 0.4;
+				const diameterSelect = document.querySelector('#wc-pc13-diameter');
+				if (diameterSelect) realDiameter = parseInt(diameterSelect.value) / 100;
+
+				const geometry = new THREE.CylinderGeometry(realDiameter / 2, realDiameter / 2, 0.01, 64);
+				const material = new THREE.MeshBasicMaterial({ map: texture });
+				// Ajuster la texture pour qu'elle s'affiche correctement sur le dessus du cylindre
+				// Par défaut le mapping cylindrique peut être bizarre sur les faces, on va simplifier avec un cercle pour l'affichage AR face user
+				// Ou mieux : on utilise un Cercle plan, plus simple.
+
+				const clockGroup = new THREE.Group();
+				// On crée un disque plat
+				const diskGeo = new THREE.CircleGeometry(realDiameter / 2, 64);
+				const diskMat = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide });
+				const clockMesh = new THREE.Mesh(diskGeo, diskMat);
+				// Orientation initiale : face à la caméra (Z-up dans WebXR souvent)
+				// On mettra à jour l'orientation avec le hit-test
+				clockGroup.add(clockMesh);
+
+				// Réticule pour viser
+				const reticleGeo = new THREE.RingGeometry(0.1, 0.11, 32).rotateX(-Math.PI / 2);
+				const reticleMat = new THREE.MeshBasicMaterial();
+				const reticle = new THREE.Mesh(reticleGeo, reticleMat);
+				reticle.matrixAutoUpdate = false;
+				reticle.visible = false;
+				scene.add(reticle);
+
+				// Session AR
+				const session = await navigator.xr.requestSession('immersive-ar', {
+					requiredFeatures: ['hit-test', 'dom-overlay'],
+					domOverlay: { root: document.body } // Fallback si supporté
+				});
+				renderer.xr.setReferenceSpaceType('local');
+				renderer.xr.setSession(session);
+
+				// Créer un container temporaire pour le rendu si besoin, mais WebXR prend le controle du framebuffer
+				// Pas besoin d'append le renderer.domElement au body pour immersive-ar, le browser gère.
+
+				// Boucle de rendu
+				let hitTestSource = null;
+				let hitTestSourceRequested = false;
+
+				// Gestion du clic pour placer l'objet
+				session.addEventListener('select', () => {
+					if (reticle.visible) {
+						const clone = clockGroup.clone();
+						clone.position.setFromMatrixPosition(reticle.matrix);
+						clone.quaternion.setFromRotationMatrix(reticle.matrix);
+						// Ajuster la rotation pour que l'horloge soit face à nous si c'est sur un mur
+						// Le reticle s'aligne à la surface normale.
+						// Si c'est un mur (vertical), le "Haut" du reticle est la normale du mur. 
+						// On veut que l'horloge soit plaquée au mur.
+						// CircleGeometry regarde vers +Z par défaut. 
+						// On doit faire pivoter le cercle pour s'aligner avec le mur.
+						clone.rotateX(-Math.PI / 2); // Rotation pour s'aligner avec le plan du reticle
+
+						scene.add(clone);
+					}
+				});
+
+				const renderLoop = (timestamp, frame) => {
+					if (frame) {
+						const referenceSpace = renderer.xr.getReferenceSpace();
+						const session = renderer.xr.getSession();
+
+						if (hitTestSourceRequested === false) {
+							session.requestReferenceSpace('viewer').then((referenceSpace) => {
+								session.requestHitTestSource({ space: referenceSpace }).then((source) => {
+									hitTestSource = source;
+								});
+							});
+							session.addEventListener('end', () => {
+								hitTestSourceRequested = false;
+								hitTestSource = null;
+								// Nettoyage éventuel
+							});
+							hitTestSourceRequested = true;
+						}
+
+						if (hitTestSource) {
+							const hitTestResults = frame.getHitTestResults(hitTestSource);
+							if (hitTestResults.length > 0) {
+								const hit = hitTestResults[0];
+								reticle.visible = true;
+								reticle.matrix.fromArray(hit.getPose(referenceSpace).transform.matrix);
+							} else {
+								reticle.visible = false;
+							}
+						}
+					}
+					renderer.render(scene, camera);
+				};
+
+				renderer.setAnimationLoop(renderLoop);
+			}
+		} // Closes initAR function
+
 		initAR();
 	}
 
