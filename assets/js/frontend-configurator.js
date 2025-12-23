@@ -6844,4 +6844,3 @@ const CENTER_COVER_THRESHOLD = 3;
 
 	$(init);
 })(jQuery);
-
