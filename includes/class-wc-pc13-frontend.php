@@ -153,6 +153,37 @@ class WC_PC13_Frontend {
 	}
 
 	/**
+	 * Détecte si on est dans le contexte du mini-panier.
+	 *
+	 * @return bool
+	 */
+	private function is_mini_cart_context() {
+		// Vérifier si on est dans le mini-panier via la pile d'appel
+		$backtrace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 10);
+		foreach ($backtrace as $frame) {
+			if (isset($frame['function'])) {
+				// Fonctions spécifiques au mini-panier/widget
+				if (strpos($frame['function'], 'widget') !== false ||
+					strpos($frame['function'], 'mini_cart') !== false ||
+					strpos($frame['function'], 'fragment') !== false) {
+					return true;
+				}
+			}
+		}
+
+		// Vérifier les classes CSS présentes
+		if (function_exists('wc_get_notices')) {
+			$classes = get_body_class();
+			if (in_array('woocommerce-mini-cart', $classes, true) ||
+				in_array('widget_shopping_cart', $classes, true)) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
 	 * Convertit un code couleur hexadécimal en nom lisible.
 	 *
 	 * @param string $color_code Code couleur hexadécimal.
@@ -185,6 +216,8 @@ class WC_PC13_Frontend {
 	 * @return array
 	 */
 	public function display_cart_item_data( $item_data, $cart_item ) {
+		// Détecter le contexte (mini-panier ou panier complet)
+		$is_mini_cart = $this->is_mini_cart_context();
 		if ( empty( $cart_item['wc_pc13'] ) ) {
 			return $item_data;
 		}
@@ -315,28 +348,20 @@ class WC_PC13_Frontend {
 			}
 		}
 
-		$download_buttons = '';
-		if ( $preview_url || $pdf_url ) {
-			$download_buttons = '<div class="wc-pc13-cart-download-buttons" style="margin-top: 8px;">';
-			if ( $preview_url ) {
-				$download_buttons .= '<a href="' . esc_url( $preview_url ) . '" target="_blank" rel="noopener noreferrer" class="wc-pc13-cart-download-btn">' . esc_html__( 'Télécharger JPEG', 'wc-photo-clock-13' ) . '</a>';
-			}
-			if ( $pdf_url ) {
-				$download_buttons .= '<a href="' . esc_url( $pdf_url ) . '" target="_blank" rel="noopener noreferrer" class="wc-pc13-cart-download-btn">' . esc_html__( 'Télécharger PDF HD', 'wc-photo-clock-13' ) . '</a>';
-			}
-			$download_buttons .= '</div>';
+		// Récupérer le prix
+		$price = isset( $config['diameter_price'] ) ? floatval( $config['diameter_price'] ) : 59;
+		if ( isset( $cart_item['data'] ) && $cart_item['data'] instanceof WC_Product ) {
+			$price = $cart_item['data']->get_price();
 		}
 
-		$value_html = '<div class="wc-pc13-cart-summary">';
-		if ( ! empty( $options_list ) ) {
-			$value_html .= '<ul class="wc-pc13-cart-options-list" style="list-style: none; padding: 0; margin: 0;">';
-			$value_html .= implode( '', $options_list );
-			$value_html .= '</ul>';
+		// Générer le HTML selon le contexte
+		if ( $is_mini_cart ) {
+			// Version concise pour le mini-panier
+			$value_html = $this->generate_mini_cart_summary( $config, $options_list, $preview_url, $pdf_url, $price );
+		} else {
+			// Version complète pour le panier normal
+			$value_html = $this->generate_full_cart_summary( $config, $options_list, $preview_url, $pdf_url );
 		}
-		if ( $download_buttons ) {
-			$value_html .= $download_buttons;
-		}
-		$value_html .= '</div>';
 
 		$item_data[] = array(
 			'key'     => __( 'Horloge Photo 13', 'wc-photo-clock-13' ),
@@ -442,6 +467,111 @@ class WC_PC13_Frontend {
 				);
 			}
 		}
+	}
+
+	/**
+	 * Génère le résumé concis pour le mini-panier.
+	 *
+	 * @param array  $config Configuration.
+	 * @param array  $options_list Liste des options.
+	 * @param string $preview_url URL de l'aperçu.
+	 * @param string $pdf_url URL du PDF.
+	 * @param float  $price Prix du produit.
+	 * @return string HTML du résumé.
+	 */
+	private function generate_mini_cart_summary( $config, $options_list, $preview_url, $pdf_url, $price ) {
+		// Recalculer les compteurs de photos
+		$center_has_photo = ! empty( $config['center']['image_url'] ) || ! empty( $config['center']['attachment_id'] );
+		$slots_with_photo = 0;
+		if ( ! empty( $config['slots'] ) && is_array( $config['slots'] ) ) {
+			foreach ( $config['slots'] as $slot ) {
+				if ( ! empty( $slot['image_url'] ) || ! empty( $slot['attachment_id'] ) ) {
+					$slots_with_photo++;
+				}
+			}
+		}
+
+		$value_html = '<div class="wc-pc13-cart-summary-compact">';
+
+		// Partie supérieure : badges principaux
+		$value_html .= '<div class="wc-pc13-cart-badges-compact">';
+
+		$badges = array();
+
+		// Badge diamètre
+		if ( ! empty( $config['diameter'] ) ) {
+			$diameter = absint( $config['diameter'] );
+			$badges[] = '<span class="wc-pc13-cart-badge-compact">' . esc_html( $diameter ) . 'cm</span>';
+		}
+
+		// Badge style d'aiguilles (abrégé)
+		if ( ! empty( $config['hands'] ) ) {
+			$hands_label = sanitize_text_field( $config['hands'] );
+			$hands_short = $hands_label === 'classic' ? 'Classic' : ucfirst( $hands_label );
+			$badges[] = '<span class="wc-pc13-cart-badge-compact">' . esc_html( $hands_short ) . '</span>';
+		}
+
+		// Badge chiffres
+		if ( array_key_exists( 'show_numbers', $config ) && wc_string_to_bool( $config['show_numbers'] ) ) {
+			$badges[] = '<span class="wc-pc13-cart-badge-compact">Chiffres</span>';
+		}
+
+		// Badge photos
+		if ( $center_has_photo && $slots_with_photo > 0 ) {
+			$badges[] = '<span class="wc-pc13-cart-badge-compact">' . sprintf( '%d+12 photos', $slots_with_photo + 1 ) . '</span>';
+		} elseif ( $center_has_photo ) {
+			$badges[] = '<span class="wc-pc13-cart-badge-compact">1 photo</span>';
+		} elseif ( $slots_with_photo > 0 ) {
+			$badges[] = '<span class="wc-pc13-cart-badge-compact">' . sprintf( '%d photos', $slots_with_photo ) . '</span>';
+		}
+
+		$value_html .= implode( '', $badges );
+		$value_html .= '</div>';
+
+		// Prix en bas
+		$value_html .= '<div class="wc-pc13-cart-price-compact">';
+		$value_html .= '<span class="wc-pc13-cart-price-value">' . number_format_i18n( $price, 0 ) . '€</span>';
+		$value_html .= '</div>';
+
+		$value_html .= '</div>';
+
+		return $value_html;
+	}
+
+	/**
+	 * Génère le résumé complet pour le panier normal.
+	 *
+	 * @param array  $config Configuration.
+	 * @param array  $options_list Liste des options.
+	 * @param string $preview_url URL de l'aperçu.
+	 * @param string $pdf_url URL du PDF.
+	 * @return string HTML du résumé.
+	 */
+	private function generate_full_cart_summary( $config, $options_list, $preview_url, $pdf_url ) {
+		$download_buttons = '';
+		if ( $preview_url || $pdf_url ) {
+			$download_buttons = '<div class="wc-pc13-cart-download-buttons" style="margin-top: 8px;">';
+			if ( $preview_url ) {
+				$download_buttons .= '<a href="' . esc_url( $preview_url ) . '" target="_blank" rel="noopener noreferrer" class="wc-pc13-cart-download-btn">' . esc_html__( 'Télécharger JPEG', 'wc-photo-clock-13' ) . '</a>';
+			}
+			if ( $pdf_url ) {
+				$download_buttons .= '<a href="' . esc_url( $pdf_url ) . '" target="_blank" rel="noopener noreferrer" class="wc-pc13-cart-download-btn">' . esc_html__( 'Télécharger PDF HD', 'wc-photo-clock-13' ) . '</a>';
+			}
+			$download_buttons .= '</div>';
+		}
+
+		$value_html = '<div class="wc-pc13-cart-summary">';
+		if ( ! empty( $options_list ) ) {
+			$value_html .= '<ul class="wc-pc13-cart-options-list" style="list-style: none; padding: 0; margin: 0;">';
+			$value_html .= implode( '', $options_list );
+			$value_html .= '</ul>';
+		}
+		if ( $download_buttons ) {
+			$value_html .= $download_buttons;
+		}
+		$value_html .= '</div>';
+
+		return $value_html;
 	}
 
 	/**

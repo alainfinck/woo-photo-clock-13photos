@@ -120,6 +120,27 @@ $default_show_slots = isset( $default_show_slots ) ? $default_show_slots : true;
 					<span class="wc-pc13-add-to-cart-text"><?php echo esc_html( $button_text ?? __( 'Ajouter au panier', 'wc-photo-clock-13' ) ); ?></span>
 					<span class="wc-pc13-add-to-cart-price" id="wc-pc13-add-to-cart-price">59€</span>
 				</button>
+				<!-- Actions secondaires : Partager, Sauvegarder, Images aléatoires et Recherche -->
+				<div class="wc-pc13-secondary-actions">
+					<button type="button" class="button button-secondary wc-pc13-share-btn">
+						<?php esc_html_e( 'Partager', 'wc-photo-clock-13' ); ?>
+					</button>
+					<button type="button" class="button button-secondary wc-pc13-save-email-btn">
+						<?php esc_html_e( 'Sauvegarder par email', 'wc-photo-clock-13' ); ?>
+					</button>
+					<button type="button" class="button wc-pc13-fill-unsplash">
+						<span class="wc-pc13-fill-unsplash-icon">🎲</span>
+						<?php esc_html_e( 'Charger des photos aléatoires', 'wc-photo-clock-13' ); ?>
+					</button>
+					<button type="button" class="button wc-pc13-search-unsplash-btn">
+						<span class="wc-pc13-search-icon">🔍</span>
+						<?php esc_html_e( 'Rechercher une photo', 'wc-photo-clock-13' ); ?>
+					</button>
+					<button type="button" class="button button-secondary wc-pc13-ar-btn">
+						<span class="wc-pc13-ar-icon">📱</span>
+						<?php esc_html_e( 'Voir dans mon intérieur (AR)', 'wc-photo-clock-13' ); ?>
+					</button>
+				</div>
 				<div class="wc-pc13-download-actions-primary">
 					<button type="button" class="button button-secondary wc-pc13-download-jpeg">
 						<?php esc_html_e( 'Télécharger JPEG', 'wc-photo-clock-13' ); ?>
@@ -128,27 +149,6 @@ $default_show_slots = isset( $default_show_slots ) ? $default_show_slots : true;
 						<?php esc_html_e( 'Télécharger en PDF HD', 'wc-photo-clock-13' ); ?>
 					</button>
 				</div>
-			</div>
-			<!-- Actions secondaires : Partager, Sauvegarder, Images aléatoires et Recherche -->
-			<div class="wc-pc13-secondary-actions">
-				<button type="button" class="button button-secondary wc-pc13-share-btn">
-					<?php esc_html_e( 'Partager', 'wc-photo-clock-13' ); ?>
-				</button>
-				<button type="button" class="button button-secondary wc-pc13-save-email-btn">
-					<?php esc_html_e( 'Sauvegarder par email', 'wc-photo-clock-13' ); ?>
-				</button>
-				<button type="button" class="button wc-pc13-fill-unsplash">
-					<span class="wc-pc13-fill-unsplash-icon">🎲</span>
-					<?php esc_html_e( 'Charger des photos aléatoires', 'wc-photo-clock-13' ); ?>
-				</button>
-				<button type="button" class="button wc-pc13-search-unsplash-btn">
-					<span class="wc-pc13-search-icon">🔍</span>
-					<?php esc_html_e( 'Rechercher une photo', 'wc-photo-clock-13' ); ?>
-				</button>
-				<button type="button" class="button button-secondary wc-pc13-ar-btn">
-					<span class="wc-pc13-ar-icon">📱</span>
-					<?php esc_html_e( 'Voir dans mon intérieur (AR)', 'wc-photo-clock-13' ); ?>
-				</button>
 			</div>
 			<div class="wc-pc13-email-modal" style="display: none;">
 				<div class="wc-pc13-email-modal-content">

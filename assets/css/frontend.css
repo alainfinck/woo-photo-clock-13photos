@@ -1383,6 +1383,7 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	gap: 0.75rem;
 	justify-content: center;
 	flex-wrap: wrap;
+	margin-top: 0.5rem;
 }
 
 .wc-pc13-download-actions-primary .button {
@@ -1404,6 +1405,7 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	display: flex;
 	gap: 0.5rem;
 	margin-top: 0.75rem;
+	margin-bottom: 1rem;
 	justify-content: center;
 	flex-wrap: wrap;
 	opacity: 0.85;
@@ -3104,6 +3106,7 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	width: 100%;
 	max-width: 100%;
 	box-sizing: border-box;
+	flex-direction: column;
 }
 
 .widget_shopping_cart .wc-pc13-cart-badges,
@@ -3111,6 +3114,8 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	gap: 3px;
 	justify-content: flex-start;
 	text-align: left;
+	flex-wrap: wrap;
+	margin-bottom: 4px;
 }
 
 .widget_shopping_cart .wc-pc13-cart-badge,
@@ -3119,6 +3124,7 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	font-size: 9px;
 	border-radius: 10px;
 	gap: 3px;
+	flex-shrink: 0;
 }
 
 .widget_shopping_cart .wc-pc13-cart-color-indicator,
@@ -3126,6 +3132,103 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	width: 10px;
 	height: 10px;
 	border-width: 1px;
+}
+
+.widget_shopping_cart .wc-pc13-cart-photos,
+.woocommerce-mini-cart .wc-pc13-cart-photos {
+	gap: 6px;
+	flex-wrap: wrap;
+	margin-top: 2px;
+}
+
+.widget_shopping_cart .wc-pc13-cart-photo-item,
+.woocommerce-mini-cart .wc-pc13-cart-photo-item {
+	font-size: 10px;
+	padding: 2px 6px;
+	gap: 3px;
+}
+
+.widget_shopping_cart .wc-pc13-cart-icon,
+.woocommerce-mini-cart .wc-pc13-cart-icon {
+	font-size: 11px;
+	line-height: 1;
+	flex-shrink: 0;
+}
+
+/* Améliorer les couleurs des badges dans le mini-panier */
+.widget_shopping_cart .wc-pc13-cart-badge-hands,
+.woocommerce-mini-cart .wc-pc13-cart-badge-hands {
+	background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%);
+}
+
+.widget_shopping_cart .wc-pc13-cart-badge-numbers,
+.woocommerce-mini-cart .wc-pc13-cart-badge-numbers {
+	background: linear-gradient(135deg, #f5a623 0%, #d68910 100%);
+}
+
+.widget_shopping_cart .wc-pc13-cart-badge-diameter,
+.woocommerce-mini-cart .wc-pc13-cart-badge-diameter {
+	background: linear-gradient(135deg, #27ae60 0%, #229954 100%);
+}
+
+/* Styles pour la mise en page compacte du mini-panier */
+.wc-pc13-cart-summary-compact {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	margin-top: 8px;
+	padding: 6px 0;
+	border-top: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.wc-pc13-cart-badges-compact {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+	align-items: center;
+}
+
+.wc-pc13-cart-badge-compact {
+	display: inline-flex;
+	align-items: center;
+	padding: 2px 6px;
+	font-size: 10px;
+	font-weight: 600;
+	color: #666;
+	background: #f0f0f0;
+	border-radius: 8px;
+	border: 1px solid #e0e0e0;
+	line-height: 1.2;
+	white-space: nowrap;
+}
+
+.wc-pc13-cart-price-compact {
+	display: flex;
+	justify-content: flex-end;
+	align-items: center;
+	margin-top: 2px;
+}
+
+.wc-pc13-cart-price-value {
+	font-size: 14px;
+	font-weight: 700;
+	color: #27ae60;
+	text-align: right;
+}
+
+/* Améliorer l'espacement dans le mini-panier */
+.widget_shopping_cart .woocommerce-mini-cart-item .wc-pc13-cart-summary,
+.woocommerce-mini-cart .woocommerce-mini-cart-item .wc-pc13-cart-summary {
+	margin-top: 6px;
+	padding: 8px 0;
+	border-top: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+/* S'assurer que le texte ne dépasse pas */
+.widget_shopping_cart .woocommerce-mini-cart-item .product-name,
+.woocommerce-mini-cart .woocommerce-mini-cart-item .product-name {
+	word-wrap: break-word;
+	hyphens: auto;
 }
 
 .widget_shopping_cart .wc-pc13-cart-download-buttons,
@@ -3380,12 +3483,13 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 
 /* Améliorer la mise en page du panier latéral */
 .widget_shopping_cart .cart_list li {
-	padding: 16px 0;
+	padding: 16px 40px 16px 0; /* Ajouter padding à droite pour la croix */
 	border-bottom: 1px solid #e8e8e8;
 	display: flex;
 	align-items: flex-start;
 	gap: 14px;
 	text-align: left;
+	position: relative; /* Pour le positionnement absolu de la croix */
 }
 
 .widget_shopping_cart .cart_list li > * {
@@ -3450,9 +3554,10 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	display: flex;
 	align-items: flex-start;
 	gap: 14px;
-	padding: 16px 0;
+	padding: 16px 40px 16px 0; /* Ajouter padding à droite pour la croix */
 	border-bottom: 1px solid #e8e8e8;
 	text-align: left;
+	position: relative; /* Pour le positionnement absolu de la croix */
 }
 
 .woocommerce-mini-cart-item > * {
@@ -3496,11 +3601,22 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	font-size: 13px;
 	color: #666;
 	margin-top: 4px;
+	margin-right: 40px; /* Laisser de la place pour la croix */
 }
 
 .woocommerce-mini-cart-item .amount {
 	font-weight: 600;
 	color: #333;
+	margin-right: 40px; /* Laisser de la place pour la croix */
+}
+
+/* Styles pour le widget shopping cart */
+.widget_shopping_cart .cart_list li .quantity,
+.widget_shopping_cart .cart_list li .amount {
+	font-size: 13px;
+	color: #666;
+	margin-top: 4px;
+	margin-right: 40px; /* Laisser de la place pour la croix */
 }
 
 .widget_shopping_cart .cart_list li .variation dd {
@@ -3531,11 +3647,70 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	margin-top: 8px;
 }
 
+/* Masquer la fonctionnalité AR (Réalité Augmentée) */
+.wc-pc13-ar-btn,
+.wc-pc13-ar-modal {
+	display: none !important;
+	visibility: hidden !important;
+	opacity: 0 !important;
+	position: absolute !important;
+	width: 0 !important;
+	height: 0 !important;
+	overflow: hidden !important;
+	pointer-events: none !important;
+}
+
 /* Styles pour le bouton de suppression dans le mini panier */
 .woocommerce-mini-cart-item a.remove.remove_from_cart_button {
-	left: 262px !important;
-	top: 2px !important;
-	width: 30px !important;
-	height: 30px !important;
+	position: absolute !important;
+	right: 8px !important;
+	top: 16px !important;
+	width: 24px !important;
+	height: 24px !important;
+	font-size: 16px !important;
+	line-height: 1 !important;
+	display: flex !important;
+	align-items: center !important;
+	justify-content: center !important;
+	border-radius: 50% !important;
+	background: rgba(255, 255, 255, 0.9) !important;
+	border: 1px solid #ddd !important;
+	color: #666 !important;
+	transition: all 0.2s ease !important;
+	z-index: 10 !important;
+}
+
+.woocommerce-mini-cart-item a.remove.remove_from_cart_button:hover {
+	background: #f5f5f5 !important;
+	color: #333 !important;
+	border-color: #bbb !important;
+	transform: scale(1.1) !important;
+}
+
+/* Styles pour le bouton de suppression dans le widget shopping cart */
+.widget_shopping_cart .cart_list li a.remove.remove_from_cart_button {
+	position: absolute !important;
+	right: 8px !important;
+	top: 16px !important;
+	width: 24px !important;
+	height: 24px !important;
+	font-size: 16px !important;
+	line-height: 1 !important;
+	display: flex !important;
+	align-items: center !important;
+	justify-content: center !important;
+	border-radius: 50% !important;
+	background: rgba(255, 255, 255, 0.9) !important;
+	border: 1px solid #ddd !important;
+	color: #666 !important;
+	transition: all 0.2s ease !important;
+	z-index: 10 !important;
+}
+
+.widget_shopping_cart .cart_list li a.remove.remove_from_cart_button:hover {
+	background: #f5f5f5 !important;
+	color: #333 !important;
+	border-color: #bbb !important;
+	transform: scale(1.1) !important;
 }
 

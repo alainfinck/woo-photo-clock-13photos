@@ -2313,53 +2313,28 @@ const CENTER_COVER_THRESHOLD = 3;
 	 */
 	function calculateOptimalZoomForCircle(imageWidth, imageHeight, circleSize, inset = DEFAULT_CENTER_INSET) {
 		if (!imageWidth || !imageHeight || !circleSize) {
-			return 1.2; // Valeur par défaut sécurisée
+			return 1.5; // Valeur par défaut plus élevée pour éviter les blancs
 		}
 
-		const imageAspectRatio = imageWidth / imageHeight;
 		const effectiveSize = circleSize - (2 * inset);
 
-		// Calculer le scale nécessaire pour que la dimension la plus petite remplisse le cercle
-		let optimalScale;
-		if (imageAspectRatio >= 1) {
-			// Image plus large ou carrée : à scale=1, height = effectiveSize/ratio
-			// Pour couvrir le cercle : height doit être >= effectiveSize
-			// Donc : scale >= ratio
-			optimalScale = imageAspectRatio;
-		} else {
-			// Image plus haute : à scale=1, width = effectiveSize*ratio
-			// Pour couvrir le cercle : width doit être >= effectiveSize
-			// Donc : scale >= 1/ratio
-			optimalScale = 1 / imageAspectRatio;
-		}
+		// Pour remplir complètement un cercle, il faut que l'image couvre la boîte englobante
+		// Calculer le ratio nécessaire pour que chaque dimension couvre au moins le diamètre du cercle
+		const widthRatio = effectiveSize / imageWidth;
+		const heightRatio = effectiveSize / imageHeight;
 
-		// Calculer aussi le scale basé sur la diagonale pour garantir le remplissage du cercle
-		let diagonalScale;
-		if (imageAspectRatio >= 1) {
-			// À scale=1 : largeur = effectiveSize, hauteur = effectiveSize/ratio
-			// Diagonale = effectiveSize * sqrt(1 + 1/ratio²)
-			// Pour que scale * diagonale >= effectiveSize :
-			// scale >= 1 / sqrt(1 + 1/ratio²)
-			diagonalScale = 1 / Math.sqrt(1 + 1 / (imageAspectRatio * imageAspectRatio));
-		} else {
-			// À scale=1 : hauteur = effectiveSize, largeur = effectiveSize*ratio
-			// Diagonale = effectiveSize * sqrt(ratio² + 1)
-			// Pour que scale * diagonale >= effectiveSize :
-			// scale >= 1 / sqrt(ratio² + 1)
-			diagonalScale = 1 / Math.sqrt(imageAspectRatio * imageAspectRatio + 1);
-		}
+		// Pour un cercle, la diagonale doit aussi être couverte
+		// La diagonale d'un carré de côté effectiveSize est effectiveSize * √2
+		const diagonalRatio = (effectiveSize * Math.sqrt(2)) / Math.sqrt(imageWidth * imageWidth + imageHeight * imageHeight);
 
-		// Prendre le maximum des deux calculs pour garantir le remplissage complet
-		optimalScale = Math.max(optimalScale, diagonalScale);
+		// Prendre le maximum des trois ratios pour garantir le remplissage complet
+		let optimalScale = Math.max(widthRatio, heightRatio, diagonalRatio);
 
-		// Ajouter une marge supplémentaire pour garantir qu'il n'y a absolument pas de blanc
-		// On multiplie par 1.1 pour avoir une marge de sécurité sans trop zoomer
+		// Ajouter une marge de sécurité de 10% pour éviter les bordures dues aux arrondis CSS
 		optimalScale = optimalScale * 1.1;
 
-		// S'assurer que le scale est au minimum 1.2 pour bien remplir
-		optimalScale = Math.max(optimalScale, 1.2);
-
-		return optimalScale;
+		// S'assurer qu'on zoome au minimum à 1.3 pour bien remplir
+		return Math.max(optimalScale, 1.3);
 	}
 
 	function applyUploadedImage(data, targetSlot = null) {
@@ -2500,13 +2475,19 @@ const CENTER_COVER_THRESHOLD = 3;
 			if (imageUrl) {
 				const img = new Image();
 				img.onload = function () {
-					const configurator = document.querySelector(selectors.configurator);
-					// Récupérer la taille actuelle du slot périphérique (ringSize)
-					const ringSize = state.ringSize || 80; // Taille par défaut si non définie
+					// Récupérer la taille effective du slot depuis le DOM
+					const slotElement = document.querySelector(`[data-slot="${slotKey}"] .wc-pc13-slot-inner`);
+					let slotSize = state.ringSize || 110; // Valeur par défaut
+
+					if (slotElement) {
+						// Utiliser la taille réelle du slot dans le DOM
+						const rect = slotElement.getBoundingClientRect();
+						slotSize = Math.min(rect.width, rect.height);
+					}
 
 					// Calculer le zoom optimal pour remplir le cercle périphérique
-					// Utiliser le même inset que pour le centre (DEFAULT_CENTER_INSET = 14px)
-					target.scale = calculateOptimalZoomForCircle(img.width, img.height, ringSize, DEFAULT_CENTER_INSET);
+					// Utiliser un inset réduit pour les slots périphériques (pas d'ombre)
+					target.scale = calculateOptimalZoomForCircle(img.width, img.height, slotSize, 2);
 					target.x = 0;
 					target.y = 0;
 
@@ -5435,7 +5416,19 @@ const CENTER_COVER_THRESHOLD = 3;
 					state.slots[i].image_url_display = image.url; // Utiliser la même URL haute résolution pour l'affichage
 					state.slots[i].x = 0;
 					state.slots[i].y = 0;
-					state.slots[i].scale = 1;
+
+					// Calculer le zoom optimal pour éviter les bordures blanches
+					const img = new Image();
+					img.onload = function() {
+						const slotSize = state.ringSize || 110;
+						state.slots[i].scale = calculateOptimalZoomForCircle(img.width, img.height, slotSize, 2);
+						applyTransforms();
+						updateSelectionUI();
+					};
+					img.src = image.url;
+
+					// Valeur par défaut en attendant le calcul
+					state.slots[i].scale = 1.5;
 				}
 			}
 
@@ -7023,7 +7016,7 @@ const CENTER_COVER_THRESHOLD = 3;
 			}
 		} // Closes initAR function
 
-		initAR();
+		// initAR(); // Désactivé pour masquer la fonctionnalité AR
 	}
 
 	$(init);
