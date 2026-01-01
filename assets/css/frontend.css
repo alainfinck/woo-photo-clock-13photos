@@ -2349,6 +2349,29 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	}
 }
 
+/* États du bouton PDF */
+.wc-pc13-download-pdf.wc-pc13-pdf-generating {
+	opacity: 0.7;
+	position: relative;
+}
+
+.wc-pc13-download-pdf.wc-pc13-pdf-ready {
+	background: linear-gradient(135deg, #28a745 0%, #20c997 100%) !important;
+	color: #fff !important;
+}
+
+.wc-pc13-download-pdf.wc-pc13-pdf-ready:hover {
+	background: linear-gradient(135deg, #218838 0%, #1aa085 100%) !important;
+}
+
+.wc-pc13-pdf-spinner {
+	display: none;
+}
+
+.wc-pc13-pdf-generating .wc-pc13-pdf-spinner {
+	display: inline-block;
+}
+
 .wc-pc13-add-to-cart-note {
 	margin: 0;
 	font-size: 14px;
@@ -2813,6 +2836,29 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	to {
 		transform: rotate(360deg);
 	}
+}
+
+/* États du bouton PDF */
+.wc-pc13-download-pdf.wc-pc13-pdf-generating {
+	opacity: 0.7;
+	position: relative;
+}
+
+.wc-pc13-download-pdf.wc-pc13-pdf-ready {
+	background: linear-gradient(135deg, #28a745 0%, #20c997 100%) !important;
+	color: #fff !important;
+}
+
+.wc-pc13-download-pdf.wc-pc13-pdf-ready:hover {
+	background: linear-gradient(135deg, #218838 0%, #1aa085 100%) !important;
+}
+
+.wc-pc13-pdf-spinner {
+	display: none;
+}
+
+.wc-pc13-pdf-generating .wc-pc13-pdf-spinner {
+	display: inline-block;
 }
 
 .wc-pc13-cart-notification {

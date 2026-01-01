@@ -145,8 +145,9 @@ $default_show_slots = isset( $default_show_slots ) ? $default_show_slots : true;
 					<button type="button" class="button button-secondary wc-pc13-download-jpeg">
 						<?php esc_html_e( 'Télécharger JPEG', 'wc-photo-clock-13' ); ?>
 					</button>
-					<button type="button" class="button button-secondary wc-pc13-download-pdf">
-						<?php esc_html_e( 'Télécharger en PDF HD', 'wc-photo-clock-13' ); ?>
+					<button type="button" class="button button-secondary wc-pc13-download-pdf wc-pc13-pdf-generating" disabled>
+						<span class="wc-pc13-pdf-text"><?php esc_html_e( 'Préparation PDF HD...', 'wc-photo-clock-13' ); ?></span>
+						<span class="wc-pc13-pdf-spinner" style="display: inline-block; width: 12px; height: 12px; border: 2px solid #ffffff; border-top-color: transparent; border-radius: 50%; animation: wc-pc13-spin 1s linear infinite; margin-left: 8px;"></span>
 					</button>
 				</div>
 			</div>

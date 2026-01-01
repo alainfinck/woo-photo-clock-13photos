@@ -1261,6 +1261,9 @@ const CENTER_COVER_THRESHOLD = 3;
 			pdfUrlInput.value = data.data.url || '';
 		}
 
+		// Mettre à jour l'interface pour indiquer que le PDF est prêt
+		updateCartFragments();
+
 		return data.data;
 	}
 
@@ -3666,15 +3669,10 @@ const CENTER_COVER_THRESHOLD = 3;
 					generateThumbnail(1, 0.75)
 				]);
 
-				// Étape 2: Génération du PDF HD (maintenant bloquant)
-				updateLoadingMessage(loadingOverlay, 'Génération du visuel HD...', 2, 3);
+				// Étape 2: Préparation du PDF HD (asynchrone)
+				updateLoadingMessage(loadingOverlay, 'Préparation du visuel HD...', 2, 3);
 				let pdfData = null;
-				try {
-					pdfData = await uploadPdfForCart();
-				} catch (pdfError) {
-					console.warn('Génération PDF échouée:', pdfError);
-					// Continuer sans PDF si échec
-				}
+				// Ne pas attendre la génération du PDF - elle sera faite en arrière-plan
 
 				// Étape 3: Ajout au panier
 				updateLoadingMessage(loadingOverlay, 'Ajout au panier...', 3, 3);
@@ -3743,6 +3741,17 @@ const CENTER_COVER_THRESHOLD = 3;
 
 				// Afficher la notification
 				showAddToCartNotification(notificationData);
+
+				// Générer le PDF HD en arrière-plan (non-bloquant)
+				setTimeout(() => {
+					uploadPdfForCart().then(pdfResult => {
+						console.log('PDF généré avec succès en arrière-plan:', pdfResult);
+						// Mettre à jour l'interface si nécessaire
+						updateCartFragments();
+					}).catch(pdfError => {
+						console.warn('Génération PDF en arrière-plan échouée:', pdfError);
+					});
+				}, 1000); // Délai d'1 seconde pour ne pas surcharger
 
 				// Réactiver le bouton
 				customBtn.disabled = false;
@@ -6149,6 +6158,14 @@ const CENTER_COVER_THRESHOLD = 3;
 
 		updateRingDimensions();
 
+		// Initialiser l'état du bouton PDF
+		const pdfBtn = configurator.querySelector(selectors.downloadPdf);
+		if (pdfBtn) {
+			// Commencer avec l'état "en cours de génération"
+			pdfBtn.classList.add('wc-pc13-pdf-generating');
+			pdfBtn.disabled = true;
+		}
+
 		initSlots();
 		addPlaceholders();
 		bindSlotClicks();
@@ -7017,6 +7034,37 @@ const CENTER_COVER_THRESHOLD = 3;
 		} // Closes initAR function
 
 		// initAR(); // Désactivé pour masquer la fonctionnalité AR
+	}
+
+	/**
+	 * Met à jour les fragments du panier après génération du PDF
+	 */
+	function updateCartFragments() {
+		const configurator = document.querySelector(selectors.configurator);
+		if (!configurator) return;
+
+		// Mettre à jour l'état du bouton PDF
+		const pdfBtn = configurator.querySelector(selectors.downloadPdf);
+		if (pdfBtn) {
+			pdfBtn.classList.remove('wc-pc13-pdf-generating');
+			pdfBtn.classList.add('wc-pc13-pdf-ready');
+			pdfBtn.disabled = false;
+
+			const pdfText = pdfBtn.querySelector('.wc-pc13-pdf-text');
+			if (pdfText) {
+				pdfText.textContent = WCPC13?.labels?.download_pdf || 'Télécharger en PDF HD';
+			}
+
+			const spinner = pdfBtn.querySelector('.wc-pc13-pdf-spinner');
+			if (spinner) {
+				spinner.style.display = 'none';
+			}
+		}
+
+		// Déclencher la mise à jour des fragments WooCommerce si jQuery est disponible
+		if (typeof jQuery !== 'undefined') {
+			jQuery(document.body).trigger('wc_fragment_refresh');
+		}
 	}
 
 	$(init);
