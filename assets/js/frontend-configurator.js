@@ -1417,7 +1417,7 @@ const CENTER_COVER_THRESHOLD = 3;
 		arError: '.wc-pc13-ar-error',
 	};
 
-	function updateRingDimensions() {
+	function updateRingDimensions(syncNumbers = false) {
 		const configurator = document.querySelector(selectors.configurator);
 		if (!configurator) {
 			return;
@@ -1469,13 +1469,20 @@ const CENTER_COVER_THRESHOLD = 3;
 			const maxDistance = Math.max(edgeDistance, 50); // Minimum 50px
 			numbersDistanceInput.max = `${Math.round(maxDistance)}`;
 
+			// Si on demande la synchronisation ou si c'est la première fois qu'on active les slots
+			if (syncNumbers && state.showSlots && state.showNumbers) {
+				state.numbers.distance = radius;
+			}
+
 			// S'assurer que la valeur actuelle ne dépasse pas le nouveau max
-			let currentValue = parseInt(numbersDistanceInput.value, 10) || state.numbers.distance || 0;
-			// Si la valeur est 0 (non définie), utiliser 90% du max par défaut
+			let currentValue = (typeof state.numbers.distance === 'number' && Number.isFinite(state.numbers.distance)) ? state.numbers.distance : 0;
+
+			// Si la valeur est 0 (non définie) et qu'on a des slots, on centre sur le radius
 			if (currentValue === 0 && maxDistance > 0) {
-				currentValue = Math.round(maxDistance * 0.9); // 90% du max par défaut
+				currentValue = state.showSlots ? radius : Math.round(maxDistance * 0.9);
 				state.numbers.distance = currentValue;
 			}
+
 			if (currentValue > maxDistance) {
 				currentValue = maxDistance;
 				state.numbers.distance = maxDistance;
@@ -2874,9 +2881,10 @@ const CENTER_COVER_THRESHOLD = 3;
 	function handleRingSizeChange(event) {
 		if (event && event.stopPropagation) event.stopPropagation();
 		state.ringSize = parseInt(event.target.value, 10);
+		// Forcer la synchronisation de la position des chiffres pour qu'ils restent centrés sur les photos
+		updateRingDimensions(true);
 		applyTransforms();
 		updateSelectionUI();
-		updateRingDimensions();
 		savePayload();
 	}
 
@@ -4537,7 +4545,7 @@ const CENTER_COVER_THRESHOLD = 3;
 				}
 				applyTransforms();
 				updateSelectionUI();
-				updateRingDimensions(); // Mettre à jour l'affichage du message d'aide
+				updateRingDimensions(true); // Synchroniser la position des chiffres
 				savePayload();
 			});
 		}
