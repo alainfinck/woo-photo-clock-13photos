@@ -138,7 +138,7 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	display: none !important;
 }
 
-.wc-pc13-configurator h3 {
+.wc-pc13-preview-column h3 {
 	margin: 0 0 32px 0;
 	text-align: center;
 	font-size: 28px;
@@ -151,9 +151,10 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	line-height: 1.2;
 	position: relative;
 	padding-bottom: 16px;
+	width: 100%;
 }
 
-.wc-pc13-configurator h3::after {
+.wc-pc13-preview-column h3::after {
 	content: '';
 	position: absolute;
 	bottom: 0;
@@ -161,6 +162,31 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	transform: translateX(-50%);
 	width: 80px;
 	height: 4px;
+	background: linear-gradient(90deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+	border-radius: 2px;
+}
+
+.wc-pc13-controls-column h3 {
+	text-align: center;
+	font-size: 22px;
+	font-weight: 700;
+	margin-bottom: 24px;
+	background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+	-webkit-background-clip: text;
+	-webkit-text-fill-color: transparent;
+	background-clip: text;
+	position: relative;
+	padding-bottom: 12px;
+}
+
+.wc-pc13-controls-column h3::after {
+	content: '';
+	position: absolute;
+	bottom: 0;
+	left: 50%;
+	transform: translateX(-50%);
+	width: 40px;
+	height: 3px;
 	background: linear-gradient(90deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
 	border-radius: 2px;
 }
@@ -1481,12 +1507,14 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 .wc-pc13-share-modal {
 	display: none;
 	position: fixed;
-	z-index: 10000;
+	z-index: 999999;
 	left: 0;
 	top: 0;
 	width: 100%;
 	height: 100%;
 	background-color: rgba(0, 0, 0, 0.6);
+	backdrop-filter: blur(5px);
+	-webkit-backdrop-filter: blur(5px);
 	align-items: center;
 	justify-content: center;
 	animation: fadeIn 0.3s ease;
@@ -1551,12 +1579,14 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 .wc-pc13-email-modal {
 	display: none;
 	position: fixed;
-	z-index: 10000;
+	z-index: 999999;
 	left: 0;
 	top: 0;
 	width: 100%;
 	height: 100%;
 	background-color: rgba(0, 0, 0, 0.6);
+	backdrop-filter: blur(5px);
+	-webkit-backdrop-filter: blur(5px);
 	align-items: center;
 	justify-content: center;
 	animation: fadeIn 0.3s ease;
@@ -1917,10 +1947,13 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	left: 0;
 	width: 100%;
 	height: 100%;
-	z-index: 10000;
-	display: flex;
+	z-index: 999999;
+	display: none;
 	align-items: center;
 	justify-content: center;
+	background: rgba(0, 0, 0, 0.75);
+	backdrop-filter: blur(5px);
+	-webkit-backdrop-filter: blur(5px);
 }
 
 .wc-pc13-unsplash-modal-overlay {
@@ -1929,8 +1962,7 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	left: 0;
 	width: 100%;
 	height: 100%;
-	background: rgba(0, 0, 0, 0.75);
-	backdrop-filter: blur(4px);
+	cursor: pointer;
 }
 
 .wc-pc13-unsplash-modal-content {
@@ -2506,12 +2538,14 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 .wc-pc13-help-modal {
 	display: none;
 	position: fixed;
-	z-index: 10000;
+	z-index: 999999;
 	left: 0;
 	top: 0;
 	width: 100%;
 	height: 100%;
 	background-color: rgba(0, 0, 0, 0.6);
+	backdrop-filter: blur(5px);
+	-webkit-backdrop-filter: blur(5px);
 	align-items: center;
 	justify-content: center;
 	animation: fadeIn 0.3s ease;

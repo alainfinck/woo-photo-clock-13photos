@@ -32,10 +32,9 @@ $mode = isset( $mode ) ? $mode : 'peripheral';
 $default_show_slots = isset( $default_show_slots ) ? $default_show_slots : true;
 ?>
 <div class="wc-pc13-configurator" data-product="<?php echo esc_attr( $product_id ); ?>" data-mode="<?php echo esc_attr( $mode ); ?>">
-	<h3><?php esc_html_e( 'Créez votre horloge photo personnalisée', 'wc-photo-clock-13' ); ?></h3>
-
 	<div class="wc-pc13-columns">
 		<div class="wc-pc13-preview-column">
+			<h3><?php esc_html_e( 'Créez votre horloge photo personnalisée', 'wc-photo-clock-13' ); ?></h3>
 			<div class="wc-pc13-preview" data-initial-slot-size="110">
 				<div class="wc-pc13-clock-face">
 					<div class="wc-pc13-ring">
@@ -291,6 +290,7 @@ $default_show_slots = isset( $default_show_slots ) ? $default_show_slots : true;
 		</div>
 
 		<div class="wc-pc13-controls-column">
+			<h3><?php esc_html_e( 'Options', 'wc-photo-clock-13' ); ?></h3>
 			<div class="wc-pc13-global-settings">
 				<div class="wc-pc13-total-price">
 					<span class="wc-pc13-total-price-label"><?php esc_html_e( 'Prix total', 'wc-photo-clock-13' ); ?></span>

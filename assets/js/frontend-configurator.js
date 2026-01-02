@@ -198,7 +198,7 @@ const CENTER_COVER_THRESHOLD = 3;
 			image_url: PLUGIN_URL && centerDemoName ? `${PLUGIN_URL}assets/demo/${centerDemoName}` : '',
 			x: 0,
 			y: 0,
-			scale: 1,
+			scale: 1.3,
 			size: 280,
 		},
 		slots: Array.from({ length: 12 }, (_, index) => {
@@ -208,7 +208,7 @@ const CENTER_COVER_THRESHOLD = 3;
 				image_url: PLUGIN_URL && name ? `${PLUGIN_URL}assets/demo/${name}` : '',
 				x: 0,
 				y: 0,
-				scale: 1,
+				scale: 1.3,
 			};
 		}),
 	};
@@ -230,7 +230,7 @@ const CENTER_COVER_THRESHOLD = 3;
 			image_url_display: '', // URL pour l'affichage (thumbnail)
 			x: 0,
 			y: 0,
-			scale: 1,
+			scale: 1.3,
 			size: 180,
 		},
 		ringSize: 110,
@@ -1549,7 +1549,7 @@ const CENTER_COVER_THRESHOLD = 3;
 				image_url_display: '', // URL thumbnail pour l'affichage (optimisation performance)
 				x: 0,
 				y: 0,
-				scale: 1,
+				scale: 1.3,
 			};
 		}
 	}
@@ -2470,7 +2470,7 @@ const CENTER_COVER_THRESHOLD = 3;
 				// Initialiser avec des valeurs par défaut, elles seront mises à jour dans onload
 				target.x = 0;
 				target.y = 0;
-				target.scale = 1;
+				target.scale = 1.3;
 
 				// Définir la taille du centre si nécessaire (avant de retourner)
 				const configurator = document.querySelector(selectors.configurator);
@@ -2502,7 +2502,7 @@ const CENTER_COVER_THRESHOLD = 3;
 				// Si pas d'URL, initialiser avec valeurs par défaut
 				target.x = 0;
 				target.y = 0;
-				target.scale = 1;
+				target.scale = 1.3;
 			}
 		} else {
 			// Slots périphériques : utiliser full_url pour l'affichage et le PDF (car le thumbnail peut ne pas exister)
@@ -2557,12 +2557,12 @@ const CENTER_COVER_THRESHOLD = 3;
 				// Initialiser avec des valeurs par défaut, elles seront mises à jour dans onload
 				target.x = 0;
 				target.y = 0;
-				target.scale = 1;
+				target.scale = 1.3;
 			} else {
 				// Si pas d'URL, initialiser avec valeurs par défaut
 				target.x = 0;
 				target.y = 0;
-				target.scale = 1;
+				target.scale = 1.3;
 			}
 
 			console.log('applyUploadedImage - Slot périphérique mis à jour:', slotKey, 'image_url:', target.image_url, 'image_url_display:', target.image_url_display, 'full_url:', data.full_url, 'url:', data.url);
@@ -2832,7 +2832,7 @@ const CENTER_COVER_THRESHOLD = 3;
 			current.image_url = '';
 			current.x = 0;
 			current.y = 0;
-			current.scale = 1;
+			current.scale = 1.3;
 			applyTransforms();
 			updateSelectionUI();
 			savePayload();
@@ -4430,11 +4430,11 @@ const CENTER_COVER_THRESHOLD = 3;
 		}
 
 		// Gestion de la modale email
-		const emailModal = configurator.querySelector(selectors.emailModal);
-		const emailModalClose = configurator.querySelector(selectors.emailModalClose);
-		const emailModalCancel = configurator.querySelector(selectors.emailModalCancel);
-		const emailModalSubmit = configurator.querySelector(selectors.emailModalSubmit);
-		const emailInput = configurator.querySelector(selectors.emailInput);
+		const emailModal = document.querySelector(selectors.emailModal);
+		const emailModalClose = emailModal ? emailModal.querySelector(selectors.emailModalClose) : null;
+		const emailModalCancel = emailModal ? emailModal.querySelector(selectors.emailModalCancel) : null;
+		const emailModalSubmit = emailModal ? emailModal.querySelector(selectors.emailModalSubmit) : null;
+		const emailInput = document.querySelector(selectors.emailInput);
 
 		if (emailModalClose) {
 			emailModalClose.addEventListener('click', () => {
@@ -4552,10 +4552,10 @@ const CENTER_COVER_THRESHOLD = 3;
 
 		// Gestion du modal d'aide
 		const helpBtn = configurator.querySelector(selectors.helpBtn);
-		const helpModal = configurator.querySelector(selectors.helpModal);
-		const helpModalClose = configurator.querySelector(selectors.helpModalClose);
-		const helpModalCancel = configurator.querySelector(selectors.helpModalCancel);
-		const helpForm = configurator.querySelector(selectors.helpForm);
+		const helpModal = document.querySelector(selectors.helpModal);
+		const helpModalClose = helpModal ? helpModal.querySelector(selectors.helpModalClose) : null;
+		const helpModalCancel = helpModal ? helpModal.querySelector(selectors.helpModalCancel) : null;
+		const helpForm = helpModal ? helpModal.querySelector(selectors.helpForm) : null;
 
 		if (helpBtn) {
 			helpBtn.addEventListener('click', () => {
@@ -4588,8 +4588,8 @@ const CENTER_COVER_THRESHOLD = 3;
 		}
 
 		// Gestion du modal de partage
-		const shareModal = configurator.querySelector(selectors.shareModal);
-		const shareModalClose = configurator.querySelector(selectors.shareModalClose);
+		const shareModal = document.querySelector(selectors.shareModal);
+		const shareModalClose = shareModal ? shareModal.querySelector(selectors.shareModalClose) : null;
 		if (shareModalClose) {
 			shareModalClose.addEventListener('click', () => {
 				closeShareModal();
@@ -5361,7 +5361,7 @@ const CENTER_COVER_THRESHOLD = 3;
 				state.slots[i].image_url_display = centerDemo.image_url;
 				state.slots[i].x = 0;
 				state.slots[i].y = 0;
-				state.slots[i].scale = 1;
+				state.slots[i].scale = 1.3;
 				filledCount++;
 			}
 
@@ -5860,6 +5860,21 @@ const CENTER_COVER_THRESHOLD = 3;
 			return;
 		}
 
+		// Déplacer les modals vers le body pour éviter les problèmes de z-index avec les thèmes
+		const modalsToMove = [
+			selectors.unsplashModal,
+			selectors.helpModal,
+			selectors.shareModal,
+			selectors.emailModal,
+			selectors.arModal
+		];
+		modalsToMove.forEach(selector => {
+			const modal = document.querySelector(selector);
+			if (modal && modal.parentElement !== document.body) {
+				document.body.appendChild(modal);
+			}
+		});
+
 		// Détecter le mode (peripheral ou central)
 		const mode = configurator.dataset.mode || 'peripheral';
 
@@ -6330,18 +6345,14 @@ const CENTER_COVER_THRESHOLD = 3;
 
 	async function openShareModal(shareBtn = null) {
 		const configurator = document.querySelector(selectors.configurator);
-		if (!configurator) {
-			return;
-		}
+		const shareModal = document.querySelector(selectors.shareModal);
+		const shareUrlInput = document.querySelector(selectors.shareUrlInput);
+		const productId = configurator ? configurator.dataset.product : null;
 
-		const productId = configurator.dataset.product;
 		if (!productId) {
 			window.alert('ID produit manquant');
 			return;
 		}
-
-		const shareModal = configurator.querySelector(selectors.shareModal);
-		const shareUrlInput = configurator.querySelector(selectors.shareUrlInput);
 
 		// Afficher le modal rapidement avec un état de chargement
 		if (shareModal) {
@@ -6469,23 +6480,15 @@ const CENTER_COVER_THRESHOLD = 3;
 	}
 
 	function closeShareModal() {
-		const configurator = document.querySelector(selectors.configurator);
-		if (!configurator) {
-			return;
-		}
-		const shareModal = configurator.querySelector(selectors.shareModal);
+		const shareModal = document.querySelector(selectors.shareModal);
 		if (shareModal) {
 			shareModal.style.display = 'none';
 		}
 	}
 
 	function openEmailModal(triggerBtn = null) {
-		const configurator = document.querySelector(selectors.configurator);
-		if (!configurator) {
-			return;
-		}
-		const emailModal = configurator.querySelector(selectors.emailModal);
-		const emailInput = configurator.querySelector(selectors.emailInput);
+		const emailModal = document.querySelector(selectors.emailModal);
+		const emailInput = document.querySelector(selectors.emailInput);
 		if (emailModal) {
 			emailModal.style.display = 'flex';
 			if (emailInput) {
@@ -6499,11 +6502,7 @@ const CENTER_COVER_THRESHOLD = 3;
 	}
 
 	function closeEmailModal() {
-		const configurator = document.querySelector(selectors.configurator);
-		if (!configurator) {
-			return;
-		}
-		const emailModal = configurator.querySelector(selectors.emailModal);
+		const emailModal = document.querySelector(selectors.emailModal);
 		const emailInput = configurator.querySelector(selectors.emailInput);
 		if (emailModal) {
 			emailModal.style.display = 'none';
@@ -6514,11 +6513,7 @@ const CENTER_COVER_THRESHOLD = 3;
 	}
 
 	function openHelpModal() {
-		const configurator = document.querySelector(selectors.configurator);
-		if (!configurator) {
-			return;
-		}
-		const helpModal = configurator.querySelector(selectors.helpModal);
+		const helpModal = document.querySelector(selectors.helpModal);
 		if (helpModal) {
 			helpModal.style.display = 'flex';
 			const emailInput = helpModal.querySelector('#wc-pc13-help-email');
@@ -6529,11 +6524,7 @@ const CENTER_COVER_THRESHOLD = 3;
 	}
 
 	function closeHelpModal() {
-		const configurator = document.querySelector(selectors.configurator);
-		if (!configurator) {
-			return;
-		}
-		const helpModal = configurator.querySelector(selectors.helpModal);
+		const helpModal = document.querySelector(selectors.helpModal);
 		const helpForm = configurator.querySelector(selectors.helpForm);
 		const helpMessage = configurator.querySelector(selectors.helpModalMessage);
 		if (helpModal) {
