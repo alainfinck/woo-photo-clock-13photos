@@ -2872,9 +2872,11 @@ const CENTER_COVER_THRESHOLD = 3;
 	}
 
 	function handleRingSizeChange(event) {
+		if (event && event.stopPropagation) event.stopPropagation();
 		state.ringSize = parseInt(event.target.value, 10);
 		applyTransforms();
 		updateSelectionUI();
+		updateRingDimensions();
 		savePayload();
 	}
 
@@ -2983,6 +2985,7 @@ const CENTER_COVER_THRESHOLD = 3;
 
 
 	function handleSlotBorderEnabledChange(event) {
+		if (event && event.stopPropagation) event.stopPropagation();
 		state.slotBorder.enabled = !!event.target.checked;
 		const configurator = document.querySelector(selectors.configurator);
 		if (configurator) {
@@ -2996,12 +2999,14 @@ const CENTER_COVER_THRESHOLD = 3;
 	}
 
 	function handleSlotBorderColorChange(event) {
+		if (event && event.stopPropagation) event.stopPropagation();
 		state.slotBorder.color = event.target.value || '#000000';
 		applyTransforms();
 		savePayload();
 	}
 
 	function handleSlotBorderWidthChange(event) {
+		if (event && event.stopPropagation) event.stopPropagation();
 		const value = parseInt(event.target.value, 10);
 		if (Number.isNaN(value)) {
 			return;
@@ -3012,6 +3017,7 @@ const CENTER_COVER_THRESHOLD = 3;
 	}
 
 	function handleSlotShadowEnabledChange(event) {
+		if (event && event.stopPropagation) event.stopPropagation();
 		state.slotShadow.enabled = !!event.target.checked;
 		applyTransforms();
 		savePayload();
@@ -4489,13 +4495,17 @@ const CENTER_COVER_THRESHOLD = 3;
 			const slotsToggleLabel = showSlotsToggle.closest('.wc-pc13-toggle');
 			if (slotsToggleLabel) {
 				slotsToggleLabel.addEventListener('click', function (e) {
-					// Si le clic est sur slots-fields ou ses enfants, empêcher
+					// Laisser passer les clics sur les éléments interactifs internes
+					if (e.target.closest('input, button, select, .wc-pc13-toggle, .wp-picker-container')) {
+						return;
+					}
+					// Si le clic est sur slots-fields ou ses enfants non-interactifs, empêcher le déclenchement du toggle parent
 					if (e.target.closest('.wc-pc13-slots-fields')) {
 						e.preventDefault();
 						e.stopPropagation();
 						return false;
 					}
-				}, true); // Utiliser capture phase pour intercepter avant le label
+				}, true); // Utiliser capture phase
 			}
 			showSlotsToggle.addEventListener('change', (e) => {
 				state.showSlots = !!e.target.checked;
