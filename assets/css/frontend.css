@@ -3665,12 +3665,26 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	color: #666;
 	margin-top: 4px;
 	margin-right: 40px; /* Laisser de la place pour la croix */
+	text-align: left;
+	justify-content: flex-start;
 }
 
 .woocommerce-mini-cart-item .amount {
 	font-weight: 600;
 	color: #333;
 	margin-right: 40px; /* Laisser de la place pour la croix */
+	text-align: left !important;
+	justify-content: flex-start !important;
+}
+
+/* Forcer l'alignement à gauche pour tous les éléments du mini-panier */
+.woocommerce-mini-cart-item .quantity,
+.woocommerce-mini-cart-item .amount,
+.widget_shopping_cart .cart_list li .quantity,
+.widget_shopping_cart .cart_list li .amount {
+	text-align: left !important;
+	justify-content: flex-start !important;
+	float: none !important;
 }
 
 /* Styles pour le widget shopping cart */
@@ -3680,6 +3694,8 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	color: #666;
 	margin-top: 4px;
 	margin-right: 40px; /* Laisser de la place pour la croix */
+	text-align: left;
+	justify-content: flex-start;
 }
 
 .widget_shopping_cart .cart_list li .variation dd {
