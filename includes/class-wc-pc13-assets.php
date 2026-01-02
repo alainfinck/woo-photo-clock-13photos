@@ -167,6 +167,7 @@ class WC_PC13_Assets {
 					'help_error' => __( 'Une erreur est survenue lors de l\'envoi.', 'wc-photo-clock-13' ),
 					'help_submit' => __( 'Envoyer', 'wc-photo-clock-13' ),
 					'sending' => __( 'Envoi en cours...', 'wc-photo-clock-13' ),
+					'download_pdf' => __( 'Télécharger en PDF HD', 'wc-photo-clock-13' ),
 				),
 				'settings' => array(
 					'max_upload_bytes' => $max_upload_bytes,

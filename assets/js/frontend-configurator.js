@@ -1232,6 +1232,24 @@ const CENTER_COVER_THRESHOLD = 3;
 			return null;
 		}
 
+		// Indiquer le début de la génération dans l'interface
+		const pdfBtn = configurator.querySelector(selectors.downloadPdf);
+		if (pdfBtn) {
+			pdfBtn.classList.remove('wc-pc13-pdf-ready');
+			pdfBtn.classList.add('wc-pc13-pdf-generating');
+			pdfBtn.disabled = true;
+
+			const pdfText = pdfBtn.querySelector('.wc-pc13-pdf-text');
+			if (pdfText) {
+				pdfText.textContent = 'Préparation PDF HD...';
+			}
+
+			const spinner = pdfBtn.querySelector('.wc-pc13-pdf-spinner');
+			if (spinner) {
+				spinner.style.display = 'inline-block';
+			}
+		}
+
 		const { blob, fileName } = await generatePdfBlob();
 
 		const formData = new FormData();
@@ -1268,7 +1286,18 @@ const CENTER_COVER_THRESHOLD = 3;
 	}
 
 	async function downloadAsPdf() {
+		const pdfBtn = document.querySelector(selectors.downloadPdf);
+		const spinner = pdfBtn?.querySelector('.wc-pc13-pdf-spinner');
+		const text = pdfBtn?.querySelector('.wc-pc13-pdf-text');
+		const originalText = text ? text.textContent : '';
+
 		try {
+			if (pdfBtn) {
+				pdfBtn.disabled = true;
+				if (spinner) spinner.style.display = 'inline-block';
+				if (text) text.textContent = 'Génération PDF...';
+			}
+
 			const { canvas, pdfWidthMm, pdfHeightMm } = await buildHighResPdfCanvas();
 			const jsPDF = await loadJsPDF();
 			const pdf = new jsPDF({
@@ -1281,7 +1310,14 @@ const CENTER_COVER_THRESHOLD = 3;
 			pdf.addImage(dataUrl, 'JPEG', 0, 0, pdfWidthMm, pdfHeightMm, undefined, 'FAST');
 			pdf.save(`horloge-personnalisee-${Date.now()}.pdf`);
 		} catch (error) {
+			console.error('Erreur PDF:', error);
 			window.alert(error.message || WCPC13.labels.download_error || 'Téléchargement impossible');
+		} finally {
+			if (pdfBtn) {
+				pdfBtn.disabled = false;
+				if (spinner) spinner.style.display = 'none';
+				if (text) text.textContent = originalText;
+			}
 		}
 	}
 
@@ -6165,13 +6201,14 @@ const CENTER_COVER_THRESHOLD = 3;
 
 		updateRingDimensions();
 
-		// Initialiser l'état du bouton PDF
-		const pdfBtn = configurator.querySelector(selectors.downloadPdf);
-		if (pdfBtn) {
-			// Commencer avec l'état "en cours de génération"
-			pdfBtn.classList.add('wc-pc13-pdf-generating');
-			pdfBtn.disabled = true;
-		}
+		// Initialisation de l'état du bouton PDF - Supprimée pour éviter le blocage
+		/*
+				const pdfBtn = configurator.querySelector(selectors.downloadPdf);
+				if (pdfBtn) {
+					pdfBtn.classList.add('wc-pc13-pdf-generating');
+					pdfBtn.disabled = true;
+				}
+		*/
 
 		initSlots();
 		addPlaceholders();
