@@ -3544,187 +3544,20 @@ form.cart .quantity:has(+ .wc-pc13-configurator) {
 	text-decoration: none;
 }
 
-/* Améliorer la mise en page du panier latéral */
-.widget_shopping_cart .cart_list li {
-	padding: 16px 40px 16px 0; /* Ajouter padding à droite pour la croix */
-	border-bottom: 1px solid #e8e8e8;
-	display: flex;
-	align-items: flex-start;
-	gap: 14px;
-	text-align: left;
-	position: relative; /* Pour le positionnement absolu de la croix */
-}
+/* Styles spécifiques uniquement pour les produits personnalisés dans le mini-cart */
+/* Ces styles ne s'appliquent que si le produit a des données wc-pc13 */
 
-.widget_shopping_cart .cart_list li > * {
-	text-align: left;
-}
+/* Garder seulement les styles essentiels pour les informations du produit personnalisé */
 
-.widget_shopping_cart .cart_list li:last-child {
-	border-bottom: none;
-}
+/* Styles pour les boutons de suppression dans le mini-cart - uniquement pour les produits personnalisés */
 
-.widget_shopping_cart .cart_list li .product-thumbnail {
-	margin-right: 0;
-	flex-shrink: 0;
-}
+/* Styles pour l'affichage des informations du produit personnalisé seulement */
 
-.widget_shopping_cart .cart_list li .product-name {
-	font-size: 14px;
-	line-height: 1.5;
-	flex: 1;
-	min-width: 0;
-	font-weight: 500;
-	color: #333;
-	text-align: left;
-	width: 100%;
-	max-width: 100%;
-	display: flex;
-	flex-direction: column;
-}
+/* Styles pour les informations du produit personnalisé dans le widget shopping cart */
 
-.widget_shopping_cart .cart_list li .variation {
-	margin-top: 8px;
-	font-size: 11px;
-	text-align: left;
-	width: 100%;
-	max-width: 100%;
-	display: block;
-}
+/* Suppression des styles qui modifient la mise en page générale du mini-cart */
 
-.woocommerce-mini-cart-item .variation {
-	width: 100%;
-	max-width: 100%;
-	display: block;
-}
-
-.widget_shopping_cart .cart_list li .variation dt {
-	font-weight: 500;
-	margin-bottom: 2px;
-	text-align: left;
-	width: 100%;
-	max-width: 100%;
-	display: block;
-}
-
-.woocommerce-mini-cart-item .variation dt {
-	width: 100%;
-	max-width: 100%;
-	display: block;
-}
-
-/* Améliorer le style du mini panier WooCommerce */
-.woocommerce-mini-cart-item {
-	display: flex;
-	align-items: flex-start;
-	gap: 14px;
-	padding: 16px 40px 16px 0; /* Ajouter padding à droite pour la croix */
-	border-bottom: 1px solid #e8e8e8;
-	text-align: left;
-	position: relative; /* Pour le positionnement absolu de la croix */
-}
-
-.woocommerce-mini-cart-item > * {
-	text-align: left;
-}
-
-.woocommerce-mini-cart-item:last-child {
-	border-bottom: none;
-}
-
-.woocommerce-mini-cart-item .product-thumbnail {
-	margin-right: 0;
-	flex-shrink: 0;
-}
-
-.woocommerce-mini-cart-item .product-name {
-	flex: 1;
-	min-width: 0;
-	font-size: 14px;
-	line-height: 1.5;
-	font-weight: 500;
-	color: #333;
-	text-align: left;
-	width: 100%;
-	max-width: 100%;
-	display: flex;
-	flex-direction: column;
-}
-
-.woocommerce-mini-cart-item .variation {
-	text-align: left;
-	margin-top: 8px;
-}
-
-.woocommerce-mini-cart-item .variation dt,
-.woocommerce-mini-cart-item .variation dd {
-	text-align: left;
-}
-
-.woocommerce-mini-cart-item .quantity {
-	font-size: 13px;
-	color: #666;
-	margin-top: 4px;
-	margin-right: 40px; /* Laisser de la place pour la croix */
-	text-align: left;
-	justify-content: flex-start;
-}
-
-.woocommerce-mini-cart-item .amount {
-	font-weight: 600;
-	color: #333;
-	margin-right: 40px; /* Laisser de la place pour la croix */
-	text-align: left !important;
-	justify-content: flex-start !important;
-}
-
-/* Forcer l'alignement à gauche pour tous les éléments du mini-panier */
-.woocommerce-mini-cart-item .quantity,
-.woocommerce-mini-cart-item .amount,
-.widget_shopping_cart .cart_list li .quantity,
-.widget_shopping_cart .cart_list li .amount {
-	text-align: left !important;
-	justify-content: flex-start !important;
-	float: none !important;
-}
-
-/* Styles pour le widget shopping cart */
-.widget_shopping_cart .cart_list li .quantity,
-.widget_shopping_cart .cart_list li .amount {
-	font-size: 13px;
-	color: #666;
-	margin-top: 4px;
-	margin-right: 40px; /* Laisser de la place pour la croix */
-	text-align: left;
-	justify-content: flex-start;
-}
-
-.widget_shopping_cart .cart_list li .variation dd {
-	margin-left: 0;
-	margin-bottom: 4px;
-	width: 100%;
-	max-width: 100%;
-}
-
-.woocommerce-mini-cart-item .variation dd {
-	width: 100%;
-	max-width: 100%;
-	margin-left: 0;
-}
-
-/* Styles pour le lien produit dans le mini-cart */
-.woocommerce-mini-cart-item .product-name a {
-	width: 286px;
-	color: rgba(255, 255, 255, 1);
-	display: block;
-}
-
-/* S'assurer que les éléments suivants sont positionnés sous le lien */
-.woocommerce-mini-cart-item .product-name > *:not(a) {
-	width: 100%;
-	max-width: 100%;
-	display: block;
-	margin-top: 8px;
-}
+/* Styles spécifiques pour les informations du produit personnalisé */
 
 /* Masquer la fonctionnalité AR (Réalité Augmentée) */
 .wc-pc13-ar-btn,
