@@ -36,9 +36,6 @@ $default_show_slots = isset( $default_show_slots ) ? $default_show_slots : true;
 
 	<div class="wc-pc13-columns">
 		<div class="wc-pc13-preview-column">
-			<small class="wc-pc13-silent-note" style="display: block; text-align: center; margin-bottom: 16px; font-size: 12px; color: #666; font-style: italic;">
-				🔇 <?php esc_html_e( 'Horloge silencieuse (pas de tic-tac) - Mouvement continu', 'wc-photo-clock-13' ); ?>
-			</small>
 			<div class="wc-pc13-preview" data-initial-slot-size="110">
 				<div class="wc-pc13-clock-face">
 					<div class="wc-pc13-ring">

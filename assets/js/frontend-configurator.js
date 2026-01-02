@@ -3750,6 +3750,8 @@ const CENTER_COVER_THRESHOLD = 3;
 						updateCartFragments();
 					}).catch(pdfError => {
 						console.warn('Génération PDF en arrière-plan échouée:', pdfError);
+						// Assurer que l'état du bouton PDF est remis à jour même en cas d'erreur
+						updateCartFragments();
 					});
 				}, 1000); // Délai d'1 seconde pour ne pas surcharger
 
@@ -3774,8 +3776,8 @@ const CENTER_COVER_THRESHOLD = 3;
 					// Déclencher aussi l'événement wc_fragment_refresh pour forcer la mise à jour
 					jQuery(document.body).trigger('wc_fragment_refresh');
 
-					// Réorganiser les éléments du mini-cart
-					setTimeout(reorganizeMiniCart, 100);
+					// Réorganiser les éléments du mini-cart - DESACTIVE par demande utilisateur
+					// setTimeout(reorganizeMiniCart, 100);
 				}
 
 				// Mettre à jour le compteur du panier si présent
@@ -3800,6 +3802,7 @@ const CENTER_COVER_THRESHOLD = 3;
 		});
 	}
 
+	/* Function désactivée par demande utilisateur car elle modifie le mini-cart de manière non souhaitée
 	function reorganizeMiniCart() {
 		// Trouver tous les éléments li du mini-cart
 		const miniCartItems = document.querySelectorAll('.woocommerce-mini-cart-item');
@@ -3814,31 +3817,35 @@ const CENTER_COVER_THRESHOLD = 3;
 					// Chercher le lien produit dans .product-name a ou directement dans le li
 					const productLink = item.querySelector('.product-name a') || item.querySelector('a');
 					if (productLink) {
-						// Insérer le span.quantity dans le lien à l'index 1 (après le premier enfant)
-						if (productLink.children.length > 0) {
-							// Insérer après le premier enfant pour qu'il soit à l'index 1
-							productLink.insertBefore(quantitySpan, productLink.children[1] || null);
-						} else {
-							// Si le lien n'a pas d'enfants, utiliser appendChild
-							productLink.appendChild(quantitySpan);
-						}
-					} else {
-						// Fallback: déplacer dans l'ul, juste après le li correspondant
-						const ul = item.closest('ul.woocommerce-mini-cart');
-						if (ul) {
-							ul.insertBefore(quantitySpan, item.nextSibling);
-						} else {
-							item.parentNode.insertBefore(quantitySpan, item.nextSibling);
+						// Vérifier si le span.quantity n'est pas déjà dans le bon endroit
+						const existingQuantity = productLink.querySelector('span.quantity');
+						if (!existingQuantity) {
+							// Créer une copie du span.quantity pour éviter les conflits de style
+							const quantityClone = quantitySpan.cloneNode(true);
+							quantityClone.className = 'quantity wc-pc13-quantity-clone';
+
+							// Insérer après le premier enfant textuel ou au début si pas d'enfants
+							const firstChild = productLink.firstChild;
+							if (firstChild && firstChild.nodeType === Node.TEXT_NODE) {
+								// Si le premier enfant est un nœud texte, insérer après
+								productLink.insertBefore(quantityClone, firstChild.nextSibling || null);
+							} else if (productLink.children.length > 0) {
+								// Insérer avant le premier élément enfant
+								productLink.insertBefore(quantityClone, productLink.children[0]);
+							} else {
+								// Sinon, ajouter à la fin
+								productLink.appendChild(quantityClone);
+							}
 						}
 					}
-					// Supprimer le div.ux-mini-cart-qty s'il est vide
-					if (qtyDiv.children.length === 0) {
-						qtyDiv.remove();
-					}
+					// Ne pas supprimer le div.ux-mini-cart-qty pour éviter de casser la structure
+					// Juste le masquer si nécessaire
+					qtyDiv.style.display = 'none';
 				}
 			}
 		});
 	}
+	*/
 
 	function bindControls() {
 		const configurator = document.querySelector(selectors.configurator);
@@ -5428,7 +5435,7 @@ const CENTER_COVER_THRESHOLD = 3;
 
 					// Calculer le zoom optimal pour éviter les bordures blanches
 					const img = new Image();
-					img.onload = function() {
+					img.onload = function () {
 						const slotSize = state.ringSize || 110;
 						state.slots[i].scale = calculateOptimalZoomForCircle(img.width, img.height, slotSize, 2);
 						applyTransforms();
@@ -6832,19 +6839,19 @@ const CENTER_COVER_THRESHOLD = 3;
 		// Appliquer les images
 		updatePreview();
 
-		// Réorganiser le mini-cart au chargement
-		setTimeout(reorganizeMiniCart, 500);
+		// Réorganiser le mini-cart au chargement - DESACTIVE
+		// setTimeout(reorganizeMiniCart, 500);
 
 		// Écouter les événements de mise à jour du panier
 		if (typeof jQuery !== 'undefined') {
 			jQuery(document.body).on('added_to_cart', function () {
-				setTimeout(reorganizeMiniCart, 100);
+				// setTimeout(reorganizeMiniCart, 100);
 			});
-			jQuery(document.body).on('wc_fragment_refresh', function () {
-				setTimeout(reorganizeMiniCart, 100);
+			jQuery(document.body).on('removed_from_cart', function () {
+				// setTimeout(reorganizeMiniCart, 100);
 			});
 			jQuery(document.body).on('updated_cart_totals', function () {
-				setTimeout(reorganizeMiniCart, 100);
+				// setTimeout(reorganizeMiniCart, 100);
 			});
 		}
 
@@ -7043,16 +7050,33 @@ const CENTER_COVER_THRESHOLD = 3;
 		const configurator = document.querySelector(selectors.configurator);
 		if (!configurator) return;
 
+		// Vérifier si un PDF a été généré
+		const pdfIdInput = configurator.querySelector(selectors.pdfIdInput);
+		const pdfUrlInput = configurator.querySelector(selectors.pdfUrlInput);
+		const hasPdf = (pdfIdInput && pdfIdInput.value) || (pdfUrlInput && pdfUrlInput.value);
+
 		// Mettre à jour l'état du bouton PDF
 		const pdfBtn = configurator.querySelector(selectors.downloadPdf);
 		if (pdfBtn) {
 			pdfBtn.classList.remove('wc-pc13-pdf-generating');
-			pdfBtn.classList.add('wc-pc13-pdf-ready');
-			pdfBtn.disabled = false;
 
-			const pdfText = pdfBtn.querySelector('.wc-pc13-pdf-text');
-			if (pdfText) {
-				pdfText.textContent = WCPC13?.labels?.download_pdf || 'Télécharger en PDF HD';
+			if (hasPdf) {
+				// PDF généré avec succès
+				pdfBtn.classList.add('wc-pc13-pdf-ready');
+				pdfBtn.disabled = false;
+
+				const pdfText = pdfBtn.querySelector('.wc-pc13-pdf-text');
+				if (pdfText) {
+					pdfText.textContent = WCPC13?.labels?.download_pdf || 'Télécharger en PDF HD';
+				}
+			} else {
+				// Aucun PDF généré - remettre en état d'attente ou d'erreur
+				pdfBtn.disabled = true;
+
+				const pdfText = pdfBtn.querySelector('.wc-pc13-pdf-text');
+				if (pdfText) {
+					pdfText.textContent = 'Erreur génération PDF';
+				}
 			}
 
 			const spinner = pdfBtn.querySelector('.wc-pc13-pdf-spinner');
